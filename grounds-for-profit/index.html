@@ -85,7 +85,9 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
 .calc-out dt{margin:0;color:var(--muted)} .calc-out dd{margin:0;font-weight:700;text-align:right}
 .calc-out .total{border-bottom:0;font-size:16px;align-items:center} .calc-out .total dd{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:26px;color:var(--copper)}
 .tier{background:#FBF3D6;border-radius:10px;padding:8px 10px;color:var(--ink)}
-.calc .btn.primary{display:block;text-align:center;margin-top:12px}
+.calc .btn.primary{display:block;width:100%;text-align:center;margin-top:12px;border:0;font:inherit;font-weight:700;font-size:17px;cursor:pointer}
+.calc .btn.primary:disabled{background:#B9B3A8;color:#F6F4EF;cursor:not-allowed}
+.min{margin-top:8px;text-align:center}
 @media (min-width:640px){.calc-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.sw-grid{grid-template-columns:repeat(6,minmax(0,1fr))}.pick img{width:100px;flex-basis:100px}}
 
 .two{display:grid;grid-template-columns:1fr;gap:14px}
@@ -216,7 +218,8 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
         </dl>
         <p class="note tier" id="o-tier"></p>
       </div>
-      <a class="btn primary" id="c-go" href="/quote/?service=cups">Request this order</a>
+      <button type="button" class="btn primary" id="c-go" disabled>Request this order</button>
+      <p class="note min" id="o-min" aria-live="polite"></p>
       <p class="note" style="margin-top:10px">Free proof before anything is made. Setup fee applies to your first order only.</p>
     </div>
   </section>
@@ -261,7 +264,7 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
     var $=function(id){return document.getElementById(id);};
     var size=$('c-size'), finish=$('c-finish'), lid=$('c-lid'), qty=$('c-qty'), img=$('o-img'), desc=$('o-desc'), lineNote=$('o-line'),
         add=$('c-add'), order=$('order'), list=$('o-lines'), go=$('c-go');
-    var lines=[];
+    var lines=[], MIN=50, goUrl='/quote/?service=cups';
     function money(n){return '$'+n.toLocaleString('en-US');}
     function slug(c){return c.toLowerCase().replace(/ /g,'-');}
     function color(){var c=document.querySelector('input[name="c-color"]:checked');return c?c.value:'Navy';}
@@ -273,6 +276,11 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
     function nextTierMsg(n){
       for(var i=TIERS.length-2;i>=0;i--){ if(n<TIERS[i][0]){ return 'Add '+(TIERS[i][0]-n)+' more cups to reach '+TIERS[i][0]+' and pay '+money(TIERS[i][1])+' base per cup instead of '+money(tierFor(n))+'.'; } }
       return 'You’re at the best price: '+money(12)+' base per cup.';
+    }
+    function gate(){
+      var n=lines.length?totalCups():current().qty, ok=n>=MIN, minEl=$('o-min');
+      go.disabled=!ok;
+      minEl.textContent=ok?'':(lines.length?'Orders start at '+MIN+' cups. Add '+(MIN-n)+' more to continue.':'Orders start at '+MIN+' cups. Set a quantity of '+MIN+' or more, or add lines until you reach '+MIN+'.');
     }
     function preview(){
       var l=current(), base=tierFor(totalCups(l.qty)), u=unitFor(l,base);
@@ -296,8 +304,9 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
         $('o-tier').textContent=(n<50?'Orders start at 50 cups. ':'')+nextTierMsg(n);
       }
       var enc=lines.map(function(l){return [l.size,l.finish,l.lid,l.color,l.qty].join('|');}).join(';');
-      go.href='/quote/?service=cups'+(lines.length?'&order='+encodeURIComponent(enc)+'&qty='+n+'&total='+(sum+SETUP):'');
+      goUrl='/quote/?service=cups'+(lines.length?'&order='+encodeURIComponent(enc)+'&qty='+n+'&total='+(sum+SETUP):'');
       preview();
+      gate();
     }
     add.addEventListener('click',function(){
       var l=current();
@@ -307,9 +316,9 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
       order.scrollIntoView({behavior:'smooth',block:'nearest'});
     });
     list.addEventListener('click',function(e){var b=e.target.closest('button[data-i]'); if(b){lines.splice(+b.getAttribute('data-i'),1);render();}});
-    go.addEventListener('click',function(){ if(!lines.length){ lines.push(current()); render(); } });
-    document.getElementById('calc').addEventListener('change',preview);
-    qty.addEventListener('input',preview);
+    go.addEventListener('click',function(){ if(!lines.length){ lines.push(current()); render(); } if(!go.disabled) location.href=goUrl; });
+    document.getElementById('calc').addEventListener('change',function(){preview();gate();});
+    qty.addEventListener('input',function(){preview();gate();});
     render();
   })();
 </script>

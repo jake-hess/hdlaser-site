@@ -9,6 +9,7 @@
 <style>
 :root{--bg:#F6F4EF;--ink:#15191E;--muted:#545B63;--red:#C8372A;--redd:#A32C21;--line:#E4E0D8;--field:#A9A196;--sel:#FBE9E6}
 *{box-sizing:border-box}
+[hidden]{display:none !important}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:Figtree,"Helvetica Neue",Helvetica,Arial,sans-serif}
 a{color:var(--redd)}
 :focus-visible{outline:3px solid var(--red);outline-offset:2px}
@@ -42,6 +43,14 @@ button[type=submit]{align-self:flex-start;background:var(--red);color:#fff;borde
 button[type=submit]:hover{background:var(--redd)}
 .note{font-size:14px;color:var(--muted);margin:0}
 .hp{position:absolute;left:-9999px}
+.summary{background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+.sum-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:8px}
+.sum-head h2{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:24px;margin:0}
+.sum-head a{font-weight:700;font-size:14px}
+.summary ul{list-style:none;margin:0;padding:0}
+.summary li{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);line-height:1.4}
+.summary li span:last-child{color:var(--muted);white-space:nowrap}
+.sum-total{margin:12px 0 4px;font-size:17px} .sum-total b{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:24px;color:var(--redd)}
 @media (max-width:900px){main{grid-template-columns:1fr}.side h1{font-size:32px}}
 @media (max-width:560px){.grid,.grid3{grid-template-columns:1fr}form,.side{padding:22px}header{padding:14px 18px}}
 </style>
@@ -65,8 +74,15 @@ button[type=submit]:hover{background:var(--redd)}
   <form action="https://formspree.io/f/xaenoorj" method="POST">
     <input type="hidden" name="_subject" value="New quote request from hdlaser.net">
     <input type="text" name="_gotcha" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <input type="hidden" name="Order" id="order-field">
+    <div class="summary" id="summary" hidden>
+      <div class="sum-head"><h2>Your order</h2><a href="/grounds-for-profit/#calc">Edit order</a></div>
+      <ul id="sum-lines"></ul>
+      <p class="sum-total">Estimated total <b id="sum-total"></b> <small>including one-time setup</small></p>
+      <p class="note">We&#8217;ll confirm the exact total on your proof. Just tell us how to reach you below.</p>
+    </div>
 
-    <fieldset>
+    <fieldset id="fs-for">
       <legend>Who is this for?</legend>
       <div class="opts">
         <label><input type="radio" name="For" value="My business" required><span>My business</span></label>
@@ -74,7 +90,7 @@ button[type=submit]:hover{background:var(--redd)}
       </div>
     </fieldset>
 
-    <fieldset>
+    <fieldset id="fs-service">
       <legend>What do you need?</legend>
       <div class="opts">
         <label><input type="radio" name="Service" value="Laser engraving" required><span>Laser engraving</span></label>
@@ -87,18 +103,18 @@ button[type=submit]:hover{background:var(--redd)}
       </div>
     </fieldset>
 
-    <fieldset>
+    <fieldset id="fs-details">
       <legend>The details</legend>
       <div class="grid">
-        <div class="f"><label for="material">Material or item</label>
+        <div class="f" id="f-material"><label for="material">Material or item</label>
           <select id="material" name="Material">
             <option value="">Choose one</option>
             <option>12 oz cup</option><option>16 oz cup</option><option>Tumbler or bottle</option>
             <option>Metal</option><option>Wood</option><option>Glass</option><option>Leather</option><option>Acrylic</option>
             <option>Other / not sure</option>
           </select></div>
-        <div class="f"><label for="qty">Quantity</label><input id="qty" name="Quantity" type="number" min="1" inputmode="numeric" placeholder="e.g. 50" required></div>
-        <div class="f"><label for="size">Size or dimensions <small>(optional)</small></label><input id="size" name="Dimensions" type="text" placeholder="e.g. 3 in &#215; 2 in"></div>
+        <div class="f" id="f-qty"><label for="qty">Quantity</label><input id="qty" name="Quantity" type="number" min="1" inputmode="numeric" placeholder="e.g. 50" required></div>
+        <div class="f" id="f-size"><label for="size">Size or dimensions <small>(optional)</small></label><input id="size" name="Dimensions" type="text" placeholder="e.g. 3 in &#215; 2 in"></div>
         <div class="f"><label for="date">Needed by <small>(optional)</small></label><input id="date" name="Needed by" type="date"></div>
       </div>
       <label class="check"><input type="checkbox" name="Rush order" value="Yes"><span><b>This is a rush order</b><br><small style="color:var(--muted)">A rush fee may apply</small></span></label>
@@ -132,17 +148,25 @@ button[type=submit]:hover{background:var(--redd)}
     var r = document.querySelector('input[value="Custom cups for my shop"]'); if (r) r.checked = true;
     var b = document.querySelector('input[value="My business"]'); if (b) b.checked = true;
   }
-  // Carry over an order built with the calculator on the Grounds for Profit page
+  // An order built with the calculator on the Grounds for Profit page: show it, skip the questions it already answered
   if (qs.get('order')) {
-    var lines = qs.get('order').split(';').map(function (s) { var f = s.split('|'); return { size: f[0], finish: f[1], lid: f[2], color: f[3], qty: f[4] }; });
-    var total = qs.get('total'), count = qs.get('qty');
+    var lines = qs.get('order').split(';').map(function (s) { var f = s.split('|'); return { size: f[0], finish: f[1], lid: f[2], color: f[3], qty: +f[4] || 0 }; });
+    var total = Number(qs.get('total')) || 0, count = lines.reduce(function (a, l) { return a + l.qty; }, 0);
+    var text = function (l) { return l.qty + ' x ' + l.size + ' oz ' + (l.finish === 'printed' ? 'UV printed' : 'laser engraved') + ', ' + l.color + ', ' + (l.lid === 'black' ? 'black' : 'matching') + ' lid'; };
+    var money = function (n) { return '$' + n.toLocaleString('en-US'); };
+    // visible summary
+    var ul = document.getElementById('sum-lines');
+    lines.forEach(function (l) { var li = document.createElement('li'); li.innerHTML = '<span>' + text(l).replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</span><span>' + l.qty + '</span>'; ul.appendChild(li); });
+    document.getElementById('sum-total').textContent = money(total);
+    document.getElementById('summary').hidden = false;
+    // values that still get emailed, without asking again
+    document.getElementById('order-field').value = lines.map(text).join('; ') + ' | ' + count + ' cups | est. ' + money(total) + ' incl. setup';
     var sizes = lines.map(function (l) { return l.size; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
-    var m = document.getElementById('material'); if (m) m.value = sizes.length === 1 ? sizes[0] + ' oz cup' : 'Other / not sure';
-    var n = document.getElementById('qty'); if (n && count) n.value = count;
-    var notes = document.getElementById('notes');
-    if (notes) notes.value = 'Order built with the Grounds for Profit calculator:\n' +
-      lines.map(function (l) { return '- ' + l.qty + ' x ' + l.size + ' oz ' + (l.finish === 'printed' ? 'UV printed' : 'laser engraved') + ', ' + l.color + ', ' + (l.lid === 'black' ? 'black' : 'matching') + ' lid'; }).join('\n') +
-      (total ? '\nEstimated total $' + Number(total).toLocaleString('en-US') + ' including setup.' : '') + '\n\n';
+    document.getElementById('material').value = sizes.length === 1 ? sizes[0] + ' oz cup' : 'Other / not sure';
+    document.getElementById('qty').value = count;
+    ['fs-for', 'fs-service', 'f-material', 'f-qty', 'f-size'].forEach(function (id) { document.getElementById(id).hidden = true; });
+    var dl = document.querySelector('#fs-details legend'); if (dl) dl.textContent = 'Anything else?';
+    var notes = document.getElementById('notes'); if (notes) notes.placeholder = 'Logo files, deadline, questions. Anything that helps us get it right.';
   }
 </script>
 </body>
