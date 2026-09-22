@@ -34,6 +34,9 @@ CREATE INDEX IF NOT EXISTS payments_created ON payments(created_at);
 CREATE TABLE IF NOT EXISTS refunds (refund_id TEXT PRIMARY KEY, payment_id TEXT, created_at TEXT, status TEXT, amount_cents INTEGER DEFAULT 0, reason TEXT);
 CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, name TEXT NOT NULL, session TEXT, ref TEXT, path TEXT);
 CREATE INDEX IF NOT EXISTS events_ts ON events(ts);
+CREATE TABLE IF NOT EXISTS square_items (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id TEXT NOT NULL, created_at TEXT, location_id TEXT, name TEXT, variation TEXT, qty REAL, gross_cents INTEGER DEFAULT 0, source TEXT);
+CREATE INDEX IF NOT EXISTS square_items_order ON square_items(order_id);
+CREATE INDEX IF NOT EXISTS square_items_created ON square_items(created_at);
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);`;
 
 let migrated = false;
@@ -68,7 +71,7 @@ export default {
         if (path === "/admin") return new Response(dashboardHtml(env), { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
         if (path === "/api/kpis") return json(await kpis(env, url.searchParams.get("from"), url.searchParams.get("to")), 200, { "Cache-Control": "no-store" });
         if (path === "/api/orders.csv") return ordersCsv(env);
-        if (path === "/api/sync" && request.method === "POST") return json(await syncSquare(env, 30), 200);
+        if (path === "/api/sync" && request.method === "POST") return json(await syncSquare(env, clamp(parseInt(url.searchParams.get("days") || "30", 10) || 30, 1, 1095)), 200);
         if (path === "/api/digest" && request.method === "POST") return json(await sendDigest(env), 200);
         const m = path.match(/^\/api\/orders\/(HD-[A-Z0-9]+)$/);
         if (m && request.method === "POST") return json(await updateOrder(env, m[1], await request.json()), 200);
@@ -227,31 +230,58 @@ async function squareWebhook(request, env) {
 async function syncSquare(env, days) {
   if (!env.DB || !env.SQUARE_ACCESS_TOKEN) return { ok: false, reason: "no db or token" };
   const begin = new Date(Date.now() - days * 86400000).toISOString();
-  let payments = 0, refunds = 0, cursor = "";
-  do {
-    const q = new URLSearchParams({ begin_time: begin, sort_order: "ASC", limit: "100" });
-    if (env.SQUARE_LOCATION_ID) q.set("location_id", env.SQUARE_LOCATION_ID);
-    if (cursor) q.set("cursor", cursor);
-    const res = await squareFetch(env, `/v2/payments?${q}`);
+  const errors = [];
+  let payments = 0, refunds = 0, orders = 0, items = 0;
+
+  // every location on the account (in-store, online, invoices)
+  let locations = [];
+  {
+    const res = await squareFetch(env, "/v2/locations");
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) { console.error("sync payments", res.status, JSON.stringify(data).slice(0, 400)); break; }
-    for (const p of data.payments || []) { await upsertPayment(env, p); payments++; }
-    cursor = data.cursor || "";
-  } while (cursor);
-  cursor = "";
-  do {
-    const q = new URLSearchParams({ begin_time: begin, sort_order: "ASC", limit: "100" });
-    if (env.SQUARE_LOCATION_ID) q.set("location_id", env.SQUARE_LOCATION_ID);
-    if (cursor) q.set("cursor", cursor);
-    const res = await squareFetch(env, `/v2/refunds?${q}`);
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) { console.error("sync refunds", res.status, JSON.stringify(data).slice(0, 400)); break; }
-    for (const r of data.refunds || []) { await upsertRefund(env, r); refunds++; }
-    cursor = data.cursor || "";
-  } while (cursor);
+    if (res.ok) locations = (data.locations || []).map((l) => l.id);
+    else errors.push("locations " + res.status + " " + squareErr(data));
+  }
+
+  const page = async (pathBase, key, handler) => {
+    let cursor = "";
+    do {
+      const q = new URLSearchParams({ begin_time: begin, sort_order: "ASC", limit: "100" });
+      if (cursor) q.set("cursor", cursor);
+      const res = await squareFetch(env, `${pathBase}?${q}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { errors.push(`${key} ${res.status} ${squareErr(data)}`); break; }
+      for (const row of data[key] || []) await handler(row);
+      cursor = data.cursor || "";
+    } while (cursor);
+  };
+  await page("/v2/payments", "payments", async (p) => { await upsertPayment(env, p); payments++; });
+  await page("/v2/refunds", "refunds", async (r) => { await upsertRefund(env, r); refunds++; });
+
+  // itemised orders (what was actually sold), for product KPIs across the whole business
+  if (locations.length) {
+    let cursor = "";
+    do {
+      const body = { location_ids: locations.slice(0, 10), limit: 500, query: { filter: { state_filter: { states: ["COMPLETED"] }, date_time_filter: { closed_at: { start_at: begin } } }, sort: { sort_field: "CLOSED_AT", sort_order: "ASC" } } };
+      if (cursor) body.cursor = cursor;
+      const res = await squareFetch(env, "/v2/orders/search", { method: "POST", body: JSON.stringify(body) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { errors.push("orders " + res.status + " " + squareErr(data)); break; }
+      for (const o of data.orders || []) {
+        const lines = o.line_items || [];
+        if (!lines.length) continue;
+        const stmts = [env.DB.prepare(`DELETE FROM square_items WHERE order_id = ?`).bind(o.id)];
+        for (const li of lines) stmts.push(env.DB.prepare(`INSERT INTO square_items (order_id, created_at, location_id, name, variation, qty, gross_cents, source) VALUES (?,?,?,?,?,?,?,?)`)
+          .bind(o.id, o.closed_at || o.created_at || null, o.location_id || null, (li.name || "Custom amount").slice(0, 120), (li.variation_name || "").slice(0, 120), parseFloat(li.quantity || "1") || 1, money(li.gross_sales_money) || money(li.total_money), (o.source && o.source.name) || null));
+        await env.DB.batch(stmts);
+        orders++; items += lines.length;
+      }
+      cursor = data.cursor || "";
+    } while (cursor);
+  }
   await env.DB.prepare(`INSERT OR REPLACE INTO meta (k, v) VALUES ('last_sync', ?)`).bind(new Date().toISOString()).run();
-  return { ok: true, payments, refunds, since: begin };
+  return { ok: errors.length === 0, payments, refunds, orders, items, locations: locations.length, since: begin, errors };
 }
+function squareErr(data) { return (data && data.errors && data.errors[0] && (data.errors[0].detail || data.errors[0].code)) || ""; }
 
 async function upsertPayment(env, p) {
   const amount = money(p.amount_money), fee = (p.processing_fee || []).reduce((a, f) => a + money(f.amount_money), 0), refunded = money(p.refunded_money);
@@ -308,6 +338,8 @@ async function kpis(env, from, to) {
   const fin = await q(`SELECT COUNT(*) n, COALESCE(SUM(amount_cents),0) gross, COALESCE(SUM(fee_cents),0) fees, COALESCE(SUM(refunded_cents),0) refunded, COALESCE(SUM(CASE WHEN ref IS NULL THEN amount_cents ELSE 0 END),0) other_gross FROM payments WHERE status = 'COMPLETED' AND created_at >= ? AND created_at < ?`, fromIso, toIso).first();
   const taxRate = parseFloat(env.TAX_RATE || "0.0775");
   const taxDue = await q(`SELECT COUNT(*) n, COALESCE(SUM(cups_subtotal_cents + setup_fee_cents),0) base FROM orders WHERE status = 'paid' AND resale_received_at IS NULL AND tax_invoiced_at IS NULL`).first();
+  const months = (await q(`SELECT substr(created_at,1,7) month, COUNT(*) payments, SUM(amount_cents) gross, SUM(fee_cents) fees, SUM(refunded_cents) refunded FROM payments WHERE status='COMPLETED' AND created_at >= ? AND created_at < ? GROUP BY month ORDER BY month DESC`, fromIso, toIso).all()).results;
+  const topItems = (await q(`SELECT name || CASE WHEN variation != '' THEN ' - ' || variation ELSE '' END k, SUM(qty) qty, SUM(gross_cents) revenue, COUNT(DISTINCT order_id) orders FROM square_items WHERE created_at >= ? AND created_at < ? GROUP BY k ORDER BY revenue DESC LIMIT 25`, fromIso, toIso).all()).results;
   const cards = (await q(`SELECT COALESCE(card_brand, source, 'other') k, COUNT(*) n, SUM(amount_cents) amount FROM payments WHERE status='COMPLETED' AND created_at >= ? AND created_at < ? GROUP BY k ORDER BY amount DESC`, fromIso, toIso).all()).results;
 
   const attention = {
@@ -327,7 +359,7 @@ async function kpis(env, from, to) {
     sales, prev, lifetime,
     product: { by_size: await mix("size"), by_finish: await mix("finish"), by_lid: await mix("lid"), by_color: await mix("color"), tiers },
     funnel,
-    financial: { gross_cents: fin.gross, fees_cents: fin.fees, refunded_cents: fin.refunded, net_cents: fin.gross - fin.fees - fin.refunded, payments: fin.n, other_square_gross_cents: fin.other_gross, web_gross_cents: fin.gross - fin.other_gross, tax_rate: taxRate, tax_exposure_orders: taxDue.n, tax_exposure_cents: Math.round(taxDue.base * taxRate), by_card: cards },
+    financial: { gross_cents: fin.gross, fees_cents: fin.fees, refunded_cents: fin.refunded, net_cents: fin.gross - fin.fees - fin.refunded, payments: fin.n, other_square_gross_cents: fin.other_gross, web_gross_cents: fin.gross - fin.other_gross, tax_rate: taxRate, tax_exposure_orders: taxDue.n, tax_exposure_cents: Math.round(taxDue.base * taxRate), by_card: cards, by_month: months, top_items: topItems },
     attention, recent,
     last_sync: lastSync ? lastSync.v : null,
   };
@@ -411,12 +443,13 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
 </style></head><body>
 <header><h1>HD Laser numbers</h1>
 <div class="ranges" id="ranges"><button data-d="7">7 days</button><button data-d="30" class="on">30 days</button><button data-d="90">90 days</button><button data-d="365">12 months</button><input type="date" id="from"><input type="date" id="to"><button id="go">Apply</button></div>
-<div><button class="act" id="sync">Sync Square now</button> <a class="act" href="/api/orders.csv" style="text-decoration:none;color:inherit">Download CSV</a> <button class="act" id="digest">Email digest</button></div></header>
+<div><button class="act" id="sync">Sync Square now</button> <button class="act" id="backfill">Import 2 years of history</button> <a class="act" href="/api/orders.csv" style="text-decoration:none;color:inherit">Download CSV</a> <button class="act" id="digest">Email digest</button></div></header>
 <main>
 <div id="err"></div>
 <p class="small" id="meta"></p>
 <h2>Sales, web cup orders</h2><div class="tiles" id="sales"></div>
 <h2>Financial, all Square payments</h2><div class="tiles" id="fin"></div>
+<div class="grid" id="fin2" style="margin-top:14px"></div>
 <h2>Funnel</h2><div class="tiles" id="funnel"></div>
 <h2>Product mix</h2><div class="grid" id="product"></div>
 <h2>Needs attention</h2><div class="grid" id="attention"></div>
@@ -441,6 +474,8 @@ async function load(){
   $('#sales').innerHTML=tile('Revenue',money(s.revenue_cents),delta(s.revenue_cents,p.revenue_cents))+tile('Orders',s.orders,delta(s.orders,p.orders))+tile('Cups sold',s.cups,delta(s.cups,p.cups))+tile('Avg order',money(s.aov_cents),delta(s.aov_cents,p.aov_cents))+tile('Cups per order',s.cups_per_order,'')+tile('Customers',s.customers,s.repeat_orders+' repeat orders')+tile('Setup fees',money(s.setup_fees_cents),'first orders');
   const f=k.financial;
   $('#fin').innerHTML=tile('Gross',money(f.gross_cents),f.payments+' payments')+tile('Square fees',money(f.fees_cents),f.gross_cents?(f.fees_cents/f.gross_cents*100).toFixed(1)+'% of gross':'')+tile('Refunds',money(f.refunded_cents),'')+tile('Net',money(f.net_cents),'after fees and refunds')+tile('Web orders',money(f.web_gross_cents),'')+tile('Other Square sales',money(f.other_square_gross_cents),'in-store, invoices')+tile('Tax exposure',money(f.tax_exposure_cents),f.tax_exposure_orders+' paid orders, no resale cert');
+  $('#fin2').innerHTML=(f.by_month.length?'<div class="card"><h3 style="margin:0 0 6px">By month</h3><table><tr><th>Month</th><th class="num">Payments</th><th class="num">Gross</th><th class="num">Fees</th><th class="num">Refunds</th><th class="num">Net</th></tr>'+f.by_month.map(m=>'<tr><td>'+m.month+'</td><td class="num">'+m.payments+'</td><td class="num">'+money(m.gross)+'</td><td class="num">'+money(m.fees)+'</td><td class="num">'+money(m.refunded)+'</td><td class="num"><b>'+money(m.gross-m.fees-m.refunded)+'</b></td></tr>').join('')+'</table></div>':'')
+    +(f.top_items.length?'<div class="card"><h3 style="margin:0 0 6px">Top items sold in Square</h3><table><tr><th>Item</th><th class="num">Qty</th><th class="num">Orders</th><th class="num">Revenue</th></tr>'+f.top_items.map(t=>'<tr><td>'+esc(t.k)+'</td><td class="num">'+(+t.qty).toLocaleString()+'</td><td class="num">'+t.orders+'</td><td class="num">'+money(t.revenue)+'</td></tr>').join('')+'</table></div>':'<div class="card"><h3 style="margin:0 0 6px">Top items sold in Square</h3><p class="empty">No itemised Square orders in range. Click "Import 2 years of history" to pull them in.</p></div>');
   const u=k.funnel;
   $('#funnel').innerHTML=tile('Calculator views',u.calc_view,'')+tile('Lines added',u.add_line,'')+tile('Checkout clicks',u.checkout_click,'')+tile('Details submitted',u.details_submitted,'')+tile('Paid',u.paid,'')+tile('Conversion',u.conversion_pct+'%','views to paid')+tile('Quote requests',u.quote_request,'non-cup form');
   $('#product').innerHTML=mixTable('By size',k.product.by_size,'Size')+mixTable('By finish',k.product.by_finish,'Finish')+mixTable('By lid',k.product.by_lid,'Lid')+mixTable('By color',k.product.by_color,'Color')+mixTable('By order size tier',k.product.tiers.map(t=>({k:t.tier,cups:t.cups,revenue:t.revenue})),'Tier');
@@ -458,7 +493,9 @@ document.addEventListener('click',async e=>{
   const rb=e.target.closest('#ranges button[data-d]'); if(rb){ document.querySelectorAll('#ranges button').forEach(x=>x.classList.remove('on')); rb.classList.add('on'); days=+rb.dataset.d; from=to=null; $('#from').value=''; $('#to').value=''; load(); }
 });
 $('#go').onclick=()=>{ from=$('#from').value?new Date($('#from').value).toISOString():null; to=$('#to').value?new Date(new Date($('#to').value).getTime()+864e5).toISOString():null; document.querySelectorAll('#ranges button').forEach(x=>x.classList.remove('on')); load(); };
-$('#sync').onclick=async()=>{ $('#sync').textContent='Syncing…'; const r=await fetch('/api/sync',{method:'POST'}); const j=await r.json(); $('#sync').textContent='Sync Square now'; alert(j.ok?('Synced '+j.payments+' payments, '+j.refunds+' refunds'):('Sync failed: '+(j.reason||j.error||r.status))); load(); };
+async function runSync(days,btn,label){ btn.disabled=true; btn.textContent='Working, this can take a minute…'; try{ const r=await fetch('/api/sync?days='+days,{method:'POST'}); const j=await r.json(); alert((j.ok?'Done. ':'Finished with problems. ')+'Payments '+(j.payments||0)+', refunds '+(j.refunds||0)+', itemised orders '+(j.orders||0)+' across '+(j.locations||0)+' location(s).'+(j.errors&&j.errors.length?'\\n\\nSquare said: '+j.errors.join(' | '):'')+(j.reason?'\\n'+j.reason:'')); }catch(e){ alert('Request failed: '+e.message); } btn.disabled=false; btn.textContent=label; load(); }
+$('#sync').onclick=()=>runSync(30,$('#sync'),'Sync Square now');
+$('#backfill').onclick=()=>{ if(confirm('Pull two years of Square payments, refunds and itemised orders? Safe to run more than once.')) runSync(730,$('#backfill'),'Import 2 years of history'); };
 $('#digest').onclick=async()=>{ if(!confirm('Email the weekly digest to '+${JSON.stringify(env.SUPPORT_EMAIL || "the support inbox")}+' now?')) return; const r=await fetch('/api/digest',{method:'POST'}); const j=await r.json(); alert(j.ok?'Sent.':'Not sent: '+(j.reason||j.status)); };
 load();
 </script></body></html>`;
