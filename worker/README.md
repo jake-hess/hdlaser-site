@@ -1,34 +1,61 @@
 # hdlaser-checkout worker
 
-Turns an order from hdlaser.net/grounds-for-profit into a Square hosted checkout page.
+One Cloudflare Worker that does four jobs for hdlaser.net:
 
-## One-time setup (Cloudflare dashboard, no command line needed)
+1. **Checkout**: turns a calculator order into a Square hosted checkout page (card details never touch the site).
+2. **Order ledger**: records every checkout, payment, refund, resale permit and funnel event in a D1 database.
+3. **Dashboard**: `/admin` shows sales, product and financial KPIs, needs-attention lists, status buttons, CSV export.
+4. **Automation**: hourly Square sync, Monday 8am PT email digest to contact@.
 
-1. dash.cloudflare.com → Workers & Pages → Create → Create Worker → name it `hdlaser-checkout` → Deploy.
-2. Click **Edit code**, delete the sample, paste the contents of `src/index.js`, click **Deploy**.
-3. Settings → Variables and Secrets → add:
-   - `SQUARE_ENV` = `sandbox` (change to `production` when going live)
-   - `SQUARE_LOCATION_ID` = the Location ID from the Square developer dashboard
-   - `SITE_URL` = `https://hdlaser.net`
-   - `ALLOWED_ORIGINS` = `https://hdlaser.net,https://www.hdlaser.net`
-   - `DEPOSIT_PERCENT` = `100` (or `50` for a half deposit)
-   - `SUPPORT_EMAIL` = `contact@hdlaser.net`
-   - `SQUARE_ACCESS_TOKEN` = the access token, saved as type **Secret**
-4. Copy the worker URL (looks like `https://hdlaser-checkout.<something>.workers.dev`).
-5. In the site repo, set `CHECKOUT_ENDPOINT` in `assets/site-config.js` to that URL plus `/checkout`.
+Files: `src/index.js` (paste into Cloudflare), `schema.sql` (reference only; the worker creates tables itself).
 
-## Going live
+## Setup in the Cloudflare dashboard
 
-Switch `SQUARE_ENV` to `production`, replace `SQUARE_LOCATION_ID` and `SQUARE_ACCESS_TOKEN` with the production values from Square, then Deploy.
+### A. The worker (done)
+Workers & Pages → Create → Create Worker → `hdlaser-checkout` → Deploy → Edit code → paste `src/index.js` → Deploy.
 
-## Test
+### B. Database
+1. Left menu **Storage & Databases → D1 SQL Database → Create** → name `hdlaser` → Create.
+2. Back on the worker: **Settings → Bindings → Add → D1 database**. Variable name `DB`, database `hdlaser`. Save/Deploy.
+   Tables are created automatically on the first request.
 
-`GET https://<worker>/health` should return `{"ok":true,"env":"sandbox"}`.
-Sandbox test card: 4111 1111 1111 1111, any future date, any CVV, any ZIP.
+### C. Variables and Secrets (worker → Settings)
 
-## Later: automation to-do (per Jake, Sept 2026)
+| Name | Value | Type |
+|---|---|---|
+| `SQUARE_ENV` | `production` (or `sandbox` for testing) | Text |
+| `SQUARE_LOCATION_ID` | Location ID from Square developer dashboard → Locations | Text |
+| `SQUARE_ACCESS_TOKEN` | Access token from Square developer dashboard → Credentials | **Secret** |
+| `SQUARE_WEBHOOK_SIGNATURE_KEY` | Signature key from the Square webhook subscription (step D) | **Secret** |
+| `ADMIN_KEY` | Password for `/admin`. Long and random. | **Secret** |
+| `SITE_URL` | `https://hdlaser.net` | Text |
+| `WORKER_URL` | `https://hdlaser-checkout.yellow-smoke-9c0e.workers.dev` | Text |
+| `ALLOWED_ORIGINS` | `https://hdlaser.net,https://www.hdlaser.net` | Text |
+| `DEPOSIT_PERCENT` | `100` (or `50` for half now, balance invoiced) | Text |
+| `SUPPORT_EMAIL` | `contact@hdlaser.net` | Text |
+| `FORMSPREE_ENDPOINT` | `https://formspree.io/f/xaenoorj` (delivers the weekly digest email) | Text |
+| `TAX_RATE` | `0.0775` (San Diego sales tax, used for the tax-exposure estimate) | Text |
 
-- Checkout prices every order as tax-exempt (resale). If a customer never sends a signed resale certificate,
-  send a Square invoice for the California sales tax on the non-exempt price. Track: ref, paid date,
-  permit number received (Formspree "Resale certificate info" email), signed certificate received.
+### D. Square webhook (real-time payment updates; the hourly sync covers everything anyway)
+1. developer.squareup.com → your app → **Webhooks → Subscriptions → Add subscription**.
+2. Name `hdlaser ledger`, URL `https://hdlaser-checkout.yellow-smoke-9c0e.workers.dev/webhooks/square`, API version latest.
+3. Events: `payment.created`, `payment.updated`, `payment.completed`, `refund.created`, `refund.updated`. Save.
+4. Open the subscription, copy **Signature key**, save it in Cloudflare as `SQUARE_WEBHOOK_SIGNATURE_KEY` (Secret).
+
+### E. Hourly schedule
+Worker → **Settings → Triggers → Cron Triggers → Add**: `0 * * * *` (every hour). The Monday 15:00 UTC run also sends the digest.
+
+## Using it
+- Dashboard: `https://hdlaser-checkout.yellow-smoke-9c0e.workers.dev/admin`. Any username, password = `ADMIN_KEY`.
+- Buttons per order: Logo received, Proof OK, Done, Resale cert, Tax invoiced. Each stamps a date.
+- "Sales tax to invoice" lists paid orders with no resale certificate and the tax amount on the order. Send the invoice from Square, then click Invoiced.
+- "Sync Square now" pulls the last 30 days of payments and refunds. "Email digest" sends the weekly summary immediately.
+- Health: `/health` returns `{"ok":true,"env":"production","db":true}` once the database is bound.
+
+## Sandbox test
+Sandbox test card: 4111 1111 1111 1111, any future date, any CVV, any ZIP. In sandbox, Square shows a testing panel instead of a card form.
+
+## Later
+- Auto-create the sales-tax invoice in Square from the "Tax to invoice" list (needs Customers + Invoices API; do after a few real orders).
 - Logo intake is by email/text today. Candidate upgrade: accept uploads in this worker and store in R2.
+- Move order emails off Formspree (50 submissions/month on the free plan) to a transactional email service.

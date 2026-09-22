@@ -110,12 +110,14 @@ button[type=submit]:hover{background:var(--redd)}
 
   <p class="btns"><a href="/" class="btn ghost">Back to home</a><a href="/#work" class="btn ghost">See more of our work</a></p>
 </main>
+<script src="/assets/site-config.js"></script>
 <script>
   var qs = new URLSearchParams(location.search), ref = (qs.get('ref') || '').replace(/[^A-Z0-9-]/gi, ''), h1 = document.getElementById('h1'), lead = document.getElementById('lead');
   if (qs.get('paid') === '1') {
     h1.textContent = 'You’re in. Order ' + ref + ' is confirmed.';
     lead.textContent = 'Payment received. Two quick things below and we’ll get your proof started. Your receipt from Square is on its way to your inbox.';
     document.getElementById('paid').hidden = false;
+    if (window.hdTrack) hdTrack('paid_return', ref);
   } else if (qs.get('pay') === 'later') {
     h1.textContent = 'Thanks. Order ' + ref + ' is in.';
     lead.textContent = 'We couldn’t open the payment page just now, so we’ll email you a secure payment link shortly. Your order details are saved.';
@@ -137,6 +139,9 @@ button[type=submit]:hover{background:var(--redd)}
     if (rf.dataset.native) return;
     e.preventDefault();
     var b = rf.querySelector('button[type=submit]'); b.disabled = true; b.textContent = 'Sending…';
+    if (ref && window.HD_CONFIG && window.HD_CONFIG.WORKER_BASE) {
+      fetch(window.HD_CONFIG.WORKER_BASE + '/resale', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ref: ref, permit: document.getElementById('r-permit').value, business: document.getElementById('r-biz').value }) }).catch(function () {});
+    }
     fetch(rf.action, { method: 'POST', body: new FormData(rf), headers: { 'Accept': 'application/json' } })
       .then(function (r) { if (!r.ok) throw 0; document.getElementById('resale-ok').hidden = false; b.textContent = 'Sent'; })
       .catch(function () { rf.dataset.native = '1'; rf.submit(); });

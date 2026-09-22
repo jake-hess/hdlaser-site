@@ -318,11 +318,13 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
       var l=current();
       for(var i=0;i<lines.length;i++){var m=lines[i]; if(m.size===l.size&&m.finish===l.finish&&m.lid===l.lid&&m.color===l.color){m.qty+=l.qty;l=null;break;}}
       if(l) lines.push(l);
+      if(window.hdTrack) hdTrack('add_line');
       render();
       order.scrollIntoView({behavior:'smooth',block:'nearest'});
     });
     list.addEventListener('click',function(e){var b=e.target.closest('button[data-i]'); if(b){lines.splice(+b.getAttribute('data-i'),1);render();}});
-    go.addEventListener('click',function(){ if(!lines.length){ lines.push(current()); render(); } if(!go.disabled) location.href=goUrl; });
+    go.addEventListener('click',function(){ if(!lines.length){ lines.push(current()); render(); } if(!go.disabled){ if(window.hdTrack) hdTrack('checkout_click'); location.href=goUrl; } });
+    if(window.hdTrack){ var seen=false; var io=new IntersectionObserver(function(en){ if(!seen&&en[0].isIntersecting){ seen=true; hdTrack('calc_view'); io.disconnect(); } }); io.observe(document.getElementById('calc')); }
     document.getElementById('calc').addEventListener('change',function(){preview();gate();});
     qty.addEventListener('input',function(){preview();gate();});
     render();
