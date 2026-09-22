@@ -1,3 +1,5 @@
 User-agent: *
-Disallow: /grounds-for-profit/
+Allow: /
 Disallow: /thanks/
+
+Sitemap: https://hdlaser.net/sitemap.xml
