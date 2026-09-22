@@ -299,7 +299,7 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
       lines.forEach(function(l,i){
         var u=unitFor(l,base); sum+=u*l.qty;
         var li=document.createElement('li');
-        li.innerHTML='<img src="/assets/cup-'+slug(l.color)+'.jpg" alt=""><div class="d">'+label(l)+'<small>'+money(u)+' each</small></div><span class="lp">'+money(u*l.qty)+'</span><button type="button" aria-label="Remove line" data-i="'+i+'">×</button>';
+        li.innerHTML='<img src="/assets/cup-'+slug(l.color)+'.jpg?v=2" alt=""><div class="d">'+label(l)+'<small>'+money(u)+' each</small></div><span class="lp">'+money(u*l.qty)+'</span><button type="button" aria-label="Remove line" data-i="'+i+'">×</button>';
         list.appendChild(li);
       });
       order.hidden=lines.length===0;
