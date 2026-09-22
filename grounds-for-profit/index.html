@@ -51,28 +51,43 @@ td.p{font-weight:700} td.m{font-weight:700;color:var(--copper)}
 table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap}
 .note{font-size:13px;line-height:1.45;color:var(--muted);margin-top:8px}
 .calc{margin-top:14px}
+.calc-intro{font-size:14px;line-height:1.45;color:var(--muted);margin:0 0 12px}
 .calc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .calc label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:700;color:var(--muted)}
-.calc select{font:inherit;font-size:16px;font-weight:500;color:var(--ink);background:#FFF;border:1px solid var(--line);border-radius:10px;padding:10px 8px;width:100%}
+.calc select,.calc input[type=number]{font:inherit;font-size:16px;font-weight:500;color:var(--ink);background:#FFF;border:1px solid var(--line);border-radius:10px;padding:10px 8px;width:100%;box-sizing:border-box}
 .colors{border:0;padding:0;margin:14px 0 0}
 .colors legend{font-size:13px;font-weight:700;color:var(--muted);padding:0;margin-bottom:6px}
 .sw-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .sw{position:relative;cursor:pointer;gap:0}
 .sw input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
-.sw img{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;object-position:50% 42%;border-radius:10px;border:2px solid var(--line);transition:border-color .15s}
+.sw img{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;object-position:50% 45%;border-radius:10px;border:2px solid var(--line);transition:border-color .15s}
 .sw span{display:block;font-size:11px;font-weight:600;color:var(--ink);text-align:center;margin-top:4px;line-height:1.2}
 .sw input:checked + img{border-color:var(--copper);box-shadow:0 0 0 2px var(--copper)}
 .sw input:focus-visible + img{outline:3px solid var(--copper);outline-offset:2px}
-.pick{display:flex;gap:14px;align-items:flex-start;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
-.pick img{width:96px;flex:0 0 96px;aspect-ratio:244/344;object-fit:cover;border-radius:12px}
-.pick-txt{flex:1;min-width:0}
-.pick-txt b{display:block;font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:17px;line-height:1.25;margin-bottom:6px}
+.pick{display:flex;gap:14px;align-items:center;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.pick img{width:84px;flex:0 0 84px;aspect-ratio:244/350;object-fit:cover;border-radius:12px}
+.pick-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.pick-txt b{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:17px;line-height:1.25}
+.pick-txt .note{margin:0}
+.btn.add{background:var(--ink);color:#FFF;padding:10px 16px;font-size:15px;align-self:flex-start}
+.order{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.order h4{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:17px;margin:0 0 8px}
+.order ul{list-style:none;margin:0 0 10px;padding:0}
+.order li{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #EDE8DF;font-size:14px}
+.order li img{width:36px;height:48px;object-fit:cover;border-radius:6px;flex:0 0 36px}
+.order li .d{flex:1;min-width:0;line-height:1.3}
+.order li .d small{display:block;color:var(--muted)}
+.order li .lp{font-weight:700;white-space:nowrap}
+.order li button{background:none;border:0;color:var(--muted);font-size:20px;line-height:1;padding:4px 6px;cursor:pointer}
+.order li button:hover{color:var(--copper)}
 .calc-out{margin:0;padding:0}
 .calc-out div{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid #EDE8DF;font-size:14px}
 .calc-out dt{margin:0;color:var(--muted)} .calc-out dd{margin:0;font-weight:700;text-align:right}
 .calc-out .total{border-bottom:0;font-size:16px;align-items:center} .calc-out .total dd{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:26px;color:var(--copper)}
-.calc .btn{display:block;text-align:center;margin-top:12px}
-@media (min-width:640px){.calc-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.sw-grid{grid-template-columns:repeat(6,minmax(0,1fr))}.pick img{width:120px;flex-basis:120px}}
+.tier{background:#FBF3D6;border-radius:10px;padding:8px 10px;color:var(--ink)}
+.calc .btn.primary{display:block;text-align:center;margin-top:12px}
+@media (min-width:640px){.calc-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.sw-grid{grid-template-columns:repeat(6,minmax(0,1fr))}.pick img{width:100px;flex-basis:100px}}
+
 .two{display:grid;grid-template-columns:1fr;gap:14px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
 .card h3{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:20px;margin:0 0 8px}
@@ -159,11 +174,12 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
     <p class="note">Order more, pay less: every cup drops $1 at each step up. Plus a one-time $50 setup on your first order. Reorders use the same artwork, no setup fee.</p>
     <div class="card calc" id="calc">
       <h3>Build your order</h3>
+      <p class="calc-intro">Mix sizes, finishes, lids and colors however you like. Your per-cup price is set by the total number of cups in the order.</p>
       <div class="calc-grid">
         <label>Size<select id="c-size"><option value="12">12 oz</option><option value="16">16 oz</option></select></label>
         <label>Finish<select id="c-finish"><option value="engraved">Laser engraved</option><option value="printed">UV printed</option></select></label>
         <label>Lid<select id="c-lid"><option value="matching">Matching color</option><option value="black">Black</option></select></label>
-        <label>Quantity<select id="c-qty"><option value="50">50 cups</option><option value="100" selected>100 cups</option><option value="150">150 cups</option><option value="200">200 cups</option></select></label>
+        <label>Quantity<input id="c-qty" type="number" inputmode="numeric" min="1" step="1" value="50"></label>
       </div>
       <fieldset class="colors">
         <legend>Color <span style="font-weight:500">(every color comes with a matching lid or a black lid)</span></legend>
@@ -186,13 +202,19 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
         <img id="o-img" src="/assets/cup-navy.jpg" alt="Navy cup">
         <div class="pick-txt">
           <b id="o-desc"></b>
-          <dl class="calc-out">
-            <div><dt>Per cup</dt><dd id="o-unit"></dd></div>
-            <div><dt>Cups</dt><dd id="o-cups"></dd></div>
-            <div><dt>One-time setup</dt><dd>$50</dd></div>
-            <div class="total"><dt>Total</dt><dd id="o-total"></dd></div>
-          </dl>
+          <span class="note" id="o-line"></span>
+          <button type="button" class="btn add" id="c-add">Add to order</button>
         </div>
+      </div>
+      <div class="order" id="order" hidden>
+        <h4>Your order</h4>
+        <ul id="o-lines"></ul>
+        <dl class="calc-out">
+          <div><dt>Total cups</dt><dd id="o-count"></dd></div>
+          <div><dt>One-time setup</dt><dd>$50</dd></div>
+          <div class="total"><dt>Total</dt><dd id="o-total"></dd></div>
+        </dl>
+        <p class="note tier" id="o-tier"></p>
       </div>
       <a class="btn primary" id="c-go" href="/quote/?service=cups">Request this order</a>
       <p class="note" style="margin-top:10px">Free proof before anything is made. Setup fee applies to your first order only.</p>
@@ -233,25 +255,62 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
   <p class="foot">Figures are based on Boards n&rsquo; Beans&rsquo; prices, sales, and customer habits. Results vary by shop.</p>
 </div>
 <script>
-  // Cup pricing by order size. 12 oz engraved is the base; printed and 16 oz add $2 each.
+  // Cup pricing. The tier is set by total cups in the order; printed finish and 16 oz each add $2.
   (function(){
-    var base={50:15,100:14,150:13,200:12}, setup=50;
-    var size=document.getElementById('c-size'), finish=document.getElementById('c-finish'), qty=document.getElementById('c-qty'), lid=document.getElementById('c-lid'),
-        go=document.getElementById('c-go'), img=document.getElementById('o-img'), desc=document.getElementById('o-desc');
+    var TIERS=[[200,12],[150,13],[100,14],[0,15]], SETUP=50;
+    var $=function(id){return document.getElementById(id);};
+    var size=$('c-size'), finish=$('c-finish'), lid=$('c-lid'), qty=$('c-qty'), img=$('o-img'), desc=$('o-desc'), lineNote=$('o-line'),
+        add=$('c-add'), order=$('order'), list=$('o-lines'), go=$('c-go');
+    var lines=[];
     function money(n){return '$'+n.toLocaleString('en-US');}
-    function color(){var c=document.querySelector('input[name="c-color"]:checked');return c?c.value:'';}
-    function update(){
-      var q=+qty.value, unit=base[q]+(size.value==='16'?2:0)+(finish.value==='printed'?2:0);
-      var cups=unit*q, total=cups+setup, c=color(), fin=finish.value==='printed'?'UV printed':'laser engraved';
-      img.src='/assets/cup-'+c.toLowerCase().replace(/ /g,'-')+'.jpg'; img.alt=c+' cup';
-      desc.textContent=q+' \u00d7 '+size.value+' oz '+fin+' in '+c+(lid.value==='black'?', black lid':', matching lid');
-      document.getElementById('o-unit').textContent=money(unit);
-      document.getElementById('o-cups').textContent=q+' \u00d7 '+money(unit)+' = '+money(cups);
-      document.getElementById('o-total').textContent=money(total);
-      go.href='/quote/?service=cups&size='+size.value+'&finish='+finish.value+'&color='+encodeURIComponent(c)+'&lid='+lid.value+'&qty='+q+'&total='+total;
+    function slug(c){return c.toLowerCase().replace(/ /g,'-');}
+    function color(){var c=document.querySelector('input[name="c-color"]:checked');return c?c.value:'Navy';}
+    function tierFor(n){for(var i=0;i<TIERS.length;i++){if(n>=TIERS[i][0])return TIERS[i][1];}return 15;}
+    function unitFor(l,base){return base+(l.size==='16'?2:0)+(l.finish==='printed'?2:0);}
+    function label(l){return l.qty+' × '+l.size+' oz '+(l.finish==='printed'?'UV printed':'laser engraved')+' in '+l.color+', '+(l.lid==='black'?'black':'matching')+' lid';}
+    function current(){return {size:size.value,finish:finish.value,lid:lid.value,color:color(),qty:Math.max(1,parseInt(qty.value,10)||0)};}
+    function totalCups(extra){return lines.reduce(function(a,l){return a+l.qty;},0)+(extra||0);}
+    function nextTierMsg(n){
+      for(var i=TIERS.length-2;i>=0;i--){ if(n<TIERS[i][0]){ return 'Add '+(TIERS[i][0]-n)+' more cups to reach '+TIERS[i][0]+' and pay '+money(TIERS[i][1])+' base per cup instead of '+money(tierFor(n))+'.'; } }
+      return 'You’re at the best price: '+money(12)+' base per cup.';
     }
-    document.getElementById('calc').addEventListener('change',update);
-    update();
+    function preview(){
+      var l=current(), base=tierFor(totalCups(l.qty)), u=unitFor(l,base);
+      img.src='/assets/cup-'+slug(l.color)+'.jpg'; img.alt=l.color+' cup';
+      desc.textContent=label(l);
+      lineNote.textContent=money(u)+' per cup at your order size · '+money(u*l.qty)+' for this line';
+    }
+    function render(){
+      var n=totalCups(), base=tierFor(n), sum=0;
+      list.innerHTML='';
+      lines.forEach(function(l,i){
+        var u=unitFor(l,base); sum+=u*l.qty;
+        var li=document.createElement('li');
+        li.innerHTML='<img src="/assets/cup-'+slug(l.color)+'.jpg" alt=""><div class="d">'+label(l)+'<small>'+money(u)+' each</small></div><span class="lp">'+money(u*l.qty)+'</span><button type="button" aria-label="Remove line" data-i="'+i+'">×</button>';
+        list.appendChild(li);
+      });
+      order.hidden=lines.length===0;
+      if(lines.length){
+        $('o-count').textContent=n+' cups · base '+money(base)+' each';
+        $('o-total').textContent=money(sum+SETUP);
+        $('o-tier').textContent=(n<50?'Orders start at 50 cups. ':'')+nextTierMsg(n);
+      }
+      var enc=lines.map(function(l){return [l.size,l.finish,l.lid,l.color,l.qty].join('|');}).join(';');
+      go.href='/quote/?service=cups'+(lines.length?'&order='+encodeURIComponent(enc)+'&qty='+n+'&total='+(sum+SETUP):'');
+      preview();
+    }
+    add.addEventListener('click',function(){
+      var l=current();
+      for(var i=0;i<lines.length;i++){var m=lines[i]; if(m.size===l.size&&m.finish===l.finish&&m.lid===l.lid&&m.color===l.color){m.qty+=l.qty;l=null;break;}}
+      if(l) lines.push(l);
+      render();
+      order.scrollIntoView({behavior:'smooth',block:'nearest'});
+    });
+    list.addEventListener('click',function(e){var b=e.target.closest('button[data-i]'); if(b){lines.splice(+b.getAttribute('data-i'),1);render();}});
+    go.addEventListener('click',function(){ if(!lines.length){ lines.push(current()); render(); } });
+    document.getElementById('calc').addEventListener('change',preview);
+    qty.addEventListener('input',preview);
+    render();
   })();
 </script>
 </body>

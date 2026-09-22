@@ -126,14 +126,16 @@ button[type=submit]:hover{background:var(--redd)}
     var b = document.querySelector('input[value="My business"]'); if (b) b.checked = true;
   }
   // Carry over an order built with the calculator on the Grounds for Profit page
-  if (qs.get('qty')) {
-    var size = qs.get('size'), finish = qs.get('finish'), color = qs.get('color'), lid = qs.get('lid'), qty = qs.get('qty'), total = qs.get('total');
-    var m = document.getElementById('material'); if (m && (size === '12' || size === '16')) m.value = size + ' oz cup';
-    var n = document.getElementById('qty'); if (n) n.value = qty;
+  if (qs.get('order')) {
+    var lines = qs.get('order').split(';').map(function (s) { var f = s.split('|'); return { size: f[0], finish: f[1], lid: f[2], color: f[3], qty: f[4] }; });
+    var total = qs.get('total'), count = qs.get('qty');
+    var sizes = lines.map(function (l) { return l.size; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
+    var m = document.getElementById('material'); if (m) m.value = sizes.length === 1 ? sizes[0] + ' oz cup' : 'Other / not sure';
+    var n = document.getElementById('qty'); if (n && count) n.value = count;
     var notes = document.getElementById('notes');
-    if (notes) notes.value = 'From the Grounds for Profit calculator: ' + qty + ' x ' + size + ' oz ' +
-      (finish === 'printed' ? 'UV printed' : 'laser engraved') + ' cups, color ' + color + (lid ? ' with ' + (lid === 'black' ? 'black' : 'matching') + ' lids' : '') +
-      (total ? ', estimated total $' + Number(total).toLocaleString('en-US') + ' including setup' : '') + '.\n\n';
+    if (notes) notes.value = 'Order built with the Grounds for Profit calculator:\n' +
+      lines.map(function (l) { return '- ' + l.qty + ' x ' + l.size + ' oz ' + (l.finish === 'printed' ? 'UV printed' : 'laser engraved') + ', ' + l.color + ', ' + (l.lid === 'black' ? 'black' : 'matching') + ' lid'; }).join('\n') +
+      (total ? '\nEstimated total $' + Number(total).toLocaleString('en-US') + ' including setup.' : '') + '\n\n';
   }
 </script>
 </body>
