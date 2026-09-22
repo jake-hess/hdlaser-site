@@ -127,12 +127,12 @@ button[type=submit]:hover{background:var(--redd)}
   }
   // Carry over an order built with the calculator on the Grounds for Profit page
   if (qs.get('qty')) {
-    var size = qs.get('size'), finish = qs.get('finish'), color = qs.get('color'), qty = qs.get('qty'), total = qs.get('total');
+    var size = qs.get('size'), finish = qs.get('finish'), color = qs.get('color'), lid = qs.get('lid'), qty = qs.get('qty'), total = qs.get('total');
     var m = document.getElementById('material'); if (m && (size === '12' || size === '16')) m.value = size + ' oz cup';
     var n = document.getElementById('qty'); if (n) n.value = qty;
     var notes = document.getElementById('notes');
     if (notes) notes.value = 'From the Grounds for Profit calculator: ' + qty + ' x ' + size + ' oz ' +
-      (finish === 'printed' ? 'UV printed' : 'laser engraved') + ' cups, color ' + color +
+      (finish === 'printed' ? 'UV printed' : 'laser engraved') + ' cups, color ' + color + (lid ? ' with ' + (lid === 'black' ? 'black' : 'matching') + ' lids' : '') +
       (total ? ', estimated total $' + Number(total).toLocaleString('en-US') + ' including setup' : '') + '.\n\n';
   }
 </script>

@@ -53,12 +53,26 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
 .calc{margin-top:14px}
 .calc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .calc label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:700;color:var(--muted)}
-.calc select{font:inherit;font-size:16px;font-weight:500;color:var(--ink);background:#FFF;border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
-.calc-out{margin:14px 0 0;padding:0;border-top:1px solid var(--line)}
-.calc-out div{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #EDE8DF;font-size:15px}
-.calc-out dt{margin:0;color:var(--muted)} .calc-out dd{margin:0;font-weight:700}
-.calc-out .total{border-bottom:0;font-size:18px} .calc-out .total dd{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:26px;color:var(--copper)}
-.calc .btn{display:block;text-align:center;margin-top:10px}
+.calc select{font:inherit;font-size:16px;font-weight:500;color:var(--ink);background:#FFF;border:1px solid var(--line);border-radius:10px;padding:10px 8px;width:100%}
+.colors{border:0;padding:0;margin:14px 0 0}
+.colors legend{font-size:13px;font-weight:700;color:var(--muted);padding:0;margin-bottom:6px}
+.sw-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.sw{position:relative;cursor:pointer;gap:0}
+.sw input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.sw img{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;object-position:50% 42%;border-radius:10px;border:2px solid var(--line);transition:border-color .15s}
+.sw span{display:block;font-size:11px;font-weight:600;color:var(--ink);text-align:center;margin-top:4px;line-height:1.2}
+.sw input:checked + img{border-color:var(--copper);box-shadow:0 0 0 2px var(--copper)}
+.sw input:focus-visible + img{outline:3px solid var(--copper);outline-offset:2px}
+.pick{display:flex;gap:14px;align-items:flex-start;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.pick img{width:96px;flex:0 0 96px;aspect-ratio:244/344;object-fit:cover;border-radius:12px}
+.pick-txt{flex:1;min-width:0}
+.pick-txt b{display:block;font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:17px;line-height:1.25;margin-bottom:6px}
+.calc-out{margin:0;padding:0}
+.calc-out div{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid #EDE8DF;font-size:14px}
+.calc-out dt{margin:0;color:var(--muted)} .calc-out dd{margin:0;font-weight:700;text-align:right}
+.calc-out .total{border-bottom:0;font-size:16px;align-items:center} .calc-out .total dd{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:26px;color:var(--copper)}
+.calc .btn{display:block;text-align:center;margin-top:12px}
+@media (min-width:640px){.calc-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.sw-grid{grid-template-columns:repeat(6,minmax(0,1fr))}.pick img{width:120px;flex-basis:120px}}
 .two{display:grid;grid-template-columns:1fr;gap:14px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
 .card h3{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:20px;margin:0 0 8px}
@@ -112,7 +126,7 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
     <h2 id="two-ways">Two ways to put your logo on it</h2>
     <div class="photos">
       <figure><img src="/assets/bnb-cups-engraved.jpg" alt="Navy and yellow Boards n' Beans cups with the logo laser-engraved into the finish"><figcaption><b>Laser engraved</b>Etched into the finish. Clean and permanent.</figcaption></figure>
-      <figure><img src="/assets/bnb-cups-printed-group.jpg" alt="Boards n' Beans cups in pink, gray, red, cream, and navy with a full-color printed logo"><figcaption><b>UV printed</b>Full-color artwork, 21 cup colors, 12 and 16 oz.</figcaption></figure>
+      <figure><img src="/assets/bnb-cups-printed-group.jpg" alt="Boards n' Beans cups in pink, gray, red, cream, and navy with a full-color printed logo"><figcaption><b>UV printed</b>Full-color artwork, 12 cup colors, 12 and 16 oz.</figcaption></figure>
     </div>
   </section>
 
@@ -148,15 +162,38 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
       <div class="calc-grid">
         <label>Size<select id="c-size"><option value="12">12 oz</option><option value="16">16 oz</option></select></label>
         <label>Finish<select id="c-finish"><option value="engraved">Laser engraved</option><option value="printed">UV printed</option></select></label>
-        <label>Color<select id="c-color"><option>Navy</option><option>Cream</option><option>Gray</option><option>Red</option><option>Pink</option><option>Yellow</option><option>Other / ask us</option></select></label>
+        <label>Lid<select id="c-lid"><option value="matching">Matching color</option><option value="black">Black</option></select></label>
         <label>Quantity<select id="c-qty"><option value="50">50 cups</option><option value="100" selected>100 cups</option><option value="150">150 cups</option><option value="200">200 cups</option></select></label>
       </div>
-      <dl class="calc-out">
-        <div><dt>Per cup</dt><dd id="o-unit"></dd></div>
-        <div><dt>Cups</dt><dd id="o-cups"></dd></div>
-        <div><dt>One-time setup</dt><dd>$50</dd></div>
-        <div class="total"><dt>Total</dt><dd id="o-total"></dd></div>
-      </dl>
+      <fieldset class="colors">
+        <legend>Color <span style="font-weight:500">(every color comes with a matching lid or a black lid)</span></legend>
+        <div class="sw-grid">
+          <label class="sw"><input type="radio" name="c-color" value="Pink"><img src="/assets/cup-pink.jpg" alt=""><span>Pink</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Bikini Pink"><img src="/assets/cup-bikini-pink.jpg" alt=""><span>Bikini Pink</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Cream"><img src="/assets/cup-cream.jpg" alt=""><span>Cream</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Yellow"><img src="/assets/cup-yellow.jpg" alt=""><span>Yellow</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Orange"><img src="/assets/cup-orange.jpg" alt=""><span>Orange</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Purple"><img src="/assets/cup-purple.jpg" alt=""><span>Purple</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Light Green"><img src="/assets/cup-light-green.jpg" alt=""><span>Light Green</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Army Green"><img src="/assets/cup-army-green.jpg" alt=""><span>Army Green</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Light Blue"><img src="/assets/cup-light-blue.jpg" alt=""><span>Light Blue</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Navy" checked><img src="/assets/cup-navy.jpg" alt=""><span>Navy</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Dark Gray"><img src="/assets/cup-dark-gray.jpg" alt=""><span>Dark Gray</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Black"><img src="/assets/cup-black.jpg" alt=""><span>Black</span></label>
+        </div>
+      </fieldset>
+      <div class="pick">
+        <img id="o-img" src="/assets/cup-navy.jpg" alt="Navy cup">
+        <div class="pick-txt">
+          <b id="o-desc"></b>
+          <dl class="calc-out">
+            <div><dt>Per cup</dt><dd id="o-unit"></dd></div>
+            <div><dt>Cups</dt><dd id="o-cups"></dd></div>
+            <div><dt>One-time setup</dt><dd>$50</dd></div>
+            <div class="total"><dt>Total</dt><dd id="o-total"></dd></div>
+          </dl>
+        </div>
+      </div>
       <a class="btn primary" id="c-go" href="/quote/?service=cups">Request this order</a>
       <p class="note" style="margin-top:10px">Free proof before anything is made. Setup fee applies to your first order only.</p>
     </div>
@@ -199,18 +236,21 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
   // Cup pricing by order size. 12 oz engraved is the base; printed and 16 oz add $2 each.
   (function(){
     var base={50:15,100:14,150:13,200:12}, setup=50;
-    var size=document.getElementById('c-size'), finish=document.getElementById('c-finish'),
-        color=document.getElementById('c-color'), qty=document.getElementById('c-qty'), go=document.getElementById('c-go');
+    var size=document.getElementById('c-size'), finish=document.getElementById('c-finish'), qty=document.getElementById('c-qty'), lid=document.getElementById('c-lid'),
+        go=document.getElementById('c-go'), img=document.getElementById('o-img'), desc=document.getElementById('o-desc');
     function money(n){return '$'+n.toLocaleString('en-US');}
+    function color(){var c=document.querySelector('input[name="c-color"]:checked');return c?c.value:'';}
     function update(){
       var q=+qty.value, unit=base[q]+(size.value==='16'?2:0)+(finish.value==='printed'?2:0);
-      var cups=unit*q, total=cups+setup;
+      var cups=unit*q, total=cups+setup, c=color(), fin=finish.value==='printed'?'UV printed':'laser engraved';
+      img.src='/assets/cup-'+c.toLowerCase().replace(/ /g,'-')+'.jpg'; img.alt=c+' cup';
+      desc.textContent=q+' \u00d7 '+size.value+' oz '+fin+' in '+c+(lid.value==='black'?', black lid':', matching lid');
       document.getElementById('o-unit').textContent=money(unit);
       document.getElementById('o-cups').textContent=q+' \u00d7 '+money(unit)+' = '+money(cups);
       document.getElementById('o-total').textContent=money(total);
-      go.href='/quote/?service=cups&size='+size.value+'&finish='+finish.value+'&color='+encodeURIComponent(color.value)+'&qty='+q+'&total='+total;
+      go.href='/quote/?service=cups&size='+size.value+'&finish='+finish.value+'&color='+encodeURIComponent(c)+'&lid='+lid.value+'&qty='+q+'&total='+total;
     }
-    [size,finish,color,qty].forEach(function(el){el.addEventListener('change',update);});
+    document.getElementById('calc').addEventListener('change',update);
     update();
   })();
 </script>
