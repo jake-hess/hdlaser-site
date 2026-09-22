@@ -458,6 +458,7 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
 <script>
 const $=s=>document.querySelector(s), money=c=>'$'+((c||0)/100).toLocaleString('en-US',{maximumFractionDigits:0}), esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmtDate=s=>s?new Date(s).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+const fmtLong=s=>s?new Date(s).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
 let days=30, from=null, to=null;
 function delta(a,b){ if(!b) return a?'<span class="up">new</span>':''; const p=Math.round((a-b)/b*100); return '<span class="'+(p>=0?'up':'down')+'">'+(p>=0?'+':'')+p+'% vs prior</span>'; }
 function tile(l,n,d){ return '<div class="tile"><div class="l">'+l+'</div><div class="n">'+n+'</div><div class="d">'+(d||'')+'</div></div>'; }
@@ -469,7 +470,7 @@ async function load(){
   const q=new URLSearchParams(); if(from){q.set('from',from);} if(to){q.set('to',to);} if(!from){q.set('from',new Date(Date.now()-days*864e5).toISOString());}
   const r=await fetch('/api/kpis?'+q); if(!r.ok){ $('#err').textContent='Could not load: '+r.status; $('#err').style.display='block'; return; }
   const k=await r.json(); if(k.error){ $('#err').textContent=k.error; $('#err').style.display='block'; return; }
-  $('#meta').textContent='Range '+fmtDate(k.range.from)+' to '+fmtDate(k.range.to)+' · Last Square sync '+(k.last_sync?new Date(k.last_sync).toLocaleString():'never')+' · Lifetime: '+k.lifetime.orders+' orders, '+k.lifetime.cups+' cups, '+money(k.lifetime.revenue);
+  $('#meta').textContent='Range '+fmtLong(k.range.from)+' to '+fmtLong(k.range.to)+' · Last Square sync '+(k.last_sync?new Date(k.last_sync).toLocaleString():'never')+' · Lifetime: '+k.lifetime.orders+' orders, '+k.lifetime.cups+' cups, '+money(k.lifetime.revenue);
   const s=k.sales,p=k.prev;
   $('#sales').innerHTML=tile('Revenue',money(s.revenue_cents),delta(s.revenue_cents,p.revenue_cents))+tile('Orders',s.orders,delta(s.orders,p.orders))+tile('Cups sold',s.cups,delta(s.cups,p.cups))+tile('Avg order',money(s.aov_cents),delta(s.aov_cents,p.aov_cents))+tile('Cups per order',s.cups_per_order,'')+tile('Customers',s.customers,s.repeat_orders+' repeat orders')+tile('Setup fees',money(s.setup_fees_cents),'first orders');
   const f=k.financial;
