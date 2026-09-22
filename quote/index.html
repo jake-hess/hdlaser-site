@@ -205,9 +205,9 @@ button[type=submit]:hover{background:var(--redd)}
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ref: ref, lines: lines, notes: document.getElementById('notes').value,
         customer: { name: document.getElementById('name').value, business: document.getElementById('business').value, email: document.getElementById('email').value, phone: document.getElementById('phone').value, agreed: true } })
-    }).then(function (r) { return r.json(); }).then(function (d) {
-      if (d && d.url) { location.href = d.url; } else { location.href = '/thanks/?ref=' + ref + '&pay=later'; }
-    }).catch(function () { location.href = '/thanks/?ref=' + ref + '&pay=later'; });
+    }).then(function (r) { return r.json().then(function (d) { d._status = r.status; return d; }); }).then(function (d) {
+      if (d && d.url) { location.href = d.url; } else { location.href = '/thanks/?ref=' + ref + '&pay=later&err=' + encodeURIComponent((d && d._status) + ' ' + ((d && d.error) || 'no url')); }
+    }).catch(function (e) { location.href = '/thanks/?ref=' + ref + '&pay=later&err=' + encodeURIComponent('network ' + (e && e.message || '')); });
   }
   form.addEventListener('submit', function (e) {
     if (form.dataset.native) return;            // second pass: plain submit as a fallback

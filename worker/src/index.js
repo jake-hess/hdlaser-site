@@ -21,13 +21,13 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/health") return json({ ok: true, env: env.SQUARE_ENV }, 200, cors);
     if (request.method !== "POST" || url.pathname !== "/checkout") return json({ error: "Not found" }, 404, cors);
-    if (!cors["Access-Control-Allow-Origin"]) return json({ error: "Origin not allowed" }, 403, cors);
+    if (!cors["Access-Control-Allow-Origin"]) { console.error("Origin not allowed:", origin, "allowed:", env.ALLOWED_ORIGINS); return json({ error: "Origin not allowed" }, 403, cors); }
 
     let body;
     try { body = await request.json(); } catch { return json({ error: "Bad JSON" }, 400, cors); }
 
     const check = validate(body);
-    if (check.error) return json({ error: check.error }, 400, cors);
+    if (check.error) { console.error("Validation:", check.error); return json({ error: check.error }, 400, cors); }
     const { lines, customer, ref, notes } = check;
 
     const priced = price(lines);
@@ -85,7 +85,8 @@ export default {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.payment_link) {
-      const msg = (data.errors && data.errors[0] && data.errors[0].detail) || "Square did not return a checkout link";
+      const msg = (data.errors && data.errors[0] && (data.errors[0].detail || data.errors[0].code)) || "Square did not return a checkout link";
+      console.error("Square error", res.status, JSON.stringify(data).slice(0, 800));
       return json({ error: msg }, 502, cors);
     }
     return json({ url: data.payment_link.url, ref, total: priced.totalCents / 100, deposit_percent: depositPct }, 200, cors);
