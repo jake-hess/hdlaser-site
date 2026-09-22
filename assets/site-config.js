@@ -6,7 +6,7 @@ window.HD_CONFIG = {
   // Same worker, used for cookieless funnel counts and resale-permit records. Leave empty to disable.
   WORKER_BASE: "https://hdlaser-checkout.yellow-smoke-9c0e.workers.dev",
   // Worker route that stores form submissions and emails through Resend. Leave empty to keep using Formspree.
-  SUBMIT_ENDPOINT: "",
+  SUBMIT_ENDPOINT: "https://hdlaser-checkout.yellow-smoke-9c0e.workers.dev/submit",
   FORMSPREE_ENDPOINT: "https://formspree.io/f/xaenoorj",
   SETUP_FEE: 50,
   MIN_CUPS: 50,
