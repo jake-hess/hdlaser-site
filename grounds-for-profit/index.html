@@ -50,6 +50,15 @@ thead th{background:#EDE8DF;font-size:13px}
 td.p{font-weight:700} td.m{font-weight:700;color:var(--copper)}
 table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap}
 .note{font-size:13px;line-height:1.45;color:var(--muted);margin-top:8px}
+.calc{margin-top:14px}
+.calc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.calc label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:700;color:var(--muted)}
+.calc select{font:inherit;font-size:16px;font-weight:500;color:var(--ink);background:#FFF;border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+.calc-out{margin:14px 0 0;padding:0;border-top:1px solid var(--line)}
+.calc-out div{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #EDE8DF;font-size:15px}
+.calc-out dt{margin:0;color:var(--muted)} .calc-out dd{margin:0;font-weight:700}
+.calc-out .total{border-bottom:0;font-size:18px} .calc-out .total dd{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:26px;color:var(--copper)}
+.calc .btn{display:block;text-align:center;margin-top:10px}
 .two{display:grid;grid-template-columns:1fr;gap:14px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
 .card h3{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:20px;margin:0 0 8px}
@@ -134,18 +143,23 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
       </table>
     </div>
     <p class="note">Order more, pay less: every cup drops $1 at each step up. Plus a one-time $50 setup on your first order. Reorders use the same artwork, no setup fee.</p>
-    <div class="tablewrap" style="margin-top:14px">
-      <table>
-        <thead><tr><th scope="col">Cup</th><th scope="col">You pay</th><th scope="col">Sell at</th><th scope="col">Profit / cup</th><th scope="col">Margin</th></tr></thead>
-        <tbody>
-          <tr><td>12 oz engraved</td><td>$12&ndash;$15</td><td>$24.00</td><td class="p">$9&ndash;$12</td><td class="m">38&ndash;50%</td></tr>
-          <tr><td>12 oz printed</td><td>$14&ndash;$17</td><td>$35.00</td><td class="p">$18&ndash;$21</td><td class="m">51&ndash;60%</td></tr>
-          <tr><td>16 oz engraved</td><td>$14&ndash;$17</td><td>$35.00</td><td class="p">$18&ndash;$21</td><td class="m">51&ndash;60%</td></tr>
-          <tr><td>16 oz printed</td><td>$16&ndash;$19</td><td>$40.00</td><td class="p">$21&ndash;$24</td><td class="m">53&ndash;60%</td></tr>
-        </tbody>
-      </table>
+    <div class="card calc" id="calc">
+      <h3>Build your order</h3>
+      <div class="calc-grid">
+        <label>Size<select id="c-size"><option value="12">12 oz</option><option value="16">16 oz</option></select></label>
+        <label>Finish<select id="c-finish"><option value="engraved">Laser engraved</option><option value="printed">UV printed</option></select></label>
+        <label>Color<select id="c-color"><option>Navy</option><option>Cream</option><option>Gray</option><option>Red</option><option>Pink</option><option>Yellow</option><option>Other / ask us</option></select></label>
+        <label>Quantity<select id="c-qty"><option value="50">50 cups</option><option value="100" selected>100 cups</option><option value="150">150 cups</option><option value="200">200 cups</option></select></label>
+      </div>
+      <dl class="calc-out">
+        <div><dt>Per cup</dt><dd id="o-unit"></dd></div>
+        <div><dt>Cups</dt><dd id="o-cups"></dd></div>
+        <div><dt>One-time setup</dt><dd>$50</dd></div>
+        <div class="total"><dt>Total</dt><dd id="o-total"></dd></div>
+      </dl>
+      <a class="btn primary" id="c-go" href="/quote/?service=cups">Request this order</a>
+      <p class="note" style="margin-top:10px">Free proof before anything is made. Setup fee applies to your first order only.</p>
     </div>
-    <p class="note">You pay: your per-cup price from the table above, 200-cup price to 50-cup price. Sell at: what Boards n&rsquo; Beans charges. You set your own shelf price.</p>
   </section>
 
   <section aria-labelledby="flow">
@@ -181,5 +195,24 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
 
   <p class="foot">Figures are based on Boards n&rsquo; Beans&rsquo; prices, sales, and customer habits. Results vary by shop.</p>
 </div>
+<script>
+  // Cup pricing by order size. 12 oz engraved is the base; printed and 16 oz add $2 each.
+  (function(){
+    var base={50:15,100:14,150:13,200:12}, setup=50;
+    var size=document.getElementById('c-size'), finish=document.getElementById('c-finish'),
+        color=document.getElementById('c-color'), qty=document.getElementById('c-qty'), go=document.getElementById('c-go');
+    function money(n){return '$'+n.toLocaleString('en-US');}
+    function update(){
+      var q=+qty.value, unit=base[q]+(size.value==='16'?2:0)+(finish.value==='printed'?2:0);
+      var cups=unit*q, total=cups+setup;
+      document.getElementById('o-unit').textContent=money(unit);
+      document.getElementById('o-cups').textContent=q+' \u00d7 '+money(unit)+' = '+money(cups);
+      document.getElementById('o-total').textContent=money(total);
+      go.href='/quote/?service=cups&size='+size.value+'&finish='+finish.value+'&color='+encodeURIComponent(color.value)+'&qty='+q+'&total='+total;
+    }
+    [size,finish,color,qty].forEach(function(el){el.addEventListener('change',update);});
+    update();
+  })();
+</script>
 </body>
 </html>

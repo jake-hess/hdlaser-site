@@ -120,9 +120,20 @@ button[type=submit]:hover{background:var(--redd)}
 </main>
 <script>
   // Pre-select "Custom cups" when arriving from the Grounds for Profit page (?service=cups)
-  if (new URLSearchParams(location.search).get('service') === 'cups') {
+  var qs = new URLSearchParams(location.search);
+  if (qs.get('service') === 'cups') {
     var r = document.querySelector('input[value="Custom cups for my shop"]'); if (r) r.checked = true;
     var b = document.querySelector('input[value="My business"]'); if (b) b.checked = true;
+  }
+  // Carry over an order built with the calculator on the Grounds for Profit page
+  if (qs.get('qty')) {
+    var size = qs.get('size'), finish = qs.get('finish'), color = qs.get('color'), qty = qs.get('qty'), total = qs.get('total');
+    var m = document.getElementById('material'); if (m && (size === '12' || size === '16')) m.value = size + ' oz cup';
+    var n = document.getElementById('qty'); if (n) n.value = qty;
+    var notes = document.getElementById('notes');
+    if (notes) notes.value = 'From the Grounds for Profit calculator: ' + qty + ' x ' + size + ' oz ' +
+      (finish === 'printed' ? 'UV printed' : 'laser engraved') + ' cups, color ' + color +
+      (total ? ', estimated total $' + Number(total).toLocaleString('en-US') + ' including setup' : '') + '.\n\n';
   }
 </script>
 </body>
