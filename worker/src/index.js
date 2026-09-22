@@ -53,8 +53,16 @@ async function ensureSchema(env) {
   migrated = true;
 }
 
+function cleanEnv(env) {
+  // Dashboard-pasted values sometimes carry a trailing space or line break; strip them from every string setting.
+  const out = {};
+  for (const k of Object.keys(env)) { const v = env[k]; out[k] = typeof v === "string" ? v.trim() : v; }
+  return out;
+}
+
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, rawEnv, ctx) {
+    const env = cleanEnv(rawEnv);
     const origin = request.headers.get("Origin") || "";
     const cors = corsHeaders(origin, env);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
@@ -95,7 +103,8 @@ export default {
     }
   },
 
-  async scheduled(event, env, ctx) {
+  async scheduled(event, rawEnv, ctx) {
+    const env = cleanEnv(rawEnv);
     await ensureSchema(env);
     ctx.waitUntil((async () => {
       await syncSquare(env, 3);
