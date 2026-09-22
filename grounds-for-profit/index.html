@@ -188,22 +188,22 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
       <fieldset class="colors">
         <legend>Color <span style="font-weight:500">(every color comes with a matching lid or a black lid)</span></legend>
         <div class="sw-grid">
-          <label class="sw"><input type="radio" name="c-color" value="Pink"><img src="/assets/cup-pink.jpg" alt=""><span>Pink</span></label>
-          <label class="sw"><input type="radio" name="c-color" value="Bikini Pink"><img src="/assets/cup-bikini-pink.jpg" alt=""><span>Bikini Pink</span></label>
-          <label class="sw"><input type="radio" name="c-color" value="Cream"><img src="/assets/cup-cream.jpg" alt=""><span>Cream</span></label>
-          <label class="sw"><input type="radio" name="c-color" value="Yellow"><img src="/assets/cup-yellow.jpg" alt=""><span>Yellow</span></label>
-          <label class="sw"><input type="radio" name="c-color" value="Orange"><img src="/assets/cup-orange.jpg" alt=""><span>Orange</span></label>
-          <label class="sw"><input type="radio" name="c-color" value="Purple"><img src="/assets/cup-purple.jpg" alt=""><span>Purple</span></label>
-          <label class="sw"><input type="radio" name="c-color" value="Light Green"><img src="/assets/cup-light-green.jpg" alt=""><span>Light Green</span></label>
-          <label class="sw"><input type="radio" name="c-color" value="Army Green"><img src="/assets/cup-army-green.jpg" alt=""><span>Army Green</span></label>
-          <label class="sw"><input type="radio" name="c-color" value="Light Blue"><img src="/assets/cup-light-blue.jpg" alt=""><span>Light Blue</span></label>
-          <label class="sw"><input type="radio" name="c-color" value="Navy" checked><img src="/assets/cup-navy.jpg" alt=""><span>Navy</span></label>
-          <label class="sw"><input type="radio" name="c-color" value="Dark Gray"><img src="/assets/cup-dark-gray.jpg" alt=""><span>Dark Gray</span></label>
-          <label class="sw"><input type="radio" name="c-color" value="Black"><img src="/assets/cup-black.jpg" alt=""><span>Black</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Pink"><img src="/assets/cup-pink.jpg?v=2" alt=""><span>Pink</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Bikini Pink"><img src="/assets/cup-bikini-pink.jpg?v=2" alt=""><span>Bikini Pink</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Cream"><img src="/assets/cup-cream.jpg?v=2" alt=""><span>Cream</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Yellow"><img src="/assets/cup-yellow.jpg?v=2" alt=""><span>Yellow</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Orange"><img src="/assets/cup-orange.jpg?v=2" alt=""><span>Orange</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Purple"><img src="/assets/cup-purple.jpg?v=2" alt=""><span>Purple</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Light Green"><img src="/assets/cup-light-green.jpg?v=2" alt=""><span>Light Green</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Army Green"><img src="/assets/cup-army-green.jpg?v=2" alt=""><span>Army Green</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Light Blue"><img src="/assets/cup-light-blue.jpg?v=2" alt=""><span>Light Blue</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Navy" checked><img src="/assets/cup-navy.jpg?v=2" alt=""><span>Navy</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Dark Gray"><img src="/assets/cup-dark-gray.jpg?v=2" alt=""><span>Dark Gray</span></label>
+          <label class="sw"><input type="radio" name="c-color" value="Black"><img src="/assets/cup-black.jpg?v=2" alt=""><span>Black</span></label>
         </div>
       </fieldset>
       <div class="pick">
-        <img id="o-img" src="/assets/cup-navy.jpg" alt="Navy cup">
+        <img id="o-img" src="/assets/cup-navy.jpg?v=2" alt="Navy cup">
         <div class="pick-txt">
           <b id="o-desc"></b>
           <span class="note" id="o-line"></span>
@@ -289,7 +289,7 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
     }
     function preview(){
       var l=current(), base=tierFor(totalCups(l.qty)), u=unitFor(l,base);
-      img.src='/assets/cup-'+slug(l.color)+'.jpg'; img.alt=l.color+' cup';
+      img.src='/assets/cup-'+slug(l.color)+'.jpg?v=2'; img.alt=l.color+' cup';
       desc.textContent=label(l);
       lineNote.textContent=money(u)+' per cup at your order size \u00b7 '+money(u*l.qty)+' for this line \u00b7 plus $'+SETUP+' one-time setup';
     }
