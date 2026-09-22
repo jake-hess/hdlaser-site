@@ -2,7 +2,7 @@
 window.HD_CONFIG = {
   // Cloudflare Worker URL that creates Square checkout pages, e.g. "https://hdlaser-checkout.<account>.workers.dev/checkout".
   // Leave empty to fall back to plain quote requests (no online payment).
-  CHECKOUT_ENDPOINT: "",
+  CHECKOUT_ENDPOINT: "https://hdlaser-checkout.yellow-smoke-9c0e.workers.dev/checkout",
   FORMSPREE_ENDPOINT: "https://formspree.io/f/xaenoorj",
   SETUP_FEE: 50,
   MIN_CUPS: 50,
