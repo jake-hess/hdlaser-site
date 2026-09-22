@@ -71,7 +71,12 @@ export default {
         if (path === "/admin") return new Response(dashboardHtml(env), { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
         if (path === "/api/kpis") return json(await kpis(env, url.searchParams.get("from"), url.searchParams.get("to")), 200, { "Cache-Control": "no-store" });
         if (path === "/api/orders.csv") return ordersCsv(env);
-        if (path === "/api/sync" && request.method === "POST") return json(await syncSquare(env, clamp(parseInt(url.searchParams.get("days") || "30", 10) || 30, 1, 1095)), 200);
+        if (path === "/api/sync" && request.method === "POST") {
+          const days = clamp(parseInt(url.searchParams.get("days") || "30", 10) || 30, 1, 1095);
+          const from = url.searchParams.get("from"), to = url.searchParams.get("to");
+          return json(await syncSquare(env, days, from, to), 200);
+        }
+        if (path === "/api/whoami") return json(await whoami(env), 200);
         if (path === "/api/digest" && request.method === "POST") return json(await sendDigest(env), 200);
         const m = path.match(/^\/api\/orders\/(HD-[A-Z0-9]+)$/);
         if (m && request.method === "POST") return json(await updateOrder(env, m[1], await request.json()), 200);
@@ -227,60 +232,77 @@ async function squareWebhook(request, env) {
   return json({ ok: true }, 200);
 }
 
-async function syncSquare(env, days) {
-  if (!env.DB || !env.SQUARE_ACCESS_TOKEN) return { ok: false, reason: "no db or token" };
-  const begin = new Date(Date.now() - days * 86400000).toISOString();
+async function syncSquare(env, days, fromIso, toIso) {
+  if (!env.DB) return { ok: false, reason: "No database bound (DB)", errors: ["no DB binding"] };
+  if (!env.SQUARE_ACCESS_TOKEN) return { ok: false, reason: "SQUARE_ACCESS_TOKEN is not set", errors: ["no token"] };
+  const begin = fromIso && !isNaN(Date.parse(fromIso)) ? new Date(fromIso).toISOString() : new Date(Date.now() - days * 86400000).toISOString();
+  const end = toIso && !isNaN(Date.parse(toIso)) ? new Date(toIso).toISOString() : null;
   const errors = [];
-  let payments = 0, refunds = 0, orders = 0, items = 0;
-
-  // every location on the account (in-store, online, invoices)
-  let locations = [];
-  {
+  let payments = 0, refunds = 0, orders = 0, items = 0, locations = [];
+  try {
     const res = await squareFetch(env, "/v2/locations");
     const data = await res.json().catch(() => ({}));
     if (res.ok) locations = (data.locations || []).map((l) => l.id);
     else errors.push("locations " + res.status + " " + squareErr(data));
-  }
 
-  const page = async (pathBase, key, handler) => {
-    let cursor = "";
-    do {
-      const q = new URLSearchParams({ begin_time: begin, sort_order: "ASC", limit: "100" });
-      if (cursor) q.set("cursor", cursor);
-      const res = await squareFetch(env, `${pathBase}?${q}`);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { errors.push(`${key} ${res.status} ${squareErr(data)}`); break; }
-      for (const row of data[key] || []) await handler(row);
-      cursor = data.cursor || "";
-    } while (cursor);
-  };
-  await page("/v2/payments", "payments", async (p) => { await upsertPayment(env, p); payments++; });
-  await page("/v2/refunds", "refunds", async (r) => { await upsertRefund(env, r); refunds++; });
+    const page = async (pathBase, key, handler) => {
+      let cursor = "", pages = 0;
+      do {
+        const q = new URLSearchParams({ begin_time: begin, sort_order: "ASC", limit: "100" });
+        if (end) q.set("end_time", end);
+        if (cursor) q.set("cursor", cursor);
+        const res = await squareFetch(env, `${pathBase}?${q}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { errors.push(`${key} ${res.status} ${squareErr(data)}`); break; }
+        for (const row of data[key] || []) await handler(row);
+        cursor = data.cursor || "";
+        if (++pages >= 12) { if (cursor) errors.push(`${key}: window too large, stopped after ${pages} pages; run a shorter window`); break; }
+      } while (cursor);
+    };
+    await page("/v2/payments", "payments", async (p) => { await upsertPayment(env, p); payments++; });
+    await page("/v2/refunds", "refunds", async (r) => { await upsertRefund(env, r); refunds++; });
 
-  // itemised orders (what was actually sold), for product KPIs across the whole business
-  if (locations.length) {
-    let cursor = "";
-    do {
-      const body = { location_ids: locations.slice(0, 10), limit: 500, query: { filter: { state_filter: { states: ["COMPLETED"] }, date_time_filter: { closed_at: { start_at: begin } } }, sort: { sort_field: "CLOSED_AT", sort_order: "ASC" } } };
-      if (cursor) body.cursor = cursor;
-      const res = await squareFetch(env, "/v2/orders/search", { method: "POST", body: JSON.stringify(body) });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { errors.push("orders " + res.status + " " + squareErr(data)); break; }
-      for (const o of data.orders || []) {
-        const lines = o.line_items || [];
-        if (!lines.length) continue;
-        const stmts = [env.DB.prepare(`DELETE FROM square_items WHERE order_id = ?`).bind(o.id)];
-        for (const li of lines) stmts.push(env.DB.prepare(`INSERT INTO square_items (order_id, created_at, location_id, name, variation, qty, gross_cents, source) VALUES (?,?,?,?,?,?,?,?)`)
-          .bind(o.id, o.closed_at || o.created_at || null, o.location_id || null, (li.name || "Custom amount").slice(0, 120), (li.variation_name || "").slice(0, 120), parseFloat(li.quantity || "1") || 1, money(li.gross_sales_money) || money(li.total_money), (o.source && o.source.name) || null));
-        await env.DB.batch(stmts);
-        orders++; items += lines.length;
-      }
-      cursor = data.cursor || "";
-    } while (cursor);
+    if (locations.length) {
+      let cursor = "", pages = 0;
+      do {
+        const closed = { start_at: begin }; if (end) closed.end_at = end;
+        const body = { location_ids: locations.slice(0, 10), limit: 500, query: { filter: { state_filter: { states: ["COMPLETED"] }, date_time_filter: { closed_at: closed } }, sort: { sort_field: "CLOSED_AT", sort_order: "ASC" } } };
+        if (cursor) body.cursor = cursor;
+        const res = await squareFetch(env, "/v2/orders/search", { method: "POST", body: JSON.stringify(body) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { errors.push("orders " + res.status + " " + squareErr(data)); break; }
+        for (const o of data.orders || []) {
+          const lines = o.line_items || [];
+          if (!lines.length) continue;
+          const stmts = [env.DB.prepare(`DELETE FROM square_items WHERE order_id = ?`).bind(o.id)];
+          for (const li of lines) stmts.push(env.DB.prepare(`INSERT INTO square_items (order_id, created_at, location_id, name, variation, qty, gross_cents, source) VALUES (?,?,?,?,?,?,?,?)`)
+            .bind(o.id, o.closed_at || o.created_at || null, o.location_id || null, String(li.name || "Custom amount").slice(0, 120), String(li.variation_name || "").slice(0, 120), parseFloat(li.quantity || "1") || 1, money(li.gross_sales_money) || money(li.total_money), (o.source && o.source.name) || null));
+          await env.DB.batch(stmts);
+          orders++; items += lines.length;
+        }
+        cursor = data.cursor || "";
+        if (++pages >= 6) { if (cursor) errors.push(`orders: window too large, stopped after ${pages} pages; run a shorter window`); break; }
+      } while (cursor);
+    }
+    await env.DB.prepare(`INSERT OR REPLACE INTO meta (k, v) VALUES ('last_sync', ?)`).bind(new Date().toISOString()).run();
+  } catch (e) {
+    console.error("sync exception", e && e.stack || e);
+    errors.push("exception: " + (e && e.message || String(e)));
   }
-  await env.DB.prepare(`INSERT OR REPLACE INTO meta (k, v) VALUES ('last_sync', ?)`).bind(new Date().toISOString()).run();
-  return { ok: errors.length === 0, payments, refunds, orders, items, locations: locations.length, since: begin, errors };
+  return { ok: errors.length === 0, payments, refunds, orders, items, locations: locations.length, since: begin, until: end, errors };
 }
+
+async function whoami(env) {
+  const out = { env: env.SQUARE_ENV, has_token: !!env.SQUARE_ACCESS_TOKEN, has_db: !!env.DB, location_setting: env.SQUARE_LOCATION_ID || null };
+  try {
+    const m = await squareFetch(env, "/v2/merchants/me"); const md = await m.json().catch(() => ({}));
+    out.merchant = m.ok ? { name: md.merchant && md.merchant.business_name, id: md.merchant && md.merchant.id, country: md.merchant && md.merchant.country } : { error: m.status + " " + squareErr(md) };
+    const l = await squareFetch(env, "/v2/locations"); const ld = await l.json().catch(() => ({}));
+    out.locations = l.ok ? (ld.locations || []).map((x) => ({ id: x.id, name: x.name, status: x.status, created_at: x.created_at })) : { error: l.status + " " + squareErr(ld) };
+  } catch (e) { out.error = "exception: " + (e && e.message || e); }
+  return out;
+}
+
 function squareErr(data) { return (data && data.errors && data.errors[0] && (data.errors[0].detail || data.errors[0].code)) || ""; }
 
 async function upsertPayment(env, p) {
@@ -447,6 +469,7 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
 <main>
 <div id="err"></div>
 <p class="small" id="meta"></p>
+<p class="small" id="who"></p>
 <h2>Sales, web cup orders</h2><div class="tiles" id="sales"></div>
 <h2>Financial, all Square payments</h2><div class="tiles" id="fin"></div>
 <div class="grid" id="fin2" style="margin-top:14px"></div>
@@ -494,11 +517,15 @@ document.addEventListener('click',async e=>{
   const rb=e.target.closest('#ranges button[data-d]'); if(rb){ document.querySelectorAll('#ranges button').forEach(x=>x.classList.remove('on')); rb.classList.add('on'); days=+rb.dataset.d; from=to=null; $('#from').value=''; $('#to').value=''; load(); }
 });
 $('#go').onclick=()=>{ from=$('#from').value?new Date($('#from').value).toISOString():null; to=$('#to').value?new Date(new Date($('#to').value).getTime()+864e5).toISOString():null; document.querySelectorAll('#ranges button').forEach(x=>x.classList.remove('on')); load(); };
-async function runSync(days,btn,label){ btn.disabled=true; btn.textContent='Working, this can take a minute…'; try{ const r=await fetch('/api/sync?days='+days,{method:'POST'}); const j=await r.json(); alert((j.ok?'Done. ':'Finished with problems. ')+'Payments '+(j.payments||0)+', refunds '+(j.refunds||0)+', itemised orders '+(j.orders||0)+' across '+(j.locations||0)+' location(s).'+(j.errors&&j.errors.length?'\\n\\nSquare said: '+j.errors.join(' | '):'')+(j.reason?'\\n'+j.reason:'')); }catch(e){ alert('Request failed: '+e.message); } btn.disabled=false; btn.textContent=label; load(); }
-$('#sync').onclick=()=>runSync(30,$('#sync'),'Sync Square now');
-$('#backfill').onclick=()=>{ if(confirm('Pull two years of Square payments, refunds and itemised orders? Safe to run more than once.')) runSync(730,$('#backfill'),'Import 2 years of history'); };
+function syncSummary(j){ return 'Payments '+(j.payments||0)+', refunds '+(j.refunds||0)+', itemised orders '+(j.orders||0)+', locations '+(j.locations||0)+'.'+(j.errors&&j.errors.length?'\\n\\nProblems: '+j.errors.join(' | '):'')+(j.error?'\\n\\nError: '+j.error:'')+(j.reason?'\\n'+j.reason:''); }
+async function runSync(days,btn,label){ btn.disabled=true; btn.textContent='Working…'; try{ const r=await fetch('/api/sync?days='+days,{method:'POST'}); const j=await r.json(); alert((j.ok?'Done. ':'Finished with problems. ')+syncSummary(j)); }catch(e){ alert('Request failed: '+e.message); } btn.disabled=false; btn.textContent=label; load(); }
+async function backfill(btn){ btn.disabled=true; const step=45*864e5, now=Date.now(), start=now-730*864e5; let t=start, n=0, tot={payments:0,refunds:0,orders:0,locations:0}, probs=[]; const steps=Math.ceil((now-start)/step);
+  for(; t<now; t+=step){ n++; btn.textContent='Importing '+n+' of '+steps+'…'; try{ const r=await fetch('/api/sync?from='+new Date(t).toISOString()+'&to='+new Date(Math.min(t+step,now)).toISOString(),{method:'POST'}); const j=await r.json(); tot.payments+=j.payments||0; tot.refunds+=j.refunds||0; tot.orders+=j.orders||0; tot.locations=j.locations||tot.locations; if(j.errors&&j.errors.length) probs.push(new Date(t).toLocaleDateString()+': '+j.errors.join(' | ')); if(j.error) probs.push('Error: '+j.error); if(probs.length>=3) break; }catch(e){ probs.push('Request failed: '+e.message); break; } }
+  alert((probs.length?'Finished with problems. ':'Done. ')+'Payments '+tot.payments+', refunds '+tot.refunds+', itemised orders '+tot.orders+', locations '+tot.locations+'.'+(probs.length?'\\n\\n'+probs.join('\\n'):'')); btn.disabled=false; btn.textContent='Import 2 years of history'; load(); }
+$('#backfill').onclick=()=>{ if(confirm('Pull two years of Square payments, refunds and itemised orders? Runs in 45-day chunks and is safe to repeat.')) backfill($('#backfill')); };
 $('#digest').onclick=async()=>{ if(!confirm('Email the weekly digest to '+${JSON.stringify(env.SUPPORT_EMAIL || "the support inbox")}+' now?')) return; const r=await fetch('/api/digest',{method:'POST'}); const j=await r.json(); alert(j.ok?'Sent.':'Not sent: '+(j.reason||j.status)); };
 load();
+fetch('/api/whoami').then(r=>r.json()).then(w=>{ const locs=Array.isArray(w.locations)?w.locations.map(l=>l.name+(l.status&&l.status!=='ACTIVE'?' ('+l.status.toLowerCase()+')':'')).join(', '):(w.locations&&w.locations.error)||'?'; const m=w.merchant&&w.merchant.name?w.merchant.name:(w.merchant&&w.merchant.error)||'?'; $('#who').textContent='Square '+(w.env||'')+' account: '+m+' · Locations: '+locs+(w.error?' · '+w.error:''); }).catch(()=>{});
 </script></body></html>`;
 }
 
