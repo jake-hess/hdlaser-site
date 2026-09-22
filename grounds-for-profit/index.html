@@ -51,7 +51,8 @@ td.p{font-weight:700} td.m{font-weight:700;color:var(--copper)}
 table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap}
 .note{font-size:13px;line-height:1.45;color:var(--muted);margin-top:8px}
 .calc{margin-top:14px}
-.calc-intro{font-size:14px;line-height:1.45;color:var(--muted);margin:0 0 12px}
+.calc-intro{font-size:14px;line-height:1.45;color:var(--muted);margin:0 0 10px}
+.fee{font-size:14px;line-height:1.45;margin:0 0 14px;padding:10px 12px;background:#FBF3D6;border-radius:10px}
 .calc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .calc label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:700;color:var(--muted)}
 .calc select,.calc input[type=number]{font:inherit;font-size:16px;font-weight:500;color:var(--ink);background:#FFF;border:1px solid var(--line);border-radius:10px;padding:10px 8px;width:100%;box-sizing:border-box}
@@ -177,6 +178,7 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
     <div class="card calc" id="calc">
       <h3>Build your order</h3>
       <p class="calc-intro">Mix sizes, finishes, lids and colors however you like. Your per-cup price is set by the total number of cups in the order.</p>
+      <p class="fee"><b>One-time $50 setup fee</b> on your first order. It&#8217;s already included in every total you see here. Reorders skip it.</p>
       <div class="calc-grid">
         <label>Size<select id="c-size"><option value="12">12 oz</option><option value="16">16 oz</option></select></label>
         <label>Finish<select id="c-finish"><option value="engraved">Laser engraved</option><option value="printed">UV printed</option></select></label>
@@ -213,7 +215,8 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
         <ul id="o-lines"></ul>
         <dl class="calc-out">
           <div><dt>Total cups</dt><dd id="o-count"></dd></div>
-          <div><dt>One-time setup</dt><dd>$50</dd></div>
+          <div><dt>Cups subtotal</dt><dd id="o-sub"></dd></div>
+          <div><dt>One-time setup fee</dt><dd>$50</dd></div>
           <div class="total"><dt>Total</dt><dd id="o-total"></dd></div>
         </dl>
         <p class="note tier" id="o-tier"></p>
@@ -257,6 +260,7 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
 
   <p class="foot">Figures are based on Boards n&rsquo; Beans&rsquo; prices, sales, and customer habits. Results vary by shop.</p>
 </div>
+<script src="/assets/site-config.js"></script>
 <script>
   // Cup pricing. The tier is set by total cups in the order; printed finish and 16 oz each add $2.
   (function(){
@@ -264,7 +268,8 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
     var $=function(id){return document.getElementById(id);};
     var size=$('c-size'), finish=$('c-finish'), lid=$('c-lid'), qty=$('c-qty'), img=$('o-img'), desc=$('o-desc'), lineNote=$('o-line'),
         add=$('c-add'), order=$('order'), list=$('o-lines'), go=$('c-go');
-    var lines=[], MIN=50, goUrl='/quote/?service=cups';
+    var CFG=window.HD_CONFIG||{}, lines=[], MIN=CFG.MIN_CUPS||50, goUrl='/quote/?service=cups';
+    go.textContent=CFG.CHECKOUT_ENDPOINT?'Checkout':'Request this order';
     function money(n){return '$'+n.toLocaleString('en-US');}
     function slug(c){return c.toLowerCase().replace(/ /g,'-');}
     function color(){var c=document.querySelector('input[name="c-color"]:checked');return c?c.value:'Navy';}
@@ -286,7 +291,7 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
       var l=current(), base=tierFor(totalCups(l.qty)), u=unitFor(l,base);
       img.src='/assets/cup-'+slug(l.color)+'.jpg'; img.alt=l.color+' cup';
       desc.textContent=label(l);
-      lineNote.textContent=money(u)+' per cup at your order size · '+money(u*l.qty)+' for this line';
+      lineNote.textContent=money(u)+' per cup at your order size \u00b7 '+money(u*l.qty)+' for this line \u00b7 plus $'+SETUP+' one-time setup';
     }
     function render(){
       var n=totalCups(), base=tierFor(n), sum=0;
@@ -300,11 +305,12 @@ table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap
       order.hidden=lines.length===0;
       if(lines.length){
         $('o-count').textContent=n+' cups · base '+money(base)+' each';
+        $('o-sub').textContent=money(sum);
         $('o-total').textContent=money(sum+SETUP);
         $('o-tier').textContent=(n<50?'Orders start at 50 cups. ':'')+nextTierMsg(n);
       }
       var enc=lines.map(function(l){return [l.size,l.finish,l.lid,l.color,l.qty].join('|');}).join(';');
-      goUrl='/quote/?service=cups'+(lines.length?'&order='+encodeURIComponent(enc)+'&qty='+n+'&total='+(sum+SETUP):'');
+      goUrl='/quote/?service=cups'+(lines.length?'&order='+encodeURIComponent(enc)+'&qty='+n+'&cups='+sum+'&total='+(sum+SETUP):'');
       preview();
       gate();
     }

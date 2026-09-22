@@ -50,7 +50,11 @@ button[type=submit]:hover{background:var(--redd)}
 .summary ul{list-style:none;margin:0;padding:0}
 .summary li{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);line-height:1.4}
 .summary li span:last-child{color:var(--muted);white-space:nowrap}
-.sum-total{margin:12px 0 4px;font-size:17px} .sum-total b{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:24px;color:var(--redd)}
+.sum-money{margin:10px 0 6px;padding:0}
+.sum-money div{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--line)}
+.sum-money dt{margin:0;color:var(--muted)} .sum-money dd{margin:0;font-weight:700}
+.sum-money .tot{border-bottom:0;font-size:17px;align-items:center} .sum-money .tot dt{color:var(--ink);font-weight:700} .sum-money .tot dd{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:26px;color:var(--redd)}
+.err{background:#FBE9E6;border:1px solid #E8B4AE;border-radius:12px;padding:12px 14px;color:var(--redd);font-weight:600}
 @media (max-width:900px){main{grid-template-columns:1fr}.side h1{font-size:32px}}
 @media (max-width:560px){.grid,.grid3{grid-template-columns:1fr}form,.side{padding:22px}header{padding:14px 18px}}
 </style>
@@ -62,8 +66,8 @@ button[type=submit]:hover{background:var(--redd)}
 </header>
 <main>
   <aside class="side">
-    <h1>Tell us your idea. We&#8217;ll handle the rest.</h1>
-    <p style="margin:0;line-height:1.55">Takes about 2 minutes. No commitment, and you&#8217;ll see a digital proof before anything is made.</p>
+    <h1 id="side-h1">Tell us your idea. We&#8217;ll handle the rest.</h1>
+    <p id="side-p" style="margin:0;line-height:1.55">Takes about 2 minutes. No commitment, and you&#8217;ll see a digital proof before anything is made.</p>
     <ul>
       <li>Price and proof back within 1&#8211;2 business days</li>
       <li>We can clean up your logo or create the artwork</li>
@@ -75,10 +79,16 @@ button[type=submit]:hover{background:var(--redd)}
     <input type="hidden" name="_subject" value="New quote request from hdlaser.net">
     <input type="text" name="_gotcha" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
     <input type="hidden" name="Order" id="order-field">
+    <input type="hidden" name="Reference" id="ref-field">
+    <input type="hidden" name="Payment" id="pay-field" value="Quote request">
     <div class="summary" id="summary" hidden>
       <div class="sum-head"><h2>Your order</h2><a href="/grounds-for-profit/#calc">Edit order</a></div>
       <ul id="sum-lines"></ul>
-      <p class="sum-total">Estimated total <b id="sum-total"></b> <small>including one-time setup</small></p>
+      <dl class="sum-money">
+        <div><dt>Cups</dt><dd id="sum-cups"></dd></div>
+        <div><dt>One-time setup fee <small>(first order only)</small></dt><dd>$50</dd></div>
+        <div class="tot"><dt>Total</dt><dd id="sum-total"></dd></div>
+      </dl>
       <p class="note">We&#8217;ll confirm the exact total on your proof. Just tell us how to reach you below.</p>
     </div>
 
@@ -124,6 +134,7 @@ button[type=submit]:hover{background:var(--redd)}
     <fieldset>
       <legend>How do we reach you?</legend>
       <div class="grid3">
+        <div class="f"><label for="business">Business name <small>(optional)</small></label><input id="business" name="Business" type="text" autocomplete="organization"></div>
         <div class="f"><label for="name">Name</label><input id="name" name="Name" type="text" autocomplete="name" required></div>
         <div class="f"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required></div>
         <div class="f"><label for="phone">Phone</label><input id="phone" name="Phone" type="tel" autocomplete="tel" required></div>
@@ -137,12 +148,15 @@ button[type=submit]:hover{background:var(--redd)}
       <input type="hidden" name="Terms version" value="2026-09-22">
     </fieldset>
 
-    <button type="submit">Send my quote request</button>
+    <p class="err" id="form-err" hidden></p>
+    <button type="submit" id="submit-btn">Send my quote request</button>
     <p class="note">Prefer to talk? Call or text <a href="tel:+18583739866">(858) 373-9866</a>, or stop by 759 Turquoise St, Pacific Beach.</p>
   </form>
 </main>
+<script src="/assets/site-config.js"></script>
 <script>
   // Pre-select "Custom cups" when arriving from the Grounds for Profit page (?service=cups)
+  var CFG = window.HD_CONFIG || {};
   var qs = new URLSearchParams(location.search);
   if (qs.get('service') === 'cups') {
     var r = document.querySelector('input[value="Custom cups for my shop"]'); if (r) r.checked = true;
@@ -168,6 +182,41 @@ button[type=submit]:hover{background:var(--redd)}
     var dl = document.querySelector('#fs-details legend'); if (dl) dl.textContent = 'Anything else?';
     var notes = document.getElementById('notes'); if (notes) notes.placeholder = 'Logo files, deadline, questions. Anything that helps us get it right.';
   }
+
+  var form = document.querySelector('form'), btn = document.getElementById('submit-btn'), errBox = document.getElementById('form-err');
+  var orderMode = !!qs.get('order'), payOnline = orderMode && !!CFG.CHECKOUT_ENDPOINT;
+  var ref = 'HD-' + Date.now().toString(36).toUpperCase();
+  document.getElementById('ref-field').value = ref;
+  if (orderMode) {
+    var cupsSub = Number(qs.get('cups')) || 0;
+    document.getElementById('sum-cups').textContent = '$' + cupsSub.toLocaleString('en-US');
+    document.getElementById('side-h1').textContent = payOnline ? 'Last step before your proof.' : 'Almost there.';
+    document.getElementById('side-p').textContent = payOnline
+      ? 'Tell us how to reach you, then pay securely through Square. Your digital proof follows within 1–2 business days, and nothing is made until you approve it.'
+      : 'Tell us how to reach you and we’ll confirm your order and send a digital proof within 1–2 business days.';
+    btn.textContent = payOnline ? 'Continue to secure payment' : 'Send my order request';
+    document.getElementById('pay-field').value = payOnline ? 'Square checkout started, ref ' + ref : 'Order request, ref ' + ref;
+  }
+  function showErr(msg) { errBox.textContent = msg; errBox.hidden = false; btn.disabled = false; btn.textContent = payOnline ? 'Continue to secure payment' : (orderMode ? 'Send my order request' : 'Send my quote request'); }
+  function startCheckout() {
+    btn.textContent = 'Opening secure payment…';
+    var lines = qs.get('order').split(';').map(function (s) { var f = s.split('|'); return { size: f[0], finish: f[1], lid: f[2], color: f[3], qty: +f[4] || 0 }; });
+    return fetch(CFG.CHECKOUT_ENDPOINT, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ref: ref, lines: lines, notes: document.getElementById('notes').value,
+        customer: { name: document.getElementById('name').value, business: document.getElementById('business').value, email: document.getElementById('email').value, phone: document.getElementById('phone').value, agreed: true } })
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d && d.url) { location.href = d.url; } else { location.href = '/thanks/?ref=' + ref + '&pay=later'; }
+    }).catch(function () { location.href = '/thanks/?ref=' + ref + '&pay=later'; });
+  }
+  form.addEventListener('submit', function (e) {
+    if (form.dataset.native) return;            // second pass: plain submit as a fallback
+    e.preventDefault(); errBox.hidden = true; btn.disabled = true; btn.textContent = 'Sending…';
+    fetch(form.action, { method: 'POST', body: new FormData(form), headers: { 'Accept': 'application/json' } })
+      .then(function (r) { if (!r.ok) throw new Error('formspree'); return r.json(); })
+      .then(function () { if (payOnline) return startCheckout(); location.href = '/thanks/' + (orderMode ? '?ref=' + ref : ''); })
+      .catch(function () { form.dataset.native = '1'; form.submit(); });
+  });
 </script>
 </body>
 </html>

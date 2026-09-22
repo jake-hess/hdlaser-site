@@ -1,0 +1,14 @@
+name = "hdlaser-checkout"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+[vars]
+SQUARE_ENV = "sandbox"          # "sandbox" or "production"
+SQUARE_LOCATION_ID = ""         # from Square developer dashboard > Locations
+SITE_URL = "https://hdlaser.net"
+ALLOWED_ORIGINS = "https://hdlaser.net,https://www.hdlaser.net,https://jake-hess.github.io"
+DEPOSIT_PERCENT = "100"         # 100 = pay in full at checkout; 50 = half now, balance invoiced after proof approval
+SUPPORT_EMAIL = "contact@hdlaser.net"
+
+# Secret (never in this file): SQUARE_ACCESS_TOKEN
+#   wrangler secret put SQUARE_ACCESS_TOKEN
