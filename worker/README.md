@@ -33,7 +33,9 @@ Workers & Pages → Create → Create Worker → `hdlaser-checkout` → Deploy �
 | `ALLOWED_ORIGINS` | `https://hdlaser.net,https://www.hdlaser.net` | Text |
 | `DEPOSIT_PERCENT` | `100` (or `50` for half now, balance invoiced) | Text |
 | `SUPPORT_EMAIL` | `contact@hdlaser.net` | Text |
-| `FORMSPREE_ENDPOINT` | `https://formspree.io/f/xaenoorj` (delivers the weekly digest email) | Text |
+| `RESEND_API_KEY` | API key from resend.com (step F). Turns on worker-sent email for forms, payments, resale and the digest | **Secret** |
+| `FROM_EMAIL` | `HD Laser Studio <orders@hdlaser.net>` (must be on the domain verified in Resend) | Text |
+| `FORMSPREE_ENDPOINT` | `https://formspree.io/f/xaenoorj` (fallback only, used until RESEND_API_KEY is set) | Text |
 | `TAX_RATE` | `0.0775` (San Diego sales tax, used for the tax-exposure estimate) | Text |
 
 ### D. Square webhook (real-time payment updates; the hourly sync covers everything anyway)
@@ -41,6 +43,13 @@ Workers & Pages → Create → Create Worker → `hdlaser-checkout` → Deploy �
 2. Name `hdlaser ledger`, URL `https://hdlaser-checkout.yellow-smoke-9c0e.workers.dev/webhooks/square`, API version latest.
 3. Events: `payment.created`, `payment.updated`, `payment.completed`, `refund.created`, `refund.updated`. Save.
 4. Open the subscription, copy **Signature key**, save it in Cloudflare as `SQUARE_WEBHOOK_SIGNATURE_KEY` (Secret).
+
+### F. Email through Resend (replaces Formspree)
+1. resend.com → sign up with the business email → **Domains → Add domain** → `hdlaser.net`.
+2. Resend shows three DNS records (DKIM TXT, SPF TXT and MX on a `send` subdomain). Add them at GoDaddy → DNS. Do not remove the existing Google MX/SPF records.
+3. Wait for Resend to show **Verified**, then **API Keys → Create** (sending access) and save it in Cloudflare as `RESEND_API_KEY` (Secret). Set `FROM_EMAIL`.
+4. In the site repo, set `SUBMIT_ENDPOINT` in `assets/site-config.js` to `https://hdlaser-checkout.yellow-smoke-9c0e.workers.dev/submit`.
+   From then on: quote/order forms → worker (stored in `inquiries`, emails shop + customer), paid orders → confirmation email to customer + "PAID" email to shop, resale permits → email to shop, Monday digest → Resend. Formspree can be cancelled.
 
 ### E. Hourly schedule
 Worker → **Settings → Triggers → Cron Triggers → Add**: `0 * * * *` (every hour). The Monday 15:00 UTC run also sends the digest.
@@ -58,4 +67,3 @@ Sandbox test card: 4111 1111 1111 1111, any future date, any CVV, any ZIP. In sa
 ## Later
 - Auto-create the sales-tax invoice in Square from the "Tax to invoice" list (needs Customers + Invoices API; do after a few real orders).
 - Logo intake is by email/text today. Candidate upgrade: accept uploads in this worker and store in R2.
-- Move order emails off Formspree (50 submissions/month on the free plan) to a transactional email service.

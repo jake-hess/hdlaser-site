@@ -4,6 +4,7 @@
 // Routes
 //   POST /checkout            create a Square checkout for a calculator order (called by the website)
 //   POST /event               funnel beacon from the website (cookieless)
+//   POST /submit              quote / order-details form from the website: stores it, emails Hugh and the customer (Resend)
 //   POST /resale              resale permit info from the thank-you page
 //   POST /webhooks/square     Square webhook (payment.*, refund.*), verified with the signature key
 //   GET  /health
@@ -37,13 +38,18 @@ CREATE INDEX IF NOT EXISTS events_ts ON events(ts);
 CREATE TABLE IF NOT EXISTS square_items (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id TEXT NOT NULL, created_at TEXT, location_id TEXT, name TEXT, variation TEXT, qty REAL, gross_cents INTEGER DEFAULT 0, source TEXT);
 CREATE INDEX IF NOT EXISTS square_items_order ON square_items(order_id);
 CREATE INDEX IF NOT EXISTS square_items_created ON square_items(created_at);
+CREATE TABLE IF NOT EXISTS inquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, kind TEXT NOT NULL, ref TEXT, name TEXT, business TEXT, email TEXT, phone TEXT, fields TEXT, emailed INTEGER DEFAULT 0);
+CREATE INDEX IF NOT EXISTS inquiries_created ON inquiries(created_at);
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);`;
+// Columns added after the first release. Each ALTER is tried once and ignored if the column already exists.
+const ALTERS = ["ALTER TABLE orders ADD COLUMN notified_paid_at TEXT"];
 
 let migrated = false;
 async function ensureSchema(env) {
   if (migrated || !env.DB) return;
   const stmts = SCHEMA.split(";").map((s) => s.trim()).filter(Boolean);
   await env.DB.batch(stmts.map((s) => env.DB.prepare(s)));
+  for (const a of ALTERS) { try { await env.DB.prepare(a).run(); } catch (e) { /* already applied */ } }
   migrated = true;
 }
 
@@ -61,6 +67,7 @@ export default {
       // ---- public, site-facing ----
       if (path === "/checkout" && request.method === "POST") return requireOrigin(cors) || checkout(request, env, cors);
       if (path === "/event" && request.method === "POST") return requireOrigin(cors) || recordEvent(request, env, cors);
+      if (path === "/submit" && request.method === "POST") return requireOrigin(cors) || submitInquiry(request, env, cors);
       if (path === "/resale" && request.method === "POST") return requireOrigin(cors) || recordResale(request, env, cors);
       if (path === "/webhooks/square" && request.method === "POST") return squareWebhook(request, env);
 
@@ -204,6 +211,61 @@ async function recordEvent(request, env, cors) {
   return json({ ok: true }, 200, cors);
 }
 
+const RATE = new Map(); // ip -> [timestamps], per isolate; a light brake on form spam
+function rateLimited(ip, limit = 8, windowMs = 600000) {
+  const now = Date.now(), arr = (RATE.get(ip) || []).filter((t) => now - t < windowMs);
+  arr.push(now); RATE.set(ip, arr); return arr.length > limit;
+}
+
+async function submitInquiry(request, env, cors) {
+  if (!env.DB) return json({ error: "No database" }, 503, cors);
+  if (!env.RESEND_API_KEY) return json({ error: "Email not configured" }, 503, cors); // site falls back to Formspree
+  let b; try { b = await request.json(); } catch { return json({ error: "Bad JSON" }, 400, cors); }
+  if (String(b._gotcha || "").trim()) return json({ ok: true, ref: null }, 200, cors); // honeypot: pretend success
+  const ip = request.headers.get("CF-Connecting-IP") || "";
+  if (rateLimited(ip)) return json({ error: "Too many requests, please try again in a few minutes" }, 429, cors);
+
+  const email = String(b.email || "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "Valid email required" }, 400, cors);
+  const name = String(b.Name || b.name || "").trim().slice(0, 80), business = String(b.Business || b.business || "").trim().slice(0, 120), phone = String(b.Phone || b.phone || "").trim().slice(0, 40);
+  const refIn = String(b.Reference || b.ref || ""); const ref = /^HD-[A-Z0-9]{4,12}$/.test(refIn) ? refIn : null;
+  const kind = b.Order ? "order" : "quote";
+  // keep every human-readable field, drop form plumbing
+  const fields = {};
+  for (const [k, v] of Object.entries(b)) { if (k.startsWith("_") || ["email", "Reference", "Payment"].includes(k)) continue; const val = String(v == null ? "" : v).trim().slice(0, 4000); if (val) fields[k] = val; }
+  const now = new Date().toISOString();
+  const ins = await env.DB.prepare(`INSERT INTO inquiries (created_at, kind, ref, name, business, email, phone, fields) VALUES (?,?,?,?,?,?,?,?)`).bind(now, kind, ref, name, business, email, phone, JSON.stringify(fields)).run();
+
+  const who = business ? `${business} (${name})` : name || email;
+  const lines = Object.entries(fields).map(([k, v]) => `${k}: ${v}`).join("\n");
+  const subject = kind === "order" ? `Cup order ${ref || ""} from ${who}`.replace("  ", " ") : `Quote request from ${who}`;
+  const toHugh = `${kind === "order" ? "New cup order details" : "New quote request"} via hdlaser.net\n\nFrom: ${name}${business ? ", " + business : ""}\nEmail: ${email}\nPhone: ${phone || "-"}\n${ref ? "Reference: " + ref + "\n" : ""}${b.Payment ? "Payment: " + b.Payment + "\n" : ""}\n${lines}\n\nReply to this email to answer them directly.`;
+  const r1 = await sendEmail(env, { to: env.SUPPORT_EMAIL, replyTo: email, subject, text: toHugh });
+
+  const first = name.split(" ")[0] || "there";
+  const toCustomer = kind === "order"
+    ? `Hi ${first},\n\nWe've got your cup order details${ref ? " (reference " + ref + ")" : ""}. If you completed payment, you're all set: email your logo to ${env.SUPPORT_EMAIL} or text it to (858) 373-9866 and we'll start your proof. If the payment page didn't open, we'll send you a secure payment link shortly.\n\nWhat happens next:\n1. Digital proof by email within 1-2 business days.\n2. You approve it (unlimited revisions).\n3. Cups ready 10-15 business days after approval.\n\nThanks for putting your name on the counter.\n\nHD Laser Studio\n759 Turquoise St, Pacific Beach\n(858) 373-9866 · hdlaser.net`
+    : `Hi ${first},\n\nThanks for reaching out to HD Laser Studio. We've got your request and will email you a price and a digital proof within 1-2 business days. If you have a logo or artwork file, just reply to this email and attach it.\n\nQuick question in the meantime? Call or text (858) 373-9866.\n\nHD Laser Studio\n759 Turquoise St, Pacific Beach\nhdlaser.net`;
+  const r2 = await sendEmail(env, { to: email, subject: kind === "order" ? `We've got your order${ref ? " " + ref : ""}` : "We've got your request", text: toCustomer });
+  await env.DB.prepare(`UPDATE inquiries SET emailed = ? WHERE id = ?`).bind((r1.ok ? 1 : 0) + (r2.ok ? 2 : 0), ins.meta && ins.meta.last_row_id).run().catch(() => {});
+  if (!r1.ok) console.error("email to shop failed", r1.error);
+  return json({ ok: r1.ok, ref, emailed_customer: r2.ok, error: r1.ok ? undefined : r1.error }, r1.ok ? 200 : 502, cors);
+}
+
+async function sendEmail(env, { to, subject, text, html, replyTo }) {
+  if (!env.RESEND_API_KEY) return { ok: false, error: "RESEND_API_KEY not set" };
+  const from = env.FROM_EMAIL || `HD Laser Studio <orders@hdlaser.net>`;
+  const body = { from, to: Array.isArray(to) ? to : [to], subject, text };
+  if (html) body.html = html;
+  if (replyTo) body.reply_to = replyTo;
+  try {
+    const res = await fetch("https://api.resend.com/emails", { method: "POST", headers: { "Authorization": `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { console.error("resend", res.status, JSON.stringify(data).slice(0, 400)); return { ok: false, error: (data && data.message) || ("Resend " + res.status) }; }
+    return { ok: true, id: data.id };
+  } catch (e) { return { ok: false, error: "exception: " + (e && e.message || e) }; }
+}
+
 async function recordResale(request, env, cors) {
   if (!env.DB) return json({ ok: false }, 200, cors);
   let b; try { b = await request.json(); } catch { return json({ error: "Bad JSON" }, 400, cors); }
@@ -212,6 +274,13 @@ async function recordResale(request, env, cors) {
   const permit = String(b.permit || "").trim().slice(0, 40), business = String(b.business || "").trim().slice(0, 120);
   if (!permit) return json({ error: "Permit required" }, 400, cors);
   const r = await env.DB.prepare(`UPDATE orders SET resale_permit = ?, resale_business = ?, resale_received_at = ? WHERE ref = ?`).bind(permit, business, new Date().toISOString(), ref).run();
+  const o = await env.DB.prepare(`SELECT name, email, phone FROM orders WHERE ref = ?`).bind(ref).first();
+  if (env.RESEND_API_KEY) await sendEmail(env, { to: env.SUPPORT_EMAIL, replyTo: o && o.email || undefined, subject: `Resale permit for order ${ref}: ${business}`, text: `Order ${ref}
+Business on permit: ${business}
+CA seller's permit: ${permit}
+Customer: ${o ? [o.name, o.email, o.phone].filter(Boolean).join(" · ") : "-"}
+
+Next: email them the CDTFA-230 resale certificate to sign, then click "Resale cert" on the dashboard when it comes back.` });
   return json({ ok: true, updated: r.meta ? r.meta.changes : undefined }, 200, cors);
 }
 
@@ -316,7 +385,40 @@ async function upsertPayment(env, p) {
   if (ref && p.status === "COMPLETED") {
     await env.DB.prepare(`UPDATE orders SET status = CASE WHEN ? >= total_cents AND ? > 0 THEN 'refunded' ELSE 'paid' END, square_payment_id = ?, paid_at = COALESCE(paid_at, ?), paid_cents = ?, fee_cents = ?, refunded_cents = ? WHERE ref = ?`)
       .bind(refunded, refunded, p.id, p.created_at || new Date().toISOString(), amount, fee, refunded, ref).run();
+    await notifyPaid(env, ref);
   }
+}
+
+async function notifyPaid(env, ref) {
+  if (!env.RESEND_API_KEY) return;
+  const o = await env.DB.prepare(`SELECT * FROM orders WHERE ref = ? AND status = 'paid' AND notified_paid_at IS NULL`).bind(ref).first();
+  if (!o) return;
+  const lines = (await env.DB.prepare(`SELECT qty, size, finish, color, lid, unit_cents FROM order_lines WHERE ref = ?`).bind(ref).all()).results;
+  const items = lines.map((l) => `- ${l.qty} x ${l.size} oz ${l.finish === "printed" ? "UV printed" : "laser engraved"}, ${l.color}, ${l.lid} lid @ $${l.unit_cents / 100}`).join("\n");
+  const total = "$" + (o.paid_cents / 100).toLocaleString("en-US");
+  const first = (o.name || "").split(" ")[0] || "there";
+  await sendEmail(env, { to: o.email, subject: `You're in. Order ${ref} is confirmed`, text:
+`Hi ${first},
+
+Payment received, ${total}. Thank you for putting your name on the counter.
+
+Your order (${ref}):
+${items}
+One-time setup: $${o.setup_fee_cents / 100}
+
+Two quick things so we can start your proof:
+1. Email your logo or artwork to ${env.SUPPORT_EMAIL} (vector AI/EPS/SVG/PDF is best; a clean PNG works too), or text it to (858) 373-9866.
+2. If you're reselling the cups, send your California seller's permit number so we can keep the order tax-exempt: ${env.SITE_URL}/thanks/?paid=1&ref=${ref}
+
+What happens next:
+- Digital proof by email within 1-2 business days. Unlimited revisions until it's right.
+- Once approved, your cups are ready in 10-15 business days. Pick up in Pacific Beach or we'll arrange delivery.
+
+HD Laser Studio
+759 Turquoise St, Pacific Beach
+(858) 373-9866 · hdlaser.net` });
+  await sendEmail(env, { to: env.SUPPORT_EMAIL, replyTo: o.email || undefined, subject: `PAID ${total}: ${o.business || o.name} (${ref})`, text: `Order ${ref} is paid.\n\nCustomer: ${[o.name, o.business, o.email, o.phone].filter(Boolean).join(" · ")}\n${items}\nTotal paid: ${total}\nResale permit: ${o.resale_permit || "not yet"}\n\nNext: watch for their logo, then send the proof. Dashboard: ${env.WORKER_URL || ""}/admin` });
+  await env.DB.prepare(`UPDATE orders SET notified_paid_at = ? WHERE ref = ?`).bind(new Date().toISOString(), ref).run();
 }
 
 async function upsertRefund(env, r) {
@@ -374,6 +476,9 @@ async function kpis(env, from, to) {
       (SELECT GROUP_CONCAT(qty || ' x ' || size || 'oz ' || finish || ' ' || color || ' (' || lid || ')', '; ') FROM order_lines l WHERE l.ref = o.ref) items
       FROM orders o ORDER BY o.created_at DESC LIMIT 100`).all()).results;
   const lastSync = await q(`SELECT v FROM meta WHERE k = 'last_sync'`).first();
+  const inqCount = await q(`SELECT COUNT(*) n FROM inquiries WHERE kind = 'quote' AND created_at >= ? AND created_at < ?`, fromIso, toIso).first();
+  const inquiries = (await q(`SELECT id, created_at, kind, ref, name, business, email, phone, fields, emailed FROM inquiries ORDER BY created_at DESC LIMIT 50`).all()).results.map((r) => { let f = {}; try { f = JSON.parse(r.fields || "{}"); } catch {} return { ...r, fields: f }; });
+  funnel.quote_request = Math.max(funnel.quote_request, inqCount.n);
   const lifetime = await q(`SELECT COUNT(*) orders, COALESCE(SUM(paid_cents - refunded_cents),0) revenue, COALESCE(SUM(cups),0) cups FROM orders WHERE status IN ('paid','refunded')`).first();
 
   return {
@@ -382,8 +487,9 @@ async function kpis(env, from, to) {
     product: { by_size: await mix("size"), by_finish: await mix("finish"), by_lid: await mix("lid"), by_color: await mix("color"), tiers },
     funnel,
     financial: { gross_cents: fin.gross, fees_cents: fin.fees, refunded_cents: fin.refunded, net_cents: fin.gross - fin.fees - fin.refunded, payments: fin.n, other_square_gross_cents: fin.other_gross, web_gross_cents: fin.gross - fin.other_gross, tax_rate: taxRate, tax_exposure_orders: taxDue.n, tax_exposure_cents: Math.round(taxDue.base * taxRate), by_card: cards, by_month: months, top_items: topItems },
-    attention, recent,
+    attention, recent, inquiries,
     last_sync: lastSync ? lastSync.v : null,
+    email_configured: !!env.RESEND_API_KEY,
   };
 }
 
@@ -439,7 +545,11 @@ async function sendDigest(env) {
     `Dashboard: ${env.WORKER_URL || ""}/admin`,
   ];
   const text = lines.join("\n");
-  if (!env.FORMSPREE_ENDPOINT) return { ok: false, reason: "no FORMSPREE_ENDPOINT", text };
+  if (env.RESEND_API_KEY) {
+    const r = await sendEmail(env, { to: env.SUPPORT_EMAIL, subject: `HD Laser weekly numbers: ${$(k.sales.revenue_cents)} from ${k.sales.orders} orders`, text });
+    return { ok: r.ok, via: "resend", error: r.error, text };
+  }
+  if (!env.FORMSPREE_ENDPOINT) return { ok: false, reason: "no FORMSPREE_ENDPOINT or RESEND_API_KEY", text };
   const res = await fetch(env.FORMSPREE_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify({ _subject: `HD Laser weekly numbers: ${$(k.sales.revenue_cents)} from ${k.sales.orders} orders`, message: text, email: env.SUPPORT_EMAIL || "" }) });
   return { ok: res.ok, status: res.status, text };
 }
@@ -477,6 +587,7 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
 <h2>Product mix</h2><div class="grid" id="product"></div>
 <h2>Needs attention</h2><div class="grid" id="attention"></div>
 <h2>Recent orders</h2><div class="card"><table id="orders"></table></div>
+<h2>Quote requests &amp; form submissions</h2><div class="card"><table id="inq"></table></div>
 </main>
 <script>
 const $=s=>document.querySelector(s), money=c=>'$'+((c||0)/100).toLocaleString('en-US',{maximumFractionDigits:0}), esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -511,6 +622,7 @@ async function load(){
     list('Sales tax to invoice',a.tax_due,r=>'<tr><td><b>'+r.ref+'</b><div class="small">paid '+fmtDate(r.paid_at)+'</div></td><td>'+who(r)+'</td><td class="num">'+money(r.tax_cents)+'<div class="small">on '+money(r.base_cents)+'</div></td><td>'+flag(r.ref,'tax_invoiced_at',0,'Invoiced')+flag(r.ref,'resale_received_at',0,'Cert received')+'</td></tr>')+
     list('In production',a.in_production,r=>'<tr><td><b>'+r.ref+'</b><div class="small">approved '+fmtDate(r.proof_approved_at)+'</div></td><td>'+esc(r.business||r.name)+'<div class="small">'+r.cups+' cups</div></td><td>'+flag(r.ref,'completed_at',0,'Done')+'</td></tr>');
   $('#orders').innerHTML='<tr><th>Ref</th><th>Customer</th><th>Items</th><th class="num">Total</th><th>Status</th><th>Progress</th></tr>'+k.recent.map(r=>'<tr><td><b>'+r.ref+'</b><div class="small">'+fmtDate(r.created_at)+'</div></td><td>'+who(r)+'</td><td class="small">'+esc(r.items||'')+'</td><td class="num">'+money(r.total_cents)+(r.refunded_cents?'<div class="small">refunded '+money(r.refunded_cents)+'</div>':'')+(r.fee_cents?'<div class="small">fee '+money(r.fee_cents)+'</div>':'')+'</td><td><span class="pill '+r.status+'">'+r.status.replace('_',' ')+'</span></td><td>'+flag(r.ref,'logo_received_at',r.logo_received_at,'Logo')+flag(r.ref,'proof_approved_at',r.proof_approved_at,'Proof OK')+flag(r.ref,'completed_at',r.completed_at,'Done')+flag(r.ref,'resale_received_at',r.resale_received_at,'Resale cert')+flag(r.ref,'tax_invoiced_at',r.tax_invoiced_at,'Tax invoiced')+'</td></tr>').join('');
+  $('#inq').innerHTML=k.inquiries.length?'<tr><th>When</th><th>Type</th><th>Who</th><th>Details</th><th>Sent</th></tr>'+k.inquiries.map(i=>'<tr><td class="small">'+fmtDate(i.created_at)+'</td><td><span class="pill">'+esc(i.kind)+(i.ref?' '+i.ref:'')+'</span></td><td>'+who(i)+'</td><td class="small">'+esc(Object.entries(i.fields).filter(([k])=>!['Name','Business','Phone','Agreed to Terms of Sale','Terms version','Text message consent'].includes(k)).map(([k,v])=>k+': '+v).join(' · ')).slice(0,400)+'</td><td class="small">'+(i.emailed&1?'shop ✓ ':'')+(i.emailed&2?'customer ✓':'')+'</td></tr>').join(''):'<tr><td class="empty">'+(k.email_configured?'No submissions yet.':'Forms still go through Formspree until RESEND_API_KEY is set on the worker.')+'</td></tr>';
 }
 document.addEventListener('click',async e=>{
   const b=e.target.closest('button[data-ref]'); if(b){ const body={}; body[b.dataset.field]=b.dataset.val==='1'; await fetch('/api/orders/'+b.dataset.ref,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); load(); return; }

@@ -159,12 +159,14 @@ button[type=submit]:hover{background:var(--redd)}
     if (rf.dataset.native) return;
     e.preventDefault();
     var b = rf.querySelector('button[type=submit]'); b.disabled = true; b.textContent = 'Sending…';
-    if (ref && window.HD_CONFIG && window.HD_CONFIG.WORKER_BASE) {
-      fetch(window.HD_CONFIG.WORKER_BASE + '/resale', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ref: ref, permit: document.getElementById('r-permit').value, business: document.getElementById('r-biz').value }) }).catch(function () {});
-    }
-    fetch(rf.action, { method: 'POST', body: new FormData(rf), headers: { 'Accept': 'application/json' } })
-      .then(function (r) { if (!r.ok) throw 0; document.getElementById('resale-ok').hidden = false; b.textContent = 'Sent'; })
-      .catch(function () { rf.dataset.native = '1'; rf.submit(); });
+    var C = window.HD_CONFIG || {}, done = function () { document.getElementById('resale-ok').hidden = false; b.textContent = 'Sent'; };
+    var toWorker = (ref && C.WORKER_BASE) ? fetch(C.WORKER_BASE + '/resale', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ref: ref, permit: document.getElementById('r-permit').value, business: document.getElementById('r-biz').value }) }).then(function (r) { return r.ok; }).catch(function () { return false; }) : Promise.resolve(false);
+    toWorker.then(function (okWorker) {
+      if (okWorker && C.SUBMIT_ENDPOINT) { done(); return; } // worker stored it and emailed the shop
+      return fetch(rf.action, { method: 'POST', body: new FormData(rf), headers: { 'Accept': 'application/json' } })
+        .then(function (r) { if (!r.ok) throw 0; done(); })
+        .catch(function () { rf.dataset.native = '1'; rf.submit(); });
+    });
   });
 </script>
 </body>
