@@ -110,8 +110,15 @@ button[type=submit]:hover{background:var(--redd)}
       <div class="grid3">
         <div class="f"><label for="name">Name</label><input id="name" name="Name" type="text" autocomplete="name" required></div>
         <div class="f"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required></div>
-        <div class="f"><label for="phone">Phone <small>(optional)</small></label><input id="phone" name="Phone" type="tel" autocomplete="tel"></div>
+        <div class="f"><label for="phone">Phone</label><input id="phone" name="Phone" type="tel" autocomplete="tel" required></div>
       </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>One last thing</legend>
+      <label class="check" style="align-items:flex-start"><input type="checkbox" name="Agreed to Terms of Sale" value="Yes" required style="margin-top:2px;flex:none"><span style="line-height:1.5">I agree to HD Laser&#8217;s <a href="/terms/" target="_blank" rel="noopener">Terms of Sale &amp; Privacy Notice</a>. I understand that custom orders are <b>final once paid</b>, that HD Laser may feature my business and this order in its marketing, and that HD Laser may email or call me about my order and future offers. I can unsubscribe at any time.</span></label>
+      <label class="check" style="align-items:flex-start"><input type="checkbox" name="Text message consent" value="Yes" style="margin-top:2px;flex:none"><span style="line-height:1.5"><b>Text me too.</b> HD Laser and its partners may send marketing texts to the number above. Not required to buy. Message and data rates may apply. Reply STOP to end.</span></label>
+      <input type="hidden" name="Terms version" value="2026-09-22">
     </fieldset>
 
     <button type="submit">Send my quote request</button>
