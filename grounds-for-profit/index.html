@@ -48,6 +48,7 @@ th,td{padding:10px 12px;text-align:right;border-bottom:1px solid #EDE8DF}
 th:first-child,td:first-child{text-align:left}
 thead th{background:#EDE8DF;font-size:13px}
 td.p{font-weight:700} td.m{font-weight:700;color:var(--copper)}
+table.tiers{min-width:0} .tiers th,.tiers td{padding:10px 8px;white-space:nowrap}
 .note{font-size:13px;line-height:1.45;color:var(--muted);margin-top:8px}
 .two{display:grid;grid-template-columns:1fr;gap:14px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
@@ -122,17 +123,29 @@ td.p{font-weight:700} td.m{font-weight:700;color:var(--copper)}
   <section aria-labelledby="earn">
     <h2 id="earn">What a cup earns you</h2>
     <div class="tablewrap">
-      <table>
-        <thead><tr><th scope="col">Cup</th><th scope="col">You pay</th><th scope="col">Sell at</th><th scope="col">Profit / cup</th><th scope="col">Margin</th></tr></thead>
+      <table class="tiers">
+        <thead><tr><th scope="col">Per cup</th><th scope="col">50 cups</th><th scope="col">100</th><th scope="col">150</th><th scope="col">200</th></tr></thead>
         <tbody>
-          <tr><td>12 oz engraved</td><td>$13.00</td><td>$24.00</td><td class="p">$11.00</td><td class="m">46%</td></tr>
-          <tr><td>12 oz printed</td><td>$15.00</td><td>$35.00</td><td class="p">$20.00</td><td class="m">57%</td></tr>
-          <tr><td>16 oz engraved</td><td>$15.00</td><td>$35.00</td><td class="p">$20.00</td><td class="m">57%</td></tr>
-          <tr><td>16 oz printed</td><td>$17.00</td><td>$40.00</td><td class="p">$23.00</td><td class="m">58%</td></tr>
+          <tr><td>12 oz engraved</td><td>$15</td><td>$14</td><td>$13</td><td class="p">$12</td></tr>
+          <tr><td>12 oz printed</td><td>$17</td><td>$16</td><td>$15</td><td class="p">$14</td></tr>
+          <tr><td>16 oz engraved</td><td>$17</td><td>$16</td><td>$15</td><td class="p">$14</td></tr>
+          <tr><td>16 oz printed</td><td>$19</td><td>$18</td><td>$17</td><td class="p">$16</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="note">You pay: HD Laser&rsquo;s price per cup on a 100-cup order, plus a one-time $50 setup on your first order. Sell at: what Boards n&rsquo; Beans charges. You set your own shelf price.</p>
+    <p class="note">Order more, pay less: every cup drops $1 at each step up. Plus a one-time $50 setup on your first order. Reorders use the same artwork, no setup fee.</p>
+    <div class="tablewrap" style="margin-top:14px">
+      <table>
+        <thead><tr><th scope="col">Cup</th><th scope="col">You pay</th><th scope="col">Sell at</th><th scope="col">Profit / cup</th><th scope="col">Margin</th></tr></thead>
+        <tbody>
+          <tr><td>12 oz engraved</td><td>$12&ndash;$15</td><td>$24.00</td><td class="p">$9&ndash;$12</td><td class="m">38&ndash;50%</td></tr>
+          <tr><td>12 oz printed</td><td>$14&ndash;$17</td><td>$35.00</td><td class="p">$18&ndash;$21</td><td class="m">51&ndash;60%</td></tr>
+          <tr><td>16 oz engraved</td><td>$14&ndash;$17</td><td>$35.00</td><td class="p">$18&ndash;$21</td><td class="m">51&ndash;60%</td></tr>
+          <tr><td>16 oz printed</td><td>$16&ndash;$19</td><td>$40.00</td><td class="p">$21&ndash;$24</td><td class="m">53&ndash;60%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">You pay: your per-cup price from the table above, 200-cup price to 50-cup price. Sell at: what Boards n&rsquo; Beans charges. You set your own shelf price.</p>
   </section>
 
   <section aria-labelledby="flow">
@@ -141,10 +154,10 @@ td.p{font-weight:700} td.m{font-weight:700;color:var(--copper)}
       <div class="card">
         <h3>Cash flow</h3>
         <dl class="timeline">
-          <dt>Week 0</dt><dd>Approve your proof and place the order ($1,350&ndash;$1,750)</dd>
+          <dt>Week 0</dt><dd>Approve your proof and place the order ($1,450&ndash;$1,850)</dd>
           <dt>Weeks 2&ndash;3</dt><dd>Cups arrive and go on the counter</dd>
           <dt>Months 2&ndash;3</dt><dd>About half sold: the order has paid for itself</dd>
-          <dt>Months 3&ndash;6</dt><dd>Sold out: keep $1,050&ndash;$2,250 in profit</dd>
+          <dt>Months 3&ndash;6</dt><dd>Sold out: keep $950&ndash;$2,150 in profit</dd>
           <dt>Reorder</dt><dd>Same artwork, no setup fee</dd>
         </dl>
       </div>
