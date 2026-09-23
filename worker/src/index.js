@@ -1218,6 +1218,8 @@ const CATEGORIES = [
   { key: "loan", name: "Loan principal", group: "excluded" },
   { key: "credit_card_payment", name: "Credit card payment", group: "excluded" },
   { key: "equipment", name: "Equipment purchase (capital)", group: "excluded" },
+  { key: "personal", name: "Personal (not a business expense)", group: "excluded" },
+  { key: "owner_paid", name: "Business expense paid personally (reimbursable)", group: "opex", target: 0.02 },
   { key: "uncategorized", name: "Uncategorized", group: "excluded" },
 ];
 const CAT = Object.fromEntries(CATEGORIES.map((c) => [c.key, c]));
@@ -1560,7 +1562,7 @@ function render(){
   const h=R.health; $('#ring').style.setProperty('--p',h.score); $('#scoreN').textContent=h.score; $('#level').textContent=h.level; $('#streak').textContent=h.profitable_streak_months?h.profitable_streak_months+' profitable month'+(h.profitable_streak_months>1?'s':'')+' in a row':'No profitable-month streak yet';
   $('#parts').innerHTML='EBITDA '+(h.parts.ebitda_pct)+'% · Cash reserve '+h.parts.reserve_months+' months · Ledger categorized '+h.parts.categorized_pct+'% · Payouts reconciled '+h.parts.reconciled_pct+'% · Open receivables '+h.parts.open_receivables;
   const t=R.totals;
-  $('#tiles').innerHTML=tile('Net sales',money(t.net_sales_cents),'after refunds & Square fees')+tile('COGS',money(t.cogs_cents),R.has_bank?'from bank ledger':'no bank data yet')+tile('Operating expenses',money(t.opex_cents),'')+tile('EBITDA',money(t.ebitda_cents),(t.ebitda_pct==null?'–':t.ebitda_pct+'%')+' of net sales')+tile('Web cup sales',money(t.web_cents),'')+tile('Cash sales',money(t.cash_cents),'must be deposited')+tile('Bank vs Square',money(t.bank_income_cents-t.net_sales_cents),'deposits minus net sales');
+  $('#tiles').innerHTML=tile('Net sales',money(t.net_sales_cents),'after refunds & Square fees')+tile('COGS',money(t.cogs_cents),R.has_bank?'from bank ledger':'no bank data yet')+tile('Operating expenses',money(t.opex_cents),'')+tile('EBITDA',money(t.ebitda_cents),(t.ebitda_pct==null?'–':t.ebitda_pct+'%')+' of net sales')+tile('Web cup sales',money(t.web_cents),'')+tile('Cash sales',money(t.cash_cents),'must be deposited')+tile('Bank vs Square',money(t.bank_income_cents-t.net_sales_cents),'deposits minus net sales')+tile('Personal spending',money(t.categories.personal||0),'kept out of the business numbers');
   const ms=R.months; const row=(label,fn,cls,key)=>'<tr class="'+(cls||'')+(key?' click':'')+'"'+(key?' data-cat="'+key+'"':'')+'><td>'+label+'</td>'+ms.map(m=>'<td class="num">'+fn(R.pnl.find(p=>p.month===m))+'</td>').join('')+'<td class="num"><b>'+fn(t)+'</b></td></tr>';
   let html='<tr><th>'+(R.has_bank?'':'<span class="pill warn">import a bank CSV to fill expenses</span>')+'</th>'+ms.map(m=>'<th class="num">'+mon(m)+'</th>').join('')+'<th class="num">Total</th></tr>';
   html+=row('Gross sales (Square)',p=>money(p.gross_cents))+row('Refunds',p=>money(-p.refunds_cents),'sub')+row('Square fees',p=>money(-p.square_fees_cents),'sub')+row('<b>Net sales</b>',p=>money(p.net_sales_cents),'tot');
