@@ -6,6 +6,7 @@
 //   POST /event               funnel beacon from the website (cookieless)
 //   POST /submit              quote / order-details form from the website: stores it, emails Hugh and the customer (Resend)
 //   ALERT_TO (optional)       extra addresses that get a one-line text alert on new orders, payments and permits
+//   NTFY_TOPIC (optional)     ntfy.sh topic that gets the same one-line alert as a phone push notification
 //   POST /resale              resale permit info from the thank-you page
 //   POST /webhooks/square     Square webhook (payment.*, refund.*), verified with the signature key
 //   GET  /health
@@ -279,10 +280,16 @@ async function sendEmail(env, { to, subject, text, html, replyTo }) {
 
 // Short text-only alerts to extra addresses (ALERT_TO, comma-separated). Works with carrier email-to-text
 // gateways such as 5551234567@vtext.com, so a phone gets a text the moment something happens.
+// NTFY_TOPIC (optional) also pushes the same line to the free ntfy phone app: https://ntfy.sh/<topic>
 async function sendAlert(env, text) {
+  const msg = String(text).slice(0, 300);
+  const jobs = [];
   const to = String(env.ALERT_TO || "").split(",").map((s) => s.trim()).filter(Boolean);
-  if (!to.length || !env.RESEND_API_KEY) return { ok: false, skipped: true };
-  return sendEmail(env, { to, subject: "HD Laser", text: String(text).slice(0, 300) });
+  if (to.length && env.RESEND_API_KEY) jobs.push(sendEmail(env, { to, subject: "HD Laser", text: msg }));
+  if (env.NTFY_TOPIC) jobs.push(fetch("https://ntfy.sh/" + encodeURIComponent(env.NTFY_TOPIC), { method: "POST", headers: { "Title": "HD Laser", "Priority": "high", "Tags": "moneybag" }, body: msg }).then((r) => ({ ok: r.ok })).catch((e) => ({ ok: false, error: String(e) })));
+  if (!jobs.length) return { ok: false, skipped: true };
+  const results = await Promise.all(jobs);
+  return { ok: results.some((r) => r && r.ok) };
 }
 
 async function recordResale(request, env, cors) {
