@@ -302,11 +302,13 @@ async function sendEmail(env, { to, subject, text, html, replyTo }) {
 // Short text-only alerts to extra addresses (ALERT_TO, comma-separated). Works with carrier email-to-text
 // gateways such as 5551234567@vtext.com, so a phone gets a text the moment something happens.
 // NTFY_TOPIC (optional) also pushes the same line to the free ntfy phone app: https://ntfy.sh/<topic>
-async function sendAlert(env, text) {
+// opts.emailShop: also email SUPPORT_EMAIL when no ALERT_TO is set (used for staff alerts, which have no other email path)
+async function sendAlert(env, text, opts = {}) {
   const msg = String(text).slice(0, 300);
   const jobs = [];
-  const to = String(env.ALERT_TO || "").split(",").map((s) => s.trim()).filter(Boolean);
-  if (to.length && env.RESEND_API_KEY) jobs.push(sendEmail(env, { to, subject: "HD Laser", text: msg }));
+  let to = String(env.ALERT_TO || "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (!to.length && opts.emailShop && env.SUPPORT_EMAIL) to = [env.SUPPORT_EMAIL];
+  if (to.length && env.RESEND_API_KEY) jobs.push(sendEmail(env, { to, subject: "HD Laser: " + msg.slice(0, 60), text: msg }));
   if (env.NTFY_TOPIC) jobs.push(fetch("https://ntfy.sh/" + encodeURIComponent(env.NTFY_TOPIC), { method: "POST", headers: { "Title": "HD Laser", "Priority": "high", "Tags": "moneybag" }, body: msg }).then((r) => ({ ok: r.ok })).catch((e) => ({ ok: false, error: String(e) })));
   // Real SMS through Twilio (see sendSms): ALERT_SMS_TO = comma-separated phones
   if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM && env.ALERT_SMS_TO)
@@ -876,7 +878,7 @@ async function staffRoutes(request, env, cors, path, url) {
       await staffLog(env, me.id, "clock_in", "");
       const l = local();
       const first = await env.DB.prepare(`SELECT COUNT(*) n FROM shifts WHERE in_at >= ? AND in_at < ?`).bind(localDayRange(l.date).from, now).first();
-      if (staffAlertsOn(env, "clockin")) await sendAlert(env, `${me.name} clocked in at ${fmtLocal(now)}${first.n === 0 ? " (first in today)" : ""}.`);
+      if (staffAlertsOn(env, "clockin")) await sendAlert(env, `${me.name} clocked in at ${fmtLocal(now)}${first.n === 0 ? " (first in today)" : ""}.`, { emailShop: true });
       await env.DB.prepare(`DELETE FROM meta WHERE k = 'noshow_pending'`).run();
       return json({ ok: true, shift: { id: r.meta && r.meta.last_row_id, in_at: now } }, 200, cors);
     }
@@ -885,7 +887,7 @@ async function staffRoutes(request, env, cors, path, url) {
       const mins = Math.max(1, Math.round((Date.now() - new Date(open.in_at)) / 60000));
       await env.DB.prepare(`UPDATE shifts SET out_at = ?, minutes = ?, note = ? WHERE id = ?`).bind(now, mins, String(b.note || "").slice(0, 500) || null, open.id).run();
       await staffLog(env, me.id, "clock_out", mins + " min");
-      if (staffAlertsOn(env, "clockout")) await sendAlert(env, `${me.name} clocked out at ${fmtLocal(now)} (${(mins / 60).toFixed(1)} h).`);
+      if (staffAlertsOn(env, "clockout")) await sendAlert(env, `${me.name} clocked out at ${fmtLocal(now)} (${(mins / 60).toFixed(1)} h).`, { emailShop: true });
       return json({ ok: true, minutes: mins }, 200, cors);
     }
     return json({ error: "action must be in or out" }, 400, cors);
@@ -1096,13 +1098,13 @@ async function noShowCheck(env) {
     if (onCall && onCall.phone) sentToOnCall = (await sendSms(env, onCall.phone, `HD Laser: nobody has clocked in and the shop should be open. Are you on your way? Reply 1 for yes, 2 if you can't make it.`)).ok;
     p = { date: l.date, on_call_id: onCall ? onCall.id : null, on_call_name: onCall ? onCall.name : null, last_hour: l.hour, muted: false };
     await env.DB.prepare(`INSERT OR REPLACE INTO meta (k, v) VALUES ('noshow_pending', ?)`).bind(JSON.stringify(p)).run();
-    if (staffAlertsOn(env, "noshow")) await sendAlert(env, `No employee is clocked in at ${hourLabel}.${onCall ? ` I texted ${onCall.name} (on call)${sentToOnCall ? "" : ", but the text failed"} asking for confirmation.` : " No on-call employee is set."} Reply 1 to text everyone else on the team, 2 to stop today's reminders.`);
+    if (staffAlertsOn(env, "noshow")) await sendAlert(env, `No employee is clocked in at ${hourLabel}.${onCall ? ` I texted ${onCall.name} (on call)${sentToOnCall ? "" : ", but the text failed"} asking for confirmation.` : " No on-call employee is set."} Reply 1 to text everyone else on the team, 2 to stop today's reminders.`, { emailShop: true });
     return { ok: true, alerted: "first", on_call: onCall ? onCall.name : null };
   }
   if (p.muted || p.last_hour === l.hour) return { ok: true, already_alerted: true };
   p.last_hour = l.hour;
   await env.DB.prepare(`INSERT OR REPLACE INTO meta (k, v) VALUES ('noshow_pending', ?)`).bind(JSON.stringify(p)).run();
-  if (staffAlertsOn(env, "noshow")) await sendAlert(env, `Still nobody clocked in at ${hourLabel}. Reply 1 to text the team, 2 to stop today's reminders.`);
+  if (staffAlertsOn(env, "noshow")) await sendAlert(env, `Still nobody clocked in at ${hourLabel}. Reply 1 to text the team, 2 to stop today's reminders.`, { emailShop: true });
   return { ok: true, alerted: "reminder" };
 }
 
@@ -1138,13 +1140,13 @@ async function twilioInbound(request, env) {
     return twiml("Reply 1 to text the rest of the team, or 2 to ignore.");
   }
   if (sender) {
-    if (body === "1") { await sendAlert(env, `${sender.name} replied: on the way.`); return twiml(`Thanks ${sender.name.split(" ")[0]}, see you soon. Remember to clock in at hdlaser.net/staff.`); }
-    if (body === "2") { await sendAlert(env, `${sender.name} replied: can't make it. Reply 1 to text the rest of the team.`); return twiml("Got it, I've let the owner know."); }
-    await sendAlert(env, `Text from ${sender.name}: ${body.slice(0, 200)}`);
+    if (body === "1") { await sendAlert(env, `${sender.name} replied: on the way.`, { emailShop: true }); return twiml(`Thanks ${sender.name.split(" ")[0]}, see you soon. Remember to clock in at hdlaser.net/staff.`); }
+    if (body === "2") { await sendAlert(env, `${sender.name} replied: can't make it. Reply 1 to text the rest of the team.`, { emailShop: true }); return twiml("Got it, I've let the owner know."); }
+    await sendAlert(env, `Text from ${sender.name}: ${body.slice(0, 200)}`, { emailShop: true });
     return twiml();
   }
   // Anyone else: forward to the owner, no auto-reply beyond Twilio's STOP/HELP handling.
-  await sendAlert(env, `Text from ${from}: ${body.slice(0, 200)}`);
+  await sendAlert(env, `Text from ${from}: ${body.slice(0, 200)}`, { emailShop: true });
   return twiml();
 }
 
