@@ -48,7 +48,7 @@ table{border-collapse:collapse;width:100%;font-size:15px;margin:8px 0 14px}th,td
 <p>Tick each step in the portal's opening checklist as you go. The list there is the source of truth; this is what each step means.</p>
 <ol>
 <li><b>Unlock the front door, turn off the alarm.</b></li>
-<li><b>Clock in.</b> This is how Hugh knows the shop is open. If nobody has clocked in by 10:15, the system texts Hugh and the on-call team member automatically.</li>
+<li><b>Clock in.</b> This is how Hugh knows the shop is open. If nobody is clocked in by 10:15, the system texts Hugh and the on-call team member automatically, and reminds Hugh every hour until someone clocks in.</li>
 <li><b>Back door open, lights on.</b></li>
 <li><b>Machines on:</b> lasers, UV printer, exhaust, compressor. Let them warm up while you do the next steps. Run the UV printer's nozzle check if it sat idle over a day off.</li>
 <li><b>Check messages:</b> contact@hdlaser.net and the shop phone. Every new web order and quote request also lands in the portal's work queue on its own.</li>
@@ -138,7 +138,7 @@ table{border-collapse:collapse;width:100%;font-size:15px;margin:8px 0 14px}th,td
 <ul>
 <li>See everyone's hours, shifts, on-time opens, checklist completion, jobs and job value in the portal's <b>Team</b> tab, and in the owner dashboard under <b>Team</b>.</li>
 <li>Add team members, reset PINs, set who is on call, and deactivate people from the Team tab. Deactivating someone signs them out immediately.</li>
-<li>Owner texts: Hugh gets a text when someone clocks in or out, when nobody has opened by 10:15, and for every new web order and payment. To change which staff events text him, edit the worker setting <code>STAFF_ALERTS</code>.</li>
+<li>Owner texts: Hugh gets a text when someone clocks in or out, when nobody is clocked in during open hours (first at 10:15, then hourly), and for every new web order and payment. To change which staff events text him, edit the worker setting <code>STAFF_ALERTS</code>.</li>
 <li>Weekly, Monday: review the Team table, the sales digest email, and the <i>Needs attention</i> lists on the dashboard.</li>
 </ul>
 

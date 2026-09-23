@@ -9,7 +9,7 @@
 //   NTFY_TOPIC (optional)     ntfy.sh topic that gets the same one-line alert as a phone push notification
 //   TWILIO_* + ALERT_SMS_TO   (optional) real SMS alerts through Twilio; see README
 //   /staff/*                  employee portal API (login, clock, checklist, jobs, team KPIs); site page at /staff/
-//   POST /webhooks/twilio     inbound texts (owner replies 1/2 to the no-show alert)
+//   POST /webhooks/twilio     inbound texts (owner replies 1/2 to the staffing alert)
 //   STAFF_ALERTS (optional)   which staff events text the owner: clockin,clockout,noshow (default all)
 //   POST /resale              resale permit info from the thank-you page
 //   POST /webhooks/square     Square webhook (payment.*, refund.*), verified with the signature key
@@ -129,7 +129,8 @@ export default {
     await ensureSchema(env);
     ctx.waitUntil((async () => {
       const d = new Date(event.scheduledTime || Date.now());
-      if (d.getUTCMinutes() >= 10) { await noShowCheck(env); return; }   // the :15 crons only run the no-show check
+      await noShowCheck(env);                                              // staffing watchdog: every tick during open hours
+      if (d.getUTCMinutes() >= 10) return;                                 // the :15 crons exist only for the 10:15 check
       await syncSquare(env, 3);
       if (d.getUTCDay() === 1 && d.getUTCHours() === 15) await sendDigest(env);
     })());
@@ -1075,21 +1076,34 @@ async function teamKpis(env, from, to) {
   return { range: { from: fromIso, to: toIso }, team: rows, aggregate: agg, log: recentLog, shifts: shiftsList, open_steps: OPEN_STEPS.length, close_steps: CLOSE_STEPS.length };
 }
 
-// 10:15 AM shop time: nobody clocked in yet? Text the owner and the on-call employee.
+// Staffing watchdog, runs on every cron tick. During open hours (10 AM to closing), if nobody is clocked in:
+// first alert of the day texts the on-call employee and the owner; then the owner gets one reminder per hour until
+// someone clocks in or the owner replies 2. Clocking in clears it.
 async function noShowCheck(env) {
   const l = local();
-  if (l.hour !== OPEN_HOUR || l.minute < 10 || l.minute > 25) return { skipped: "not 10:15 local" };
+  if (l.hour < OPEN_HOUR || l.hour >= CLOSE_HOUR(l.dow)) return { skipped: "outside open hours" };
+  if (l.hour === OPEN_HOUR && l.minute < 10) return { skipped: "before 10:10, opener may still be walking in" };
   const day = localDayRange(l.date);
-  const n = (await env.DB.prepare(`SELECT COUNT(*) n FROM shifts WHERE in_at >= ? AND in_at < ?`).bind(day.from, day.to).first()).n;
-  if (n > 0) return { ok: true, clocked_in: n };
-  const already = await env.DB.prepare(`SELECT v FROM meta WHERE k = 'noshow_pending'`).first();
-  if (already && JSON.parse(already.v).date === l.date) return { ok: true, already_alerted: true };
-  const onCall = await env.DB.prepare(`SELECT * FROM staff WHERE active = 1 AND on_call = 1 AND phone != '' ORDER BY role, name LIMIT 1`).first();
-  let sentToOnCall = false;
-  if (onCall && onCall.phone) sentToOnCall = (await sendSms(env, onCall.phone, `HD Laser: nobody has clocked in yet and the shop opens at 10. Are you on your way? Reply 1 for yes, 2 if you can't make it.`)).ok;
-  await env.DB.prepare(`INSERT OR REPLACE INTO meta (k, v) VALUES ('noshow_pending', ?)`).bind(JSON.stringify({ date: l.date, on_call_id: onCall ? onCall.id : null, on_call_name: onCall ? onCall.name : null })).run();
-  if (staffAlertsOn(env, "noshow")) await sendAlert(env, `No employee has clocked in by 10:15.${onCall ? ` I texted ${onCall.name} (on call)${sentToOnCall ? "" : ", but the text failed"} asking for confirmation.` : " No on-call employee is set."} Reply 1 to text everyone else on the team, 2 to ignore.`);
-  return { ok: true, alerted: true, on_call: onCall ? onCall.name : null };
+  const n = (await env.DB.prepare(`SELECT COUNT(*) n FROM shifts WHERE in_at >= ? AND in_at < ? AND out_at IS NULL`).bind(day.from, day.to).first()).n;
+  if (n > 0) { await env.DB.prepare(`DELETE FROM meta WHERE k = 'noshow_pending'`).run(); return { ok: true, clocked_in: n }; }
+  const row = await env.DB.prepare(`SELECT v FROM meta WHERE k = 'noshow_pending'`).first();
+  let p = row ? JSON.parse(row.v) : null;
+  if (p && p.date !== l.date) p = null;
+  const hourLabel = new Date().toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" });
+  if (!p) {
+    const onCall = await env.DB.prepare(`SELECT * FROM staff WHERE active = 1 AND on_call = 1 AND phone != '' ORDER BY role, name LIMIT 1`).first();
+    let sentToOnCall = false;
+    if (onCall && onCall.phone) sentToOnCall = (await sendSms(env, onCall.phone, `HD Laser: nobody has clocked in and the shop should be open. Are you on your way? Reply 1 for yes, 2 if you can't make it.`)).ok;
+    p = { date: l.date, on_call_id: onCall ? onCall.id : null, on_call_name: onCall ? onCall.name : null, last_hour: l.hour, muted: false };
+    await env.DB.prepare(`INSERT OR REPLACE INTO meta (k, v) VALUES ('noshow_pending', ?)`).bind(JSON.stringify(p)).run();
+    if (staffAlertsOn(env, "noshow")) await sendAlert(env, `No employee is clocked in at ${hourLabel}.${onCall ? ` I texted ${onCall.name} (on call)${sentToOnCall ? "" : ", but the text failed"} asking for confirmation.` : " No on-call employee is set."} Reply 1 to text everyone else on the team, 2 to stop today's reminders.`);
+    return { ok: true, alerted: "first", on_call: onCall ? onCall.name : null };
+  }
+  if (p.muted || p.last_hour === l.hour) return { ok: true, already_alerted: true };
+  p.last_hour = l.hour;
+  await env.DB.prepare(`INSERT OR REPLACE INTO meta (k, v) VALUES ('noshow_pending', ?)`).bind(JSON.stringify(p)).run();
+  if (staffAlertsOn(env, "noshow")) await sendAlert(env, `Still nobody clocked in at ${hourLabel}. Reply 1 to text the team, 2 to stop today's reminders.`);
+  return { ok: true, alerted: "reminder" };
 }
 
 // Twilio posts here when someone texts the shop's Twilio number. Owner replies 1/2 to the no-show alert; the on-call employee replies 1/2 too.
@@ -1120,7 +1134,7 @@ async function twilioInbound(request, env) {
       let n = 0; for (const s of others) if ((await sendSms(env, s.phone, `HD Laser: nobody has opened the shop yet. Can you come in? Reply 1 for yes.`)).ok) n++;
       return twiml(`Texted ${n} team member${n === 1 ? "" : "s"}. I'll tell you who replies.`);
     }
-    if (body === "2") { await env.DB.prepare(`DELETE FROM meta WHERE k = 'noshow_pending'`).run(); return twiml("OK, ignoring today's no-show."); }
+    if (body === "2") { p.muted = true; await env.DB.prepare(`INSERT OR REPLACE INTO meta (k, v) VALUES ('noshow_pending', ?)`).bind(JSON.stringify(p)).run(); return twiml("OK, no more reminders today. I'll still tell you when someone clocks in."); }
     return twiml("Reply 1 to text the rest of the team, or 2 to ignore.");
   }
   if (sender) {
