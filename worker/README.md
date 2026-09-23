@@ -83,3 +83,17 @@ Carrier email-to-text (ALERT_TO with an address like `number@vtext.com`) is free
 3. Messaging → Regulatory compliance → **Toll-Free Verification**. Business name HD Laser Studio INC, address, website hdlaser.net, use case "order notifications to the business owner", sample message `HD Laser: PAID $850 by Boards n' Beans (HD-7K2Q). 50 cups. Logo + proof next.`, volume under 100/month, opt-in "internal staff only". Approval usually takes 1–3 business days. Texts to unverified toll-free numbers are blocked, so wait for approval.
 4. In Cloudflare set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` (Secret), `TWILIO_FROM`, `ALERT_SMS_TO`, then Deploy.
 
+## Staff portal (hdlaser.net/staff)
+
+Every employee signs in with their own name and PIN (no shared account). The portal gives them clock in/out, the opening and closing checklists, the prioritized work queue with a same-day capacity counter, a form to log walk-in jobs, and their own weekly numbers. Managers and the owner also get a Team tab with everyone's KPIs, and can add people, reset PINs, set who is on call, and deactivate accounts. The written SOP lives at hdlaser.net/staff/sop/.
+
+Setup, once:
+
+1. **Add the first team members** on the owner dashboard (`/admin`, section *Team*). Hugh should be role `owner`. Employees who may open the shop alone get a cell number and, for one of them, *On call*.
+2. **No-show watchdog.** In Cloudflare → hdlaser-checkout → Settings → Trigger events, add two cron triggers next to the hourly one: `15 17 * * *` and `15 18 * * *`. The worker runs the check only when it is 10:15 AM Pacific (the two entries cover daylight and standard time). If nobody has clocked in, it texts the on-call employee ("Reply 1 if on your way, 2 if not") and the owner ("Reply 1 to text the rest of the team, 2 to ignore").
+3. **Inbound texts.** In Twilio → Phone Numbers → your toll-free number → Messaging configuration → *A message comes in*: Webhook, `https://hdlaser-checkout.yellow-smoke-9c0e.workers.dev/webhooks/twilio`, HTTP POST. Save. This is what lets Hugh and the on-call employee reply 1 or 2. Twilio still handles STOP/HELP itself.
+4. **Square passcodes.** In Square Dashboard → Staff → Team, add each employee with their own passcode and the permissions you want (sales yes; refunds up to a limit or manager only). Every sale and refund is then attributed to a person in Square; the worker stores the Square team member id on each payment for per-person sales later.
+5. Optional settings: `STAFF_ALERTS` (default `clockin,clockout,noshow`) picks which staff events text the owner. `PRODUCT_MINUTES` (JSON array of `{key,name,setup,each}`) overrides the planning minutes per product used by the queue and the capacity counter.
+
+Endpoints (all under `/staff/`, Bearer token from `/staff/login`): `me`, `clock`, `checklist`, `jobs`, `jobs/:id`, `orders/:ref`, `team` (managers). Admin: `/api/team`, `/api/staff`, `/api/noshow-check`.
+

@@ -8,6 +8,9 @@
 //   ALERT_TO (optional)       extra addresses that get a one-line text alert on new orders, payments and permits
 //   NTFY_TOPIC (optional)     ntfy.sh topic that gets the same one-line alert as a phone push notification
 //   TWILIO_* + ALERT_SMS_TO   (optional) real SMS alerts through Twilio; see README
+//   /staff/*                  employee portal API (login, clock, checklist, jobs, team KPIs); site page at /staff/
+//   POST /webhooks/twilio     inbound texts (owner replies 1/2 to the no-show alert)
+//   STAFF_ALERTS (optional)   which staff events text the owner: clockin,clockout,noshow (default all)
 //   POST /resale              resale permit info from the thank-you page
 //   POST /webhooks/square     Square webhook (payment.*, refund.*), verified with the signature key
 //   GET  /health
@@ -43,9 +46,18 @@ CREATE INDEX IF NOT EXISTS square_items_order ON square_items(order_id);
 CREATE INDEX IF NOT EXISTS square_items_created ON square_items(created_at);
 CREATE TABLE IF NOT EXISTS inquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, kind TEXT NOT NULL, ref TEXT, name TEXT, business TEXT, email TEXT, phone TEXT, fields TEXT, emailed INTEGER DEFAULT 0);
 CREATE INDEX IF NOT EXISTS inquiries_created ON inquiries(created_at);
-CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);`;
+CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
+CREATE TABLE IF NOT EXISTS staff (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'staff', phone TEXT DEFAULT '', email TEXT DEFAULT '', pin_hash TEXT, pin_salt TEXT, on_call INTEGER DEFAULT 0, active INTEGER DEFAULT 1, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS staff_sessions (token TEXT PRIMARY KEY, staff_id INTEGER NOT NULL, created_at TEXT, expires_at TEXT, ip TEXT);
+CREATE TABLE IF NOT EXISTS shifts (id INTEGER PRIMARY KEY AUTOINCREMENT, staff_id INTEGER NOT NULL, in_at TEXT NOT NULL, out_at TEXT, minutes INTEGER, note TEXT);
+CREATE INDEX IF NOT EXISTS shifts_in ON shifts(in_at);
+CREATE TABLE IF NOT EXISTS checklist (id INTEGER PRIMARY KEY AUTOINCREMENT, shift_id INTEGER NOT NULL, kind TEXT NOT NULL, step INTEGER NOT NULL, done_at TEXT, UNIQUE(shift_id, kind, step));
+CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, staff_id INTEGER, customer TEXT, phone TEXT, product TEXT NOT NULL, qty INTEGER DEFAULT 1, minutes INTEGER, amount_cents INTEGER DEFAULT 0, due_at TEXT, status TEXT DEFAULT 'queued', started_at TEXT, done_at TEXT, done_by INTEGER, note TEXT, ref TEXT);
+CREATE INDEX IF NOT EXISTS jobs_status ON jobs(status);
+CREATE TABLE IF NOT EXISTS staff_log (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, staff_id INTEGER, action TEXT NOT NULL, detail TEXT);
+CREATE INDEX IF NOT EXISTS staff_log_ts ON staff_log(ts);`;
 // Columns added after the first release. Each ALTER is tried once and ignored if the column already exists.
-const ALTERS = ["ALTER TABLE orders ADD COLUMN notified_paid_at TEXT"];
+const ALTERS = ["ALTER TABLE orders ADD COLUMN notified_paid_at TEXT", "ALTER TABLE payments ADD COLUMN team_member_id TEXT"];
 
 let migrated = false;
 async function ensureSchema(env) {
@@ -81,6 +93,9 @@ export default {
       if (path === "/submit" && request.method === "POST") return requireOrigin(cors) || submitInquiry(request, env, cors);
       if (path === "/resale" && request.method === "POST") return requireOrigin(cors) || recordResale(request, env, cors);
       if (path === "/webhooks/square" && request.method === "POST") return squareWebhook(request, env);
+      if (path === "/webhooks/twilio" && request.method === "POST") return twilioInbound(request, env);
+      // ---- staff portal (per-employee sign-in, Bearer token) ----
+      if (path.startsWith("/staff/")) return requireOrigin(cors) || staffRoutes(request, env, cors, path, url);
 
       // ---- admin ----
       if (path === "/admin" || path.startsWith("/api/")) {
@@ -95,6 +110,9 @@ export default {
           return json(await syncSquare(env, days, from, to), 200);
         }
         if (path === "/api/whoami") return json(await whoami(env), 200);
+        if (path === "/api/team") return json(await teamKpis(env, url.searchParams.get("from"), url.searchParams.get("to")), 200, { "Cache-Control": "no-store" });
+        if (path === "/api/staff" && request.method === "POST") { const r = await upsertStaff(env, await request.json()); await staffLog(env, null, "team_update_admin", JSON.stringify({ id: r.id })); return json(r, r.ok ? 200 : 400); }
+        if (path === "/api/noshow-check" && request.method === "POST") return json(await noShowCheck(env), 200);
         if (path === "/api/digest" && request.method === "POST") return json(await sendDigest(env), 200);
         const m = path.match(/^\/api\/orders\/(HD-[A-Z0-9]+)$/);
         if (m && request.method === "POST") return json(await updateOrder(env, m[1], await request.json()), 200);
@@ -110,8 +128,9 @@ export default {
     const env = cleanEnv(rawEnv);
     await ensureSchema(env);
     ctx.waitUntil((async () => {
-      await syncSquare(env, 3);
       const d = new Date(event.scheduledTime || Date.now());
+      if (d.getUTCMinutes() >= 10) { await noShowCheck(env); return; }   // the :15 crons only run the no-show check
+      await syncSquare(env, 3);
       if (d.getUTCDay() === 1 && d.getUTCHours() === 15) await sendDigest(env);
     })());
   },
@@ -288,16 +307,9 @@ async function sendAlert(env, text) {
   const to = String(env.ALERT_TO || "").split(",").map((s) => s.trim()).filter(Boolean);
   if (to.length && env.RESEND_API_KEY) jobs.push(sendEmail(env, { to, subject: "HD Laser", text: msg }));
   if (env.NTFY_TOPIC) jobs.push(fetch("https://ntfy.sh/" + encodeURIComponent(env.NTFY_TOPIC), { method: "POST", headers: { "Title": "HD Laser", "Priority": "high", "Tags": "moneybag" }, body: msg }).then((r) => ({ ok: r.ok })).catch((e) => ({ ok: false, error: String(e) })));
-  // Real SMS through Twilio: TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN (secret) + TWILIO_FROM (your Twilio number) + ALERT_SMS_TO (comma-separated phones)
-  if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM && env.ALERT_SMS_TO) {
-    const auth = "Basic " + btoa(env.TWILIO_ACCOUNT_SID + ":" + env.TWILIO_AUTH_TOKEN);
-    for (const raw of String(env.ALERT_SMS_TO).split(",")) {
-      const to = e164(raw); if (!to) continue;
-      const form = new URLSearchParams({ To: to, From: e164(env.TWILIO_FROM) || env.TWILIO_FROM, Body: "HD Laser: " + msg.slice(0, 140) });
-      jobs.push(fetch(`https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`, { method: "POST", headers: { "Authorization": auth, "Content-Type": "application/x-www-form-urlencoded" }, body: form })
-        .then(async (r) => { if (!r.ok) console.error("twilio", r.status, (await r.text()).slice(0, 300)); return { ok: r.ok }; }).catch((e) => ({ ok: false, error: String(e) })));
-    }
-  }
+  // Real SMS through Twilio (see sendSms): ALERT_SMS_TO = comma-separated phones
+  if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM && env.ALERT_SMS_TO)
+    for (const raw of String(env.ALERT_SMS_TO).split(",")) if (e164(raw)) jobs.push(sendSms(env, raw, "HD Laser: " + msg.slice(0, 140)));
   if (!jobs.length) return { ok: false, skipped: true };
   const results = await Promise.all(jobs);
   return { ok: results.some((r) => r && r.ok) };
@@ -420,6 +432,7 @@ async function upsertPayment(env, p) {
   await env.DB.prepare(`INSERT INTO payments (payment_id, created_at, updated_at, status, amount_cents, fee_cents, refunded_cents, square_order_id, ref, source, card_brand) VALUES (?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(payment_id) DO UPDATE SET updated_at=excluded.updated_at, status=excluded.status, amount_cents=excluded.amount_cents, fee_cents=excluded.fee_cents, refunded_cents=excluded.refunded_cents, ref=COALESCE(excluded.ref, payments.ref), card_brand=COALESCE(excluded.card_brand, payments.card_brand)`)
     .bind(p.id, p.created_at || null, p.updated_at || null, p.status || null, amount, fee, refunded, p.order_id || null, ref, p.source_type || null, brand).run();
+  if (p.team_member_id) await env.DB.prepare(`UPDATE payments SET team_member_id = ? WHERE payment_id = ?`).bind(p.team_member_id, p.id).run().catch(() => {});
   if (ref && p.status === "COMPLETED") {
     await env.DB.prepare(`UPDATE orders SET status = CASE WHEN ? >= total_cents AND ? > 0 THEN 'refunded' ELSE 'paid' END, square_payment_id = ?, paid_at = COALESCE(paid_at, ?), paid_cents = ?, fee_cents = ?, refunded_cents = ? WHERE ref = ?`)
       .bind(refunded, refunded, p.id, p.created_at || new Date().toISOString(), amount, fee, refunded, ref).run();
@@ -627,6 +640,17 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
 <h2>Needs attention</h2><div class="grid" id="attention"></div>
 <h2>Recent orders</h2><div class="card"><table id="orders"></table></div>
 <h2>Quote requests &amp; form submissions</h2><div class="card"><table id="inq"></table></div>
+<h2>Team</h2>
+<div class="grid" id="team"></div>
+<div class="card" style="margin-top:14px"><h3 style="margin:0 0 6px">Add a team member</h3>
+<form id="addstaff" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+<input name="name" placeholder="Name (e.g. Sam R.)" required style="font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:8px">
+<select name="role" style="font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:8px"><option value="staff">Staff</option><option value="manager">Manager</option><option value="owner">Owner</option></select>
+<input name="phone" placeholder="Cell (for on-call texts)" style="font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:8px">
+<input name="pin" placeholder="PIN, 4-8 digits" inputmode="numeric" pattern="\\d{4,8}" required style="font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:8px">
+<label class="small"><input type="checkbox" name="on_call"> On call</label>
+<button class="act" type="submit">Add</button><span class="small" id="addmsg"></span></form>
+<p class="small" style="margin:8px 0 0">Employees sign in at <b>hdlaser.net/staff</b> with their name and PIN. Managers and owners can edit the team there too.</p></div>
 </main>
 <script>
 const $=s=>document.querySelector(s), money=c=>'$'+((c||0)/100).toLocaleString('en-US',{maximumFractionDigits:0}), esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -661,8 +685,16 @@ async function load(){
     list('Sales tax to invoice',a.tax_due,r=>'<tr><td><b>'+r.ref+'</b><div class="small">paid '+fmtDate(r.paid_at)+'</div></td><td>'+who(r)+'</td><td class="num">'+money(r.tax_cents)+'<div class="small">on '+money(r.base_cents)+'</div></td><td>'+flag(r.ref,'tax_invoiced_at',0,'Invoiced')+flag(r.ref,'resale_received_at',0,'Cert received')+'</td></tr>')+
     list('In production',a.in_production,r=>'<tr><td><b>'+r.ref+'</b><div class="small">approved '+fmtDate(r.proof_approved_at)+'</div></td><td>'+esc(r.business||r.name)+'<div class="small">'+r.cups+' cups</div></td><td>'+flag(r.ref,'completed_at',0,'Done')+'</td></tr>');
   $('#orders').innerHTML='<tr><th>Ref</th><th>Customer</th><th>Items</th><th class="num">Total</th><th>Status</th><th>Progress</th></tr>'+k.recent.map(r=>'<tr><td><b>'+r.ref+'</b><div class="small">'+fmtDate(r.created_at)+'</div></td><td>'+who(r)+'</td><td class="small">'+esc(r.items||'')+'</td><td class="num">'+money(r.total_cents)+(r.refunded_cents?'<div class="small">refunded '+money(r.refunded_cents)+'</div>':'')+(r.fee_cents?'<div class="small">fee '+money(r.fee_cents)+'</div>':'')+'</td><td><span class="pill '+r.status+'">'+r.status.replace('_',' ')+'</span></td><td>'+flag(r.ref,'logo_received_at',r.logo_received_at,'Logo')+flag(r.ref,'proof_approved_at',r.proof_approved_at,'Proof OK')+flag(r.ref,'completed_at',r.completed_at,'Done')+flag(r.ref,'resale_received_at',r.resale_received_at,'Resale cert')+flag(r.ref,'tax_invoiced_at',r.tax_invoiced_at,'Tax invoiced')+'</td></tr>').join('');
+  loadTeam();
   $('#inq').innerHTML=k.inquiries.length?'<tr><th>When</th><th>Type</th><th>Who</th><th>Details</th><th>Sent</th></tr>'+k.inquiries.map(i=>'<tr><td class="small">'+fmtDate(i.created_at)+'</td><td><span class="pill">'+esc(i.kind)+(i.ref?' '+i.ref:'')+'</span></td><td>'+who(i)+'</td><td class="small">'+esc(Object.entries(i.fields).filter(([k])=>!['Name','Business','Phone','Agreed to Terms of Sale','Terms version','Text message consent'].includes(k)).map(([k,v])=>k+': '+v).join(' · ')).slice(0,400)+'</td><td class="small">'+(i.emailed&1?'shop ✓ ':'')+(i.emailed&2?'customer ✓':'')+'</td></tr>').join(''):'<tr><td class="empty">'+(k.email_configured?'No submissions yet.':'Forms still go through Formspree until RESEND_API_KEY is set on the worker.')+'</td></tr>';
 }
+async function loadTeam(){ const q=new URLSearchParams(); if(from){q.set('from',from);} if(to){q.set('to',to);} if(!from){q.set('from',new Date(Date.now()-days*864e5).toISOString());}
+  const r=await fetch('/api/team?'+q); if(!r.ok) return; const t=await r.json(); const a=t.aggregate;
+  const rows=t.team.map(p=>'<tr><td><b>'+esc(p.name)+'</b><div class="small">'+esc(p.role)+(p.on_call?' · on call':'')+(p.active?'':' · inactive')+'</div></td><td class="num">'+p.shifts+'</td><td class="num">'+p.hours+'</td><td class="num">'+(p.opens?p.on_time_opens+'/'+p.opens:'-')+'</td><td class="num">'+(p.checklist_pct==null?'-':p.checklist_pct+'%')+'</td><td class="num">'+p.jobs_done+'</td><td class="num">'+money(p.jobs_done_amount_cents)+'</td></tr>').join('');
+  $('#team').innerHTML='<div class="card"><h3 style="margin:0 0 6px">Team KPIs</h3>'+(t.team.length?'<table><tr><th>Person</th><th class="num">Shifts</th><th class="num">Hours</th><th class="num">On-time opens</th><th class="num">Checklist</th><th class="num">Jobs done</th><th class="num">Job value</th></tr>'+rows+'<tr><td><b>Everyone</b></td><td class="num">'+a.shifts+'</td><td class="num">'+a.hours+'</td><td class="num">'+(a.opens?a.on_time_opens+'/'+a.opens:'-')+'</td><td></td><td class="num">'+a.jobs_done+'</td><td class="num">'+money(a.jobs_done_amount_cents)+'</td></tr></table>':'<p class="empty">No team members yet. Add the first one below.</p>')+'</div>'
+    +'<div class="card"><h3 style="margin:0 0 6px">Recent shifts</h3>'+(t.shifts.length?'<table>'+t.shifts.slice(0,20).map(s=>'<tr><td>'+esc(s.name)+'</td><td class="small">'+new Date(s.in_at).toLocaleString('en-US',{timeZone:'America/Los_Angeles',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+(s.out_at?' – '+new Date(s.out_at).toLocaleTimeString('en-US',{timeZone:'America/Los_Angeles',hour:'numeric',minute:'2-digit'}):' (open)')+'</td><td class="num">'+(s.minutes?(s.minutes/60).toFixed(1)+' h':'')+'</td></tr>').join('')+'</table>':'<p class="empty">No shifts yet</p>')+'</div>'
+    +'<div class="card"><h3 style="margin:0 0 6px">Activity log</h3>'+(t.log.length?'<table>'+t.log.slice(0,25).map(l=>'<tr><td class="small">'+new Date(l.ts).toLocaleString('en-US',{timeZone:'America/Los_Angeles',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+'</td><td>'+esc(l.name||'')+'</td><td class="small">'+esc(l.action)+' '+esc(l.detail||'')+'</td></tr>').join('')+'</table>':'<p class="empty">Nothing yet</p>')+'</div>'; }
+$('#addstaff').onsubmit=async e=>{ e.preventDefault(); const f=e.target; const body={name:f.name.value,role:f.role.value,phone:f.phone.value,pin:f.pin.value,on_call:f.on_call.checked}; const r=await fetch('/api/staff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const j=await r.json(); $('#addmsg').textContent=j.ok?'Added. They can sign in now.':(j.error||'Failed'); if(j.ok){ f.reset(); loadTeam(); } };
 document.addEventListener('click',async e=>{
   const b=e.target.closest('button[data-ref]'); if(b){ const body={}; body[b.dataset.field]=b.dataset.val==='1'; await fetch('/api/orders/'+b.dataset.ref,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); load(); return; }
   const rb=e.target.closest('#ranges button[data-d]'); if(rb){ document.querySelectorAll('#ranges button').forEach(x=>x.classList.remove('on')); rb.classList.add('on'); days=+rb.dataset.d; from=to=null; $('#from').value=''; $('#to').value=''; load(); }
@@ -703,7 +735,7 @@ async function hmacBase64(key, msg) {
 }
 function corsHeaders(origin, env) {
   const allowed = String(env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
-  const h = { "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type", "Vary": "Origin" };
+  const h = { "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, Authorization", "Vary": "Origin" };
   if (allowed.includes(origin)) h["Access-Control-Allow-Origin"] = origin;
   return h;
 }
@@ -711,3 +743,405 @@ function json(obj, status, headers) { return new Response(JSON.stringify(obj), {
 function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 function money(m) { return m && typeof m.amount === "number" ? m.amount : 0; }
 function e164(phone) { const d = String(phone || "").replace(/\D/g, ""); if (d.length === 10) return "+1" + d; if (d.length === 11 && d[0] === "1") return "+" + d; return undefined; }
+
+// ================================================================ staff portal
+// Every employee signs in with their own name + PIN (no shared account). Sessions last one shift (14 h).
+// Owner/manager create staff from the /admin dashboard or from the portal's Team tab.
+
+const TZ = "America/Los_Angeles";
+const OPEN_HOUR = 10;                                   // shop opens 10:00 every day
+const CLOSE_HOUR = (dow) => (dow === 0 ? 15 : 17);      // Sunday closes 3 PM, otherwise 5 PM
+const OPEN_STEPS = [
+  "Unlock front door, turn off alarm",
+  "Clock in on this page",
+  "Open back door, lights on",
+  "Turn on lasers, UV printer and exhaust; let them warm up",
+  "Check contact@hdlaser.net and the shop phone for new orders and messages",
+  "Review today's work queue below and plan the day",
+  "Count the cash drawer, open Square Point of Sale with your own passcode",
+  "Wipe counters, restock cups and samples at the front",
+];
+const CLOSE_STEPS = [
+  "Finish or safely pause every job that's running; mark done jobs below",
+  "Reply to any customer waiting on a proof or a pickup time",
+  "Close out Square: count the drawer, note any overage/shortage",
+  "Clean laser beds, empty scrap, wipe the UV printer",
+  "Turn off machines, exhaust and compressor",
+  "Lock back door, lights off, set alarm",
+  "Clock out on this page",
+  "Lock the front door",
+];
+// Time value per product. Minutes = setup + each × quantity. Override with PRODUCT_MINUTES (JSON array) in Cloudflare.
+const PRODUCTS = [
+  { key: "cup_engraved", name: "Logo cups, laser engraved", setup: 20, each: 2.5 },
+  { key: "cup_printed", name: "Logo cups, UV printed", setup: 30, each: 3 },
+  { key: "tumbler", name: "Tumbler or bottle engraving", setup: 10, each: 12 },
+  { key: "uv_small", name: "UV print, small item", setup: 10, each: 8 },
+  { key: "award", name: "Plaque, award or trophy", setup: 15, each: 25 },
+  { key: "board", name: "Cutting board or wood engraving", setup: 10, each: 20 },
+  { key: "glass", name: "Glassware engraving", setup: 10, each: 10 },
+  { key: "tags", name: "Metal tags or plates", setup: 10, each: 3 },
+  { key: "cut", name: "Laser cut or layered art", setup: 20, each: 45 },
+  { key: "other", name: "Other or custom", setup: 15, each: 20 },
+];
+const WALKIN_MINUTES = 30;       // planning size of a typical same-day walk-in job
+const UTILIZATION = 0.7;         // share of a shift that is real machine time; the rest is customers, cleanup, breaks
+const ON_TIME_GRACE_MIN = 5;     // clock-in by 10:05 counts as on time
+
+function products(env) {
+  if (env.PRODUCT_MINUTES) { try { const p = JSON.parse(env.PRODUCT_MINUTES); if (Array.isArray(p) && p.length) return p; } catch {} }
+  return PRODUCTS;
+}
+function productMinutes(env, key, qty) {
+  const p = products(env).find((x) => x.key === key) || PRODUCTS[PRODUCTS.length - 1];
+  return Math.round(p.setup + p.each * Math.max(1, qty || 1));
+}
+// Local (Pacific) time parts for a Date, so shifts and opening times follow the shop clock, not UTC.
+function local(d = new Date()) {
+  const f = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", weekday: "short" });
+  const o = {}; for (const p of f.formatToParts(d)) o[p.type] = p.value;
+  const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(o.weekday);
+  return { date: `${o.year}-${o.month}-${o.day}`, hour: +o.hour % 24, minute: +o.minute, dow, minutes: (+o.hour % 24) * 60 + (+o.minute) };
+}
+function fmtLocal(iso) { return iso ? new Date(iso).toLocaleString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" }) : ""; }
+// Minutes to add to UTC to get shop-local time (negative in California).
+function tzOffsetMin(d) {
+  const f = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const o = {}; for (const p of f.formatToParts(d)) o[p.type] = p.value;
+  return Math.round((Date.UTC(+o.year, +o.month - 1, +o.day, +o.hour % 24, +o.minute, +o.second) - d.getTime()) / 60000);
+}
+// ISO range covering one shop-local calendar day.
+function localDayRange(dateStr) {
+  const off = tzOffsetMin(new Date(dateStr + "T12:00:00Z"));
+  const start = new Date(Date.parse(dateStr + "T00:00:00Z") - off * 60000);
+  return { from: start.toISOString(), to: new Date(start.getTime() + 86400000).toISOString() };
+}
+
+async function pbkdf(pin, saltHex) {
+  const salt = new Uint8Array(saltHex.match(/../g).map((h) => parseInt(h, 16)));
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(String(pin)), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 100000 }, key, 256);
+  return [...new Uint8Array(bits)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+function randomHex(n) { return [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, "0")).join(""); }
+const ROLE_RANK = { staff: 1, manager: 2, owner: 3 };
+
+async function staffSession(request, env) {
+  const h = request.headers.get("Authorization") || "";
+  if (!h.startsWith("Bearer ")) return null;
+  const token = h.slice(7).trim();
+  if (!/^[a-f0-9]{64}$/.test(token)) return null;
+  const row = await env.DB.prepare(`SELECT s.token, s.expires_at, p.* FROM staff_sessions s JOIN staff p ON p.id = s.staff_id WHERE s.token = ? AND p.active = 1`).bind(token).first();
+  if (!row || new Date(row.expires_at) < new Date()) return null;
+  return row;
+}
+async function staffLog(env, staffId, action, detail) {
+  await env.DB.prepare(`INSERT INTO staff_log (ts, staff_id, action, detail) VALUES (?,?,?,?)`).bind(new Date().toISOString(), staffId || null, action, detail ? String(detail).slice(0, 500) : null).run();
+}
+function staffAlertsOn(env, kind) { return String(env.STAFF_ALERTS || "clockin,clockout,noshow").split(",").map((s) => s.trim()).includes(kind); }
+
+async function staffRoutes(request, env, cors, path, url) {
+  if (!env.DB) return json({ error: "No database" }, 503, cors);
+  const now = new Date().toISOString();
+
+  if (path === "/staff/login" && request.method === "POST") {
+    const ip = request.headers.get("CF-Connecting-IP") || "";
+    if (rateLimited("login:" + ip, 12, 600000)) return json({ error: "Too many attempts. Wait 10 minutes." }, 429, cors);
+    let b; try { b = await request.json(); } catch { return json({ error: "Bad JSON" }, 400, cors); }
+    const name = String(b.name || "").trim(), pin = String(b.pin || "").trim();
+    if (!name || !/^\d{4,8}$/.test(pin)) return json({ error: "Enter your name and your PIN" }, 400, cors);
+    const p = await env.DB.prepare(`SELECT * FROM staff WHERE lower(name) = lower(?) AND active = 1`).bind(name).first();
+    if (!p || !p.pin_hash || !timingSafeEqual(await pbkdf(pin, p.pin_salt), p.pin_hash)) { await staffLog(env, p && p.id, "login_failed", name); return json({ error: "Name or PIN doesn't match" }, 401, cors); }
+    const token = randomHex(32);
+    await env.DB.prepare(`INSERT INTO staff_sessions (token, staff_id, created_at, expires_at, ip) VALUES (?,?,?,?,?)`).bind(token, p.id, now, new Date(Date.now() + 14 * 3600000).toISOString(), ip).run();
+    await staffLog(env, p.id, "login", ip);
+    return json({ ok: true, token, me: pub(p) }, 200, cors);
+  }
+
+  const me = await staffSession(request, env);
+  if (!me) return json({ error: "Please sign in" }, 401, cors);
+  const isMgr = ROLE_RANK[me.role] >= 2;
+
+  if (path === "/staff/logout" && request.method === "POST") { await env.DB.prepare(`DELETE FROM staff_sessions WHERE token = ?`).bind(me.token).run(); return json({ ok: true }, 200, cors); }
+
+  if (path === "/staff/me") return json(await staffHome(env, me), 200, { ...cors, "Cache-Control": "no-store" });
+
+  if (path === "/staff/clock" && request.method === "POST") {
+    const b = await request.json().catch(() => ({}));
+    const open = await env.DB.prepare(`SELECT * FROM shifts WHERE staff_id = ? AND out_at IS NULL ORDER BY in_at DESC LIMIT 1`).bind(me.id).first();
+    if (b.action === "in") {
+      if (open) return json({ ok: true, shift: open, note: "Already clocked in" }, 200, cors);
+      const r = await env.DB.prepare(`INSERT INTO shifts (staff_id, in_at) VALUES (?,?)`).bind(me.id, now).run();
+      await staffLog(env, me.id, "clock_in", "");
+      const l = local();
+      const first = await env.DB.prepare(`SELECT COUNT(*) n FROM shifts WHERE in_at >= ? AND in_at < ?`).bind(localDayRange(l.date).from, now).first();
+      if (staffAlertsOn(env, "clockin")) await sendAlert(env, `${me.name} clocked in at ${fmtLocal(now)}${first.n === 0 ? " (first in today)" : ""}.`);
+      await env.DB.prepare(`DELETE FROM meta WHERE k = 'noshow_pending'`).run();
+      return json({ ok: true, shift: { id: r.meta && r.meta.last_row_id, in_at: now } }, 200, cors);
+    }
+    if (b.action === "out") {
+      if (!open) return json({ error: "You're not clocked in" }, 400, cors);
+      const mins = Math.max(1, Math.round((Date.now() - new Date(open.in_at)) / 60000));
+      await env.DB.prepare(`UPDATE shifts SET out_at = ?, minutes = ?, note = ? WHERE id = ?`).bind(now, mins, String(b.note || "").slice(0, 500) || null, open.id).run();
+      await staffLog(env, me.id, "clock_out", mins + " min");
+      if (staffAlertsOn(env, "clockout")) await sendAlert(env, `${me.name} clocked out at ${fmtLocal(now)} (${(mins / 60).toFixed(1)} h).`);
+      return json({ ok: true, minutes: mins }, 200, cors);
+    }
+    return json({ error: "action must be in or out" }, 400, cors);
+  }
+
+  if (path === "/staff/checklist" && request.method === "POST") {
+    const b = await request.json().catch(() => ({}));
+    const kind = b.kind === "close" ? "close" : "open";
+    const steps = kind === "open" ? OPEN_STEPS : CLOSE_STEPS;
+    const idx = parseInt(b.step, 10);
+    if (!(idx >= 0 && idx < steps.length)) return json({ error: "Bad step" }, 400, cors);
+    const shift = await env.DB.prepare(`SELECT id FROM shifts WHERE staff_id = ? AND out_at IS NULL ORDER BY in_at DESC LIMIT 1`).bind(me.id).first();
+    if (!shift) return json({ error: "Clock in first" }, 400, cors);
+    if (b.done === false) await env.DB.prepare(`DELETE FROM checklist WHERE shift_id = ? AND kind = ? AND step = ?`).bind(shift.id, kind, idx).run();
+    else await env.DB.prepare(`INSERT OR IGNORE INTO checklist (shift_id, kind, step, done_at) VALUES (?,?,?,?)`).bind(shift.id, kind, idx, now).run();
+    return json({ ok: true }, 200, cors);
+  }
+
+  if (path === "/staff/jobs" && request.method === "POST") {
+    const b = await request.json().catch(() => ({}));
+    const product = String(b.product || "other"), qty = clamp(parseInt(b.qty, 10) || 1, 1, 10000);
+    const minutes = clamp(parseInt(b.minutes, 10) || productMinutes(env, product, qty), 1, 100000);
+    const amount = Math.round((parseFloat(b.amount) || 0) * 100);
+    const due = b.due ? new Date(b.due) : null;
+    const r = await env.DB.prepare(`INSERT INTO jobs (created_at, staff_id, customer, phone, product, qty, minutes, amount_cents, due_at, status, note) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+      .bind(now, me.id, String(b.customer || "").slice(0, 120), String(b.phone || "").slice(0, 40), product, qty, minutes, amount, due && !isNaN(due) ? due.toISOString() : null, "queued", String(b.note || "").slice(0, 500)).run();
+    await staffLog(env, me.id, "job_new", `${product} x${qty} ${minutes}m $${amount / 100}`);
+    return json({ ok: true, id: r.meta && r.meta.last_row_id, minutes }, 200, cors);
+  }
+  let m = path.match(/^\/staff\/jobs\/(\d+)$/);
+  if (m && request.method === "POST") {
+    const b = await request.json().catch(() => ({}));
+    const id = +m[1];
+    if (b.status === "started") await env.DB.prepare(`UPDATE jobs SET status = 'started', started_at = COALESCE(started_at, ?) WHERE id = ?`).bind(now, id).run();
+    else if (b.status === "done") await env.DB.prepare(`UPDATE jobs SET status = 'done', done_at = ?, done_by = ? WHERE id = ?`).bind(now, me.id, id).run();
+    else if (b.status === "queued") await env.DB.prepare(`UPDATE jobs SET status = 'queued', done_at = NULL, done_by = NULL WHERE id = ?`).bind(id).run();
+    else if (b.status === "cancelled") await env.DB.prepare(`UPDATE jobs SET status = 'cancelled' WHERE id = ?`).bind(id).run();
+    else return json({ error: "Bad status" }, 400, cors);
+    await staffLog(env, me.id, "job_" + b.status, String(id));
+    return json({ ok: true }, 200, cors);
+  }
+  m = path.match(/^\/staff\/orders\/(HD-[A-Z0-9]+)$/);
+  if (m && request.method === "POST") {
+    const b = await request.json().catch(() => ({}));
+    const allowed = {}; for (const k of ["logo_received_at", "proof_approved_at", "completed_at"]) if (k in b) allowed[k] = b[k];
+    const r = await updateOrder(env, m[1], allowed);
+    await staffLog(env, me.id, "order_update", m[1] + " " + Object.keys(allowed).join(","));
+    return json(r, 200, cors);
+  }
+
+  // ---- managers and owner ----
+  if (path === "/staff/team") {
+    if (!isMgr) return json({ error: "Managers only" }, 403, cors);
+    if (request.method === "GET") return json(await teamKpis(env, url.searchParams.get("from"), url.searchParams.get("to")), 200, { ...cors, "Cache-Control": "no-store" });
+    if (request.method === "POST") {
+      const b = await request.json().catch(() => ({}));
+      if (b.role && ROLE_RANK[b.role] > ROLE_RANK[me.role]) return json({ error: "You can't grant a role above your own" }, 403, cors);
+      const r = await upsertStaff(env, b);
+      await staffLog(env, me.id, "team_update", (b.id ? "edit " : "add ") + (b.name || b.id));
+      return json(r, r.ok ? 200 : 400, cors);
+    }
+  }
+  return json({ error: "Not found" }, 404, cors);
+}
+function pub(p) { return { id: p.id, name: p.name, role: p.role, phone: p.phone || "", email: p.email || "", on_call: !!p.on_call, active: p.active !== 0 }; }
+
+async function upsertStaff(env, b) {
+  const name = String(b.name || "").trim().slice(0, 60);
+  const role = ["staff", "manager", "owner"].includes(b.role) ? b.role : "staff";
+  if (b.id) {
+    const sets = [], args = [];
+    if (name) { sets.push("name = ?"); args.push(name); }
+    if (b.role) { sets.push("role = ?"); args.push(role); }
+    for (const k of ["phone", "email"]) if (k in b) { sets.push(`${k} = ?`); args.push(String(b[k] || "").slice(0, 120)); }
+    if ("on_call" in b) { sets.push("on_call = ?"); args.push(b.on_call ? 1 : 0); }
+    if ("active" in b) { sets.push("active = ?"); args.push(b.active ? 1 : 0); if (!b.active) await env.DB.prepare(`DELETE FROM staff_sessions WHERE staff_id = ?`).bind(+b.id).run(); }
+    if (b.pin) { if (!/^\d{4,8}$/.test(String(b.pin))) return { ok: false, error: "PIN must be 4 to 8 digits" }; const salt = randomHex(16); sets.push("pin_salt = ?", "pin_hash = ?"); args.push(salt, await pbkdf(String(b.pin), salt)); }
+    if (!sets.length) return { ok: false, error: "Nothing to update" };
+    args.push(+b.id);
+    await env.DB.prepare(`UPDATE staff SET ${sets.join(", ")} WHERE id = ?`).bind(...args).run();
+    return { ok: true, id: +b.id };
+  }
+  if (!name) return { ok: false, error: "Name required" };
+  if (!/^\d{4,8}$/.test(String(b.pin || ""))) return { ok: false, error: "PIN must be 4 to 8 digits" };
+  const dup = await env.DB.prepare(`SELECT id FROM staff WHERE lower(name) = lower(?)`).bind(name).first();
+  if (dup) return { ok: false, error: "That name is already on the team. Use a last initial." };
+  const salt = randomHex(16);
+  const r = await env.DB.prepare(`INSERT INTO staff (name, role, phone, email, pin_hash, pin_salt, on_call, active, created_at) VALUES (?,?,?,?,?,?,?,1,?)`)
+    .bind(name, role, String(b.phone || "").slice(0, 40), String(b.email || "").slice(0, 120), await pbkdf(String(b.pin), salt), salt, b.on_call ? 1 : 0, new Date().toISOString()).run();
+  return { ok: true, id: r.meta && r.meta.last_row_id };
+}
+
+// What one employee sees when they open the portal.
+async function staffHome(env, me) {
+  const q = (sql, ...a) => env.DB.prepare(sql).bind(...a);
+  const l = local(); const day = localDayRange(l.date);
+  const shift = await q(`SELECT * FROM shifts WHERE staff_id = ? AND out_at IS NULL ORDER BY in_at DESC LIMIT 1`, me.id).first();
+  const done = shift ? (await q(`SELECT kind, step FROM checklist WHERE shift_id = ?`, shift.id).all()).results : [];
+  const onToday = (await q(`SELECT s.in_at, s.out_at, p.name FROM shifts s JOIN staff p ON p.id = s.staff_id WHERE s.in_at >= ? AND s.in_at < ? ORDER BY s.in_at`, day.from, day.to).all()).results;
+  const queue = await workQueue(env);
+  const cap = capacity(l, queue);
+  const week = weekRange(l.date);
+  const mine = await staffStats(env, me.id, week.from, week.to);
+  return {
+    me: pub(me), now: new Date().toISOString(), local: l,
+    shift: shift ? { id: shift.id, in_at: shift.in_at, minutes: Math.round((Date.now() - new Date(shift.in_at)) / 60000) } : null,
+    checklist: { open: OPEN_STEPS.map((s, i) => ({ step: s, done: done.some((d) => d.kind === "open" && d.step === i) })), close: CLOSE_STEPS.map((s, i) => ({ step: s, done: done.some((d) => d.kind === "close" && d.step === i) })) },
+    on_today: onToday.map((r) => ({ name: r.name, in_at: r.in_at, out_at: r.out_at })),
+    queue, capacity: cap, products: products(env), week: mine,
+    is_manager: ROLE_RANK[me.role] >= 2,
+  };
+}
+
+// Everything waiting to be made, scored so the most urgent and valuable work sits on top.
+async function workQueue(env) {
+  const q = (sql, ...a) => env.DB.prepare(sql).bind(...a);
+  const items = [];
+  const jobs = (await q(`SELECT j.*, p.name staff_name FROM jobs j LEFT JOIN staff p ON p.id = j.staff_id WHERE j.status IN ('queued','started') ORDER BY j.created_at`).all()).results;
+  for (const j of jobs) items.push({ kind: "job", id: j.id, title: `${j.customer || "Walk-in"}: ${prodName(env, j.product)} x${j.qty}`, note: j.note, phone: j.phone, minutes: j.minutes, amount_cents: j.amount_cents, due_at: j.due_at, created_at: j.created_at, status: j.status, by: j.staff_name });
+  const orders = (await q(`SELECT o.ref, o.business, o.name, o.phone, o.cups, o.paid_at, o.paid_cents, o.logo_received_at, o.proof_approved_at,
+      (SELECT SUM(CASE WHEN finish='printed' THEN qty*3+30 ELSE qty*2.5+20 END) FROM order_lines l WHERE l.ref=o.ref) minutes,
+      (SELECT GROUP_CONCAT(qty || ' x ' || size || 'oz ' || finish || ' ' || color || ' (' || lid || ')', '; ') FROM order_lines l WHERE l.ref = o.ref) items
+      FROM orders o WHERE o.status = 'paid' AND o.completed_at IS NULL ORDER BY o.paid_at`).all()).results;
+  for (const o of orders) {
+    const stage = !o.logo_received_at ? "waiting for logo" : !o.proof_approved_at ? "send proof" : "in production";
+    const due = o.proof_approved_at ? new Date(new Date(o.proof_approved_at).getTime() + 21 * 86400000).toISOString() : (o.logo_received_at ? new Date(new Date(o.logo_received_at).getTime() + 2 * 86400000).toISOString() : null);
+    items.push({ kind: "order", id: o.ref, title: `${o.business || o.name}: ${o.cups} logo cups`, note: o.items, phone: o.phone, minutes: stage === "in production" ? Math.round(o.minutes || 0) : stage === "send proof" ? 20 : 0, amount_cents: o.paid_cents, due_at: due, created_at: o.paid_at, status: stage, stage, logo: !!o.logo_received_at, proof: !!o.proof_approved_at });
+  }
+  const now = Date.now();
+  for (const it of items) {
+    let s = 40;
+    if (it.due_at) { const d = (new Date(it.due_at) - now) / 86400000; s = d < 0 ? 100 : d < 1 ? 80 : d < 2 ? 65 : Math.max(20, 55 - Math.round(d * 3)); }
+    if (it.status === "waiting for logo") s = 10;
+    s += Math.min(20, Math.round((it.amount_cents || 0) / 10000));
+    s += Math.min(10, Math.round((now - new Date(it.created_at)) / 86400000));
+    if (it.status === "started") s += 5;
+    it.score = s;
+  }
+  items.sort((a, b) => b.score - a.score);
+  return items;
+}
+function prodName(env, key) { const p = products(env).find((x) => x.key === key); return p ? p.name : key; }
+// How much same-day work the shop can still take today.
+function capacity(l, queue) {
+  const closeMin = CLOSE_HOUR(l.dow) * 60;
+  const left = Math.max(0, closeMin - Math.max(l.minutes, OPEN_HOUR * 60));
+  const workable = Math.round(left * UTILIZATION);
+  const committed = queue.filter((i) => i.status !== "waiting for logo" && (!i.due_at || new Date(i.due_at) <= new Date(new Date().getTime() + 86400000))).reduce((n, i) => n + (i.minutes || 0), 0);
+  const free = Math.max(0, workable - committed);
+  return { minutes_left_today: left, workable_minutes: workable, committed_minutes: committed, free_minutes: free, walkins_today: Math.floor(free / WALKIN_MINUTES), walkin_minutes: WALKIN_MINUTES, closes_at: CLOSE_HOUR(l.dow) };
+}
+function weekRange(dateStr) {
+  const d = new Date(dateStr + "T12:00:00Z"); const dow = d.getUTCDay();
+  const mon = new Date(d.getTime() - ((dow + 6) % 7) * 86400000);
+  const from = localDayRange(mon.toISOString().slice(0, 10)).from;
+  return { from, to: new Date(new Date(from).getTime() + 7 * 86400000).toISOString() };
+}
+async function staffStats(env, staffId, fromIso, toIso) {
+  const q = (sql, ...a) => env.DB.prepare(sql).bind(...a);
+  const shifts = (await q(`SELECT * FROM shifts WHERE staff_id = ? AND in_at >= ? AND in_at < ? ORDER BY in_at`, staffId, fromIso, toIso).all()).results;
+  let minutes = 0, onTime = 0, openers = 0, expected = 0;
+  for (const s of shifts) {
+    minutes += s.minutes || (s.out_at ? 0 : Math.round((Date.now() - new Date(s.in_at)) / 60000));
+    const li = local(new Date(s.in_at));
+    if (li.minutes <= OPEN_HOUR * 60 + 60) { // an opening shift
+      const first = await q(`SELECT MIN(in_at) m FROM shifts WHERE in_at >= ? AND in_at < ?`, localDayRange(li.date).from, localDayRange(li.date).to).first();
+      if (first.m === s.in_at) { openers++; if (li.minutes <= OPEN_HOUR * 60 + ON_TIME_GRACE_MIN) onTime++; }
+      expected += OPEN_STEPS.length;
+    }
+    if (s.out_at && local(new Date(s.out_at)).minutes >= CLOSE_HOUR(li.dow) * 60 - 90) expected += CLOSE_STEPS.length;
+  }
+  const ids = shifts.map((s) => s.id);
+  const doneSteps = ids.length ? (await q(`SELECT COUNT(*) n FROM checklist WHERE shift_id IN (${ids.map(() => "?").join(",")})`, ...ids).first()).n : 0;
+  const jobs = await q(`SELECT COUNT(*) n, COALESCE(SUM(amount_cents),0) amount, COALESCE(SUM(minutes),0) minutes FROM jobs WHERE done_by = ? AND done_at >= ? AND done_at < ?`, staffId, fromIso, toIso).first();
+  const logged = await q(`SELECT COUNT(*) n, COALESCE(SUM(amount_cents),0) amount FROM jobs WHERE staff_id = ? AND created_at >= ? AND created_at < ? AND status != 'cancelled'`, staffId, fromIso, toIso).first();
+  const orders = await q(`SELECT COUNT(*) n FROM staff_log WHERE staff_id = ? AND action = 'order_update' AND ts >= ? AND ts < ?`, staffId, fromIso, toIso).first();
+  return { shifts: shifts.length, hours: +(minutes / 60).toFixed(1), on_time_opens: onTime, opens: openers, checklist_pct: expected ? Math.min(100, Math.round(doneSteps / expected * 100)) : null, jobs_done: jobs.n, jobs_done_minutes: jobs.minutes, jobs_done_amount_cents: jobs.amount, jobs_logged: logged.n, jobs_logged_amount_cents: logged.amount, order_updates: orders.n };
+}
+async function teamKpis(env, from, to) {
+  const toIso = to ? new Date(to).toISOString() : new Date().toISOString();
+  const fromIso = from ? new Date(from).toISOString() : new Date(Date.now() - 30 * 86400000).toISOString();
+  const team = (await env.DB.prepare(`SELECT * FROM staff ORDER BY active DESC, role DESC, name`).all()).results;
+  const rows = [];
+  for (const p of team) rows.push({ ...pub(p), ...(await staffStats(env, p.id, fromIso, toIso)) });
+  const agg = rows.reduce((a, r) => ({ shifts: a.shifts + r.shifts, hours: +(a.hours + r.hours).toFixed(1), on_time_opens: a.on_time_opens + r.on_time_opens, opens: a.opens + r.opens, jobs_done: a.jobs_done + r.jobs_done, jobs_done_amount_cents: a.jobs_done_amount_cents + r.jobs_done_amount_cents, jobs_logged_amount_cents: a.jobs_logged_amount_cents + r.jobs_logged_amount_cents }), { shifts: 0, hours: 0, on_time_opens: 0, opens: 0, jobs_done: 0, jobs_done_amount_cents: 0, jobs_logged_amount_cents: 0 });
+  const recentLog = (await env.DB.prepare(`SELECT l.ts, l.action, l.detail, p.name FROM staff_log l LEFT JOIN staff p ON p.id = l.staff_id ORDER BY l.ts DESC LIMIT 60`).all()).results;
+  const shiftsList = (await env.DB.prepare(`SELECT s.in_at, s.out_at, s.minutes, p.name FROM shifts s JOIN staff p ON p.id = s.staff_id WHERE s.in_at >= ? AND s.in_at < ? ORDER BY s.in_at DESC LIMIT 100`).bind(fromIso, toIso).all()).results;
+  return { range: { from: fromIso, to: toIso }, team: rows, aggregate: agg, log: recentLog, shifts: shiftsList, open_steps: OPEN_STEPS.length, close_steps: CLOSE_STEPS.length };
+}
+
+// 10:15 AM shop time: nobody clocked in yet? Text the owner and the on-call employee.
+async function noShowCheck(env) {
+  const l = local();
+  if (l.hour !== OPEN_HOUR || l.minute < 10 || l.minute > 25) return { skipped: "not 10:15 local" };
+  const day = localDayRange(l.date);
+  const n = (await env.DB.prepare(`SELECT COUNT(*) n FROM shifts WHERE in_at >= ? AND in_at < ?`).bind(day.from, day.to).first()).n;
+  if (n > 0) return { ok: true, clocked_in: n };
+  const already = await env.DB.prepare(`SELECT v FROM meta WHERE k = 'noshow_pending'`).first();
+  if (already && JSON.parse(already.v).date === l.date) return { ok: true, already_alerted: true };
+  const onCall = await env.DB.prepare(`SELECT * FROM staff WHERE active = 1 AND on_call = 1 AND phone != '' ORDER BY role, name LIMIT 1`).first();
+  let sentToOnCall = false;
+  if (onCall && onCall.phone) sentToOnCall = (await sendSms(env, onCall.phone, `HD Laser: nobody has clocked in yet and the shop opens at 10. Are you on your way? Reply 1 for yes, 2 if you can't make it.`)).ok;
+  await env.DB.prepare(`INSERT OR REPLACE INTO meta (k, v) VALUES ('noshow_pending', ?)`).bind(JSON.stringify({ date: l.date, on_call_id: onCall ? onCall.id : null, on_call_name: onCall ? onCall.name : null })).run();
+  if (staffAlertsOn(env, "noshow")) await sendAlert(env, `No employee has clocked in by 10:15.${onCall ? ` I texted ${onCall.name} (on call)${sentToOnCall ? "" : ", but the text failed"} asking for confirmation.` : " No on-call employee is set."} Reply 1 to text everyone else on the team, 2 to ignore.`);
+  return { ok: true, alerted: true, on_call: onCall ? onCall.name : null };
+}
+
+// Twilio posts here when someone texts the shop's Twilio number. Owner replies 1/2 to the no-show alert; the on-call employee replies 1/2 too.
+async function twilioInbound(request, env) {
+  const raw = await request.text();
+  const params = Object.fromEntries(new URLSearchParams(raw));
+  if (env.TWILIO_AUTH_TOKEN) {
+    const sig = request.headers.get("X-Twilio-Signature") || "";
+    const url = env.WORKER_URL ? env.WORKER_URL.replace(/\/$/, "") + "/webhooks/twilio" : request.url;
+    const data = url + Object.keys(params).sort().map((k) => k + params[k]).join("");
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.TWILIO_AUTH_TOKEN), { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
+    const expected = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data)))));
+    if (!timingSafeEqual(sig, expected)) return new Response("Bad signature", { status: 403 });
+  }
+  const from = e164(params.From || "") || params.From || "", body = String(params.Body || "").trim();
+  const twiml = (msg) => new Response(`<?xml version="1.0" encoding="UTF-8"?><Response>${msg ? `<Message>${msg.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]))}</Message>` : ""}</Response>`, { headers: { "Content-Type": "text/xml" } });
+  const owners = String(env.ALERT_SMS_TO || "").split(",").map((s) => e164(s.trim())).filter(Boolean);
+  const pending = await env.DB.prepare(`SELECT v FROM meta WHERE k = 'noshow_pending'`).first();
+  const p = pending ? JSON.parse(pending.v) : null;
+  const staffRow = await env.DB.prepare(`SELECT * FROM staff WHERE active = 1 AND phone != ''`).all();
+  const sender = staffRow.results.find((s) => e164(s.phone) === from);
+  await staffLog(env, sender ? sender.id : null, "sms_in", `${from}: ${body.slice(0, 120)}`);
+
+  if (owners.includes(from)) {
+    if (!p) return twiml("HD Laser: nothing is waiting on a reply right now.");
+    if (body === "1") {
+      const others = staffRow.results.filter((s) => s.id !== p.on_call_id && !owners.includes(e164(s.phone)));
+      let n = 0; for (const s of others) if ((await sendSms(env, s.phone, `HD Laser: nobody has opened the shop yet. Can you come in? Reply 1 for yes.`)).ok) n++;
+      return twiml(`Texted ${n} team member${n === 1 ? "" : "s"}. I'll tell you who replies.`);
+    }
+    if (body === "2") { await env.DB.prepare(`DELETE FROM meta WHERE k = 'noshow_pending'`).run(); return twiml("OK, ignoring today's no-show."); }
+    return twiml("Reply 1 to text the rest of the team, or 2 to ignore.");
+  }
+  if (sender) {
+    if (body === "1") { await sendAlert(env, `${sender.name} replied: on the way.`); return twiml(`Thanks ${sender.name.split(" ")[0]}, see you soon. Remember to clock in at hdlaser.net/staff.`); }
+    if (body === "2") { await sendAlert(env, `${sender.name} replied: can't make it. Reply 1 to text the rest of the team.`); return twiml("Got it, I've let the owner know."); }
+    await sendAlert(env, `Text from ${sender.name}: ${body.slice(0, 200)}`);
+    return twiml();
+  }
+  // Anyone else: forward to the owner, no auto-reply beyond Twilio's STOP/HELP handling.
+  await sendAlert(env, `Text from ${from}: ${body.slice(0, 200)}`);
+  return twiml();
+}
+
+async function sendSms(env, to, body) {
+  const num = e164(to);
+  if (!num || !env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_FROM) return { ok: false, skipped: true };
+  const auth = "Basic " + btoa(env.TWILIO_ACCOUNT_SID + ":" + env.TWILIO_AUTH_TOKEN);
+  const form = new URLSearchParams({ To: num, From: e164(env.TWILIO_FROM) || env.TWILIO_FROM, Body: String(body).slice(0, 320) });
+  try {
+    const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`, { method: "POST", headers: { "Authorization": auth, "Content-Type": "application/x-www-form-urlencoded" }, body: form });
+    if (!r.ok) console.error("twilio", r.status, (await r.text()).slice(0, 300));
+    return { ok: r.ok };
+  } catch (e) { return { ok: false, error: String(e) }; }
+}

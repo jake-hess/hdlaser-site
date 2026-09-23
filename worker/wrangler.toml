@@ -3,7 +3,7 @@ main = "src/index.js"
 compatibility_date = "2026-01-01"
 
 [triggers]
-crons = ["0 * * * *"]          # hourly Square sync; Monday 15:00 UTC run also sends the digest
+crons = ["0 * * * *", "15 17 * * *", "15 18 * * *"]   # hourly Square sync (Mon 15:00 UTC also sends the digest); :15 runs are the 10:15 AM Pacific no-show check
 
 [[d1_databases]]
 binding = "DB"
