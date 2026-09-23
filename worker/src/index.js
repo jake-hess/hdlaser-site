@@ -13,6 +13,7 @@
 //   STAFF_ALERTS (optional)   which staff events text the owner: clockin,clockout,noshow (default all)
 //   GET  /admin/money         P&L, bank ledger, reconciliation, unit economics, 13-week cash forecast (Basic auth)
 //   /api/money, /api/bank/*   data behind it; bank statements are imported as CSV rows from the page
+//   /api/plaid/*              live bank feed (PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV); synced hourly with the Square job
 //   POST /resale              resale permit info from the thank-you page
 //   POST /webhooks/square     Square webhook (payment.*, refund.*), verified with the signature key
 //   GET  /health
@@ -62,7 +63,8 @@ CREATE TABLE IF NOT EXISTS bank_txns (id INTEGER PRIMARY KEY AUTOINCREMENT, hash
 CREATE INDEX IF NOT EXISTS bank_txns_posted ON bank_txns(posted_at);
 CREATE INDEX IF NOT EXISTS bank_txns_cat ON bank_txns(category);
 CREATE TABLE IF NOT EXISTS bank_rules (id INTEGER PRIMARY KEY AUTOINCREMENT, pattern TEXT NOT NULL, category TEXT NOT NULL, vendor TEXT, created_at TEXT);
-CREATE TABLE IF NOT EXISTS payouts (payout_id TEXT PRIMARY KEY, created_at TEXT, arrival_date TEXT, status TEXT, amount_cents INTEGER DEFAULT 0, location_id TEXT, type TEXT, matched_txn_id INTEGER);`;
+CREATE TABLE IF NOT EXISTS payouts (payout_id TEXT PRIMARY KEY, created_at TEXT, arrival_date TEXT, status TEXT, amount_cents INTEGER DEFAULT 0, location_id TEXT, type TEXT, matched_txn_id INTEGER);
+CREATE TABLE IF NOT EXISTS plaid_items (item_id TEXT PRIMARY KEY, access_token TEXT NOT NULL, institution TEXT, accounts TEXT, balances TEXT, cursor TEXT, status TEXT, last_error TEXT, synced_at TEXT, created_at TEXT);`;
 // Columns added after the first release. Each ALTER is tried once and ignored if the column already exists.
 const ALTERS = ["ALTER TABLE orders ADD COLUMN notified_paid_at TEXT", "ALTER TABLE payments ADD COLUMN team_member_id TEXT", "ALTER TABLE staff ADD COLUMN hourly_rate_cents INTEGER DEFAULT 0", "ALTER TABLE staff ADD COLUMN commission_pct REAL DEFAULT 0"];
 
@@ -123,6 +125,12 @@ export default {
         if (path === "/api/bank/import" && request.method === "POST") return json(await importBank(env, await request.json()), 200);
         if (path === "/api/bank/txns") return json(await txnsFor(env, url.searchParams.get("month"), url.searchParams.get("category")), 200, { "Cache-Control": "no-store" });
         if (path === "/api/bank/export.csv") return bankCsv(env);
+        if (path === "/api/plaid/link-token" && request.method === "POST") { const b = await request.json().catch(() => ({})); return json(await plaidLinkToken(env, b.item_id), 200); }
+        if (path === "/api/plaid/exchange" && request.method === "POST") return json(await plaidExchange(env, await request.json()), 200);
+        if (path === "/api/plaid/sync" && request.method === "POST") return json(await plaidSync(env), 200);
+        if (path === "/api/plaid/items") return json({ items: await plaidItems(env), configured: !!(env.PLAID_CLIENT_ID && env.PLAID_SECRET), env: env.PLAID_ENV || "sandbox" }, 200, { "Cache-Control": "no-store" });
+        const pm = path.match(/^\/api\/plaid\/items\/([\w-]+)$/);
+        if (pm && request.method === "DELETE") return json(await plaidRemove(env, pm[1]), 200);
         const bm = path.match(/^\/api\/bank\/txns\/(\d+)$/);
         if (bm && request.method === "POST") { const r = await categorize(env, +bm[1], await request.json()); return json(r, r.ok ? 200 : 400); }
         if (path === "/api/team") return json(await teamKpis(env, url.searchParams.get("from"), url.searchParams.get("to")), 200, { "Cache-Control": "no-store" });
@@ -147,6 +155,7 @@ export default {
       await noShowCheck(env);                                              // staffing watchdog: every tick during open hours
       if (d.getUTCMinutes() >= 10) return;                                 // the :15 crons exist only for the 10:15 check
       await syncSquare(env, 3);
+      if (env.PLAID_CLIENT_ID) await plaidSync(env);
       if (d.getUTCDay() === 1 && d.getUTCHours() === 15) await sendDigest(env);
     })());
   },
@@ -1534,7 +1543,8 @@ svg text{font-size:11px;fill:var(--muted)}
 
 <h2>Bank ledger</h2>
 <div class="grid">
-  <div class="card"><h3>Import bank or card statement (CSV)</h3>
+  <div class="card"><h3>Connected accounts <span class="pill" id="plaidenv"></span></h3><div id="plaid"></div><p style="margin-top:10px"><button class="act dark" id="plaidlink">Connect a bank or card</button> <button class="act" id="plaidsync">Pull now</button> <span class="small" id="plaidmsg"></span></p><p class="small">Live feed through Plaid. New transactions arrive every hour and land in the ledger with the same rules as CSV imports. Balances feed the forecast.</p></div>
+  <div class="card"><h3>Or import a statement (CSV)</h3>
     <p class="small">Download a CSV from the bank (any date range), pick it here. Columns are detected automatically: date, description, amount (or debit/credit), balance. Re-importing the same rows is safe; duplicates are skipped.</p>
     <p><input type="text" id="src" placeholder="Account name, e.g. Chase checking" style="width:60%"> <input type="file" id="csv" accept=".csv,text/csv"></p>
     <p><button class="act dark" id="imp">Import</button> <span class="small" id="impmsg"></span></p></div>
@@ -1549,6 +1559,7 @@ svg text{font-size:11px;fill:var(--muted)}
 </div>
 </main>
 <div id="drawer"><p style="text-align:right;margin:0"><button class="act" id="dclose">Close</button></p><h3 id="dtitle"></h3><p class="small" id="dsub"></p><table id="dtable"></table></div>
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
 <script>
 const $=s=>document.querySelector(s), esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const money=c=>(c<0?'-':'')+'$'+Math.abs((c||0)/100).toLocaleString('en-US',{maximumFractionDigits:0});
@@ -1619,6 +1630,101 @@ $('#imp').onclick=async()=>{ const f=$('#csv').files[0]; if(!f){ alert('Choose a
   const out=rows.slice(1).map(r=>({date:r[iDate],description:r[iDesc],amount:iAmt>=0?r[iAmt]:undefined,debit:iDeb>=0?r[iDeb]:undefined,credit:iCred>=0?r[iCred]:undefined,balance:iBal>=0?r[iBal]:undefined}));
   $('#impmsg').textContent='Importing '+out.length+' rows…'; const r=await fetch('/api/bank/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:$('#src').value||f.name.replace(/\\.csv$/i,''),rows:out})}); const j=await r.json();
   $('#impmsg').textContent=j.ok?('Added '+j.added+', skipped '+j.duplicates+' duplicates, '+j.skipped+' unreadable.'+(j.balance_cents!=null?' Balance '+money(j.balance_cents)+' as of '+j.balance_as_of+'.':'')):(j.error||'Import failed'); load(); };
+async function loadPlaid(){ const r=await fetch('/api/plaid/items'); const d=await r.json(); $('#plaidenv').textContent=d.configured?d.env:'not set up';
+  $('#plaid').innerHTML=d.items.length?'<table>'+d.items.map(it=>'<tr><td><b>'+esc(it.institution)+'</b><div class="small">'+it.accounts.map(a=>esc(a.name)+(a.mask?' …'+a.mask:'')).join(', ')+'</div>'+(it.status!=='ok'?'<div class="small" style="color:var(--red)">'+esc(it.status==='reconnect'?'Needs reconnecting':it.last_error||it.status)+'</div>':'')+'</td><td class="num">'+it.balances.map(b=>money(b.available!=null?b.available:b.current)).join('<br>')+'</td><td class="small">'+(it.synced_at?'synced '+new Date(it.synced_at).toLocaleString():'')+'</td><td>'+(it.status==='reconnect'?'<button class="act" data-relink="'+it.item_id+'">Reconnect</button> ':'')+'<button class="act" data-unlink="'+it.item_id+'">Remove</button></td></tr>').join('')+'</table>':(d.configured?'<p class="empty">No accounts connected yet.</p>':'<p class="small">Add PLAID_CLIENT_ID, PLAID_SECRET and PLAID_ENV to the worker settings to enable the live feed.</p>'); }
+async function linkBank(itemId){ $('#plaidmsg').textContent='Opening…'; const r=await fetch('/api/plaid/link-token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item_id:itemId||null})}); const j=await r.json(); if(!j.ok){ $('#plaidmsg').textContent=j.error||'Could not start'; return; }
+  const h=Plaid.create({token:j.link_token,onSuccess:async(public_token,metadata)=>{ $('#plaidmsg').textContent='Connecting…'; if(itemId){ await fetch('/api/plaid/sync',{method:'POST'}); } else { const x=await (await fetch('/api/plaid/exchange',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_token,metadata}))).json(); $('#plaidmsg').textContent=x.ok?('Connected '+x.institution+'. Pulled '+x.sync.added+' transactions.'):(x.error||'Failed'); } loadPlaid(); load(); },onExit:(err)=>{ $('#plaidmsg').textContent=err?(err.display_message||err.error_message||'Closed'):''; }}); h.open(); }
+$('#plaidlink').onclick=()=>linkBank(null);
+$('#plaidsync').onclick=async()=>{ $('#plaidmsg').textContent='Pulling…'; const j=await (await fetch('/api/plaid/sync',{method:'POST'})).json(); $('#plaidmsg').textContent='Added '+j.added+', changed '+j.modified+', removed '+j.removed+(j.errors.length?'. '+j.errors.join(' | '):'.'); loadPlaid(); load(); };
+document.addEventListener('click',async e=>{ const rl=e.target.closest('button[data-relink]'); if(rl) return linkBank(rl.dataset.relink); const ul=e.target.closest('button[data-unlink]'); if(ul&&confirm('Remove this bank connection? Transactions already in the ledger stay.')){ await fetch('/api/plaid/items/'+ul.dataset.unlink,{method:'DELETE'}); loadPlaid(); } });
+loadPlaid();
 load();
 </script></body></html>`;
+}
+
+// ================================================================ Plaid: live bank feed into the ledger
+// Settings: PLAID_CLIENT_ID (Text), PLAID_SECRET (Secret), PLAID_ENV = sandbox | production. One Plaid "item" per bank login.
+const PFC_MAP = { INCOME: "other_income", TRANSFER_IN: "transfer", TRANSFER_OUT: "transfer", LOAN_PAYMENTS: "credit_card_payment", BANK_FEES: "bank_fees", ENTERTAINMENT: "personal", FOOD_AND_DRINK: "meals", GENERAL_MERCHANDISE: "supplies", HOME_IMPROVEMENT: "supplies", MEDICAL: "personal", PERSONAL_CARE: "personal", GENERAL_SERVICES: "professional", GOVERNMENT_AND_NON_PROFIT: "taxes_licenses", TRANSPORTATION: "vehicle", TRAVEL: "meals", RENT_AND_UTILITIES: "utilities" };
+function plaidHost(env) { return `https://${(env.PLAID_ENV || "sandbox").toLowerCase() === "production" ? "production" : "sandbox"}.plaid.com`; }
+async function plaid(env, path, body) {
+  if (!env.PLAID_CLIENT_ID || !env.PLAID_SECRET) return { ok: false, error: "PLAID_CLIENT_ID / PLAID_SECRET not set" };
+  const res = await fetch(plaidHost(env) + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ client_id: env.PLAID_CLIENT_ID, secret: env.PLAID_SECRET, ...body }) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return { ok: false, error: data.error_message || data.error_code || ("Plaid " + res.status), code: data.error_code };
+  return { ok: true, data };
+}
+async function plaidLinkToken(env, itemId) {
+  const body = { client_name: "HD Laser Studio", user: { client_user_id: "hdlaser-owner" }, country_codes: ["US"], language: "en" };
+  if (itemId) { const it = await env.DB.prepare(`SELECT access_token FROM plaid_items WHERE item_id = ?`).bind(itemId).first(); if (!it) return { ok: false, error: "Unknown item" }; body.access_token = it.access_token; }
+  else { body.products = ["transactions"]; body.transactions = { days_requested: 730 }; }
+  const r = await plaid(env, "/link/token/create", body);
+  return r.ok ? { ok: true, link_token: r.data.link_token, env: (env.PLAID_ENV || "sandbox") } : r;
+}
+async function plaidExchange(env, body) {
+  const r = await plaid(env, "/item/public_token/exchange", { public_token: body.public_token });
+  if (!r.ok) return r;
+  const inst = (body.metadata && body.metadata.institution && body.metadata.institution.name) || "Bank";
+  const accounts = (body.metadata && body.metadata.accounts) || [];
+  await env.DB.prepare(`INSERT OR REPLACE INTO plaid_items (item_id, access_token, institution, accounts, cursor, status, created_at) VALUES (?,?,?,?,?,?,?)`)
+    .bind(r.data.item_id, r.data.access_token, inst, JSON.stringify(accounts.map((a) => ({ id: a.id, name: a.name, mask: a.mask, type: a.type, subtype: a.subtype }))), "", "ok", new Date().toISOString()).run();
+  const sync = await plaidSync(env, r.data.item_id);
+  return { ok: true, item_id: r.data.item_id, institution: inst, accounts: accounts.length, sync };
+}
+// Pull new/changed/removed transactions since the stored cursor, plus current balances.
+async function plaidSync(env, onlyItem) {
+  const items = (await env.DB.prepare(`SELECT * FROM plaid_items${onlyItem ? " WHERE item_id = ?" : ""}`).bind(...(onlyItem ? [onlyItem] : [])).all()).results;
+  const out = { items: items.length, added: 0, modified: 0, removed: 0, errors: [] };
+  const rules = await rulesFor(env);
+  for (const it of items) {
+    try {
+      const accts = JSON.parse(it.accounts || "[]"); const acctName = (id) => { const a = accts.find((x) => x.id === id); return a ? `${it.institution} ${a.name}${a.mask ? " …" + a.mask : ""}` : it.institution; };
+      let cursor = it.cursor || "", more = true, guard = 0;
+      while (more && guard++ < 20) {
+        const r = await plaid(env, "/transactions/sync", { access_token: it.access_token, cursor, count: 500 });
+        if (!r.ok) { await env.DB.prepare(`UPDATE plaid_items SET status = ?, last_error = ? WHERE item_id = ?`).bind(r.code === "ITEM_LOGIN_REQUIRED" ? "reconnect" : "error", r.error, it.item_id).run(); out.errors.push(`${it.institution}: ${r.error}`); more = false; break; }
+        const d = r.data;
+        for (const t of [...(d.added || []), ...(d.modified || [])]) {
+          if (t.pending) continue;
+          const cents = -Math.round((t.amount || 0) * 100); // Plaid: positive = money out
+          const desc = String(t.merchant_name || t.name || "").slice(0, 200);
+          const rule = applyRules(rules, t.name || desc) || applyRules(rules, desc);
+          const pfc = t.personal_finance_category && t.personal_finance_category.primary;
+          const cat = rule ? rule.category : (pfc === "RENT_AND_UTILITIES" && /RENT/.test(t.personal_finance_category.detailed || "") ? "rent" : (PFC_MAP[pfc] || "uncategorized"));
+          const memo = rule ? null : (pfc ? "Plaid: " + pfc.toLowerCase().replace(/_/g, " ") : null);
+          await env.DB.prepare(`INSERT INTO bank_txns (hash, source, posted_at, amount_cents, description, category, vendor, memo, imported_at) VALUES (?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(hash) DO UPDATE SET posted_at = excluded.posted_at, amount_cents = excluded.amount_cents, description = excluded.description`)
+            .bind("plaid:" + t.transaction_id, acctName(t.account_id), t.date, cents, desc, cat, rule && rule.vendor || null, memo, new Date().toISOString()).run();
+        }
+        out.added += (d.added || []).length; out.modified += (d.modified || []).length;
+        for (const rm of d.removed || []) { await env.DB.prepare(`DELETE FROM bank_txns WHERE hash = ?`).bind("plaid:" + rm.transaction_id).run(); out.removed++; }
+        cursor = d.next_cursor || cursor; more = !!d.has_more;
+        await env.DB.prepare(`UPDATE plaid_items SET cursor = ?, status = 'ok', last_error = NULL, synced_at = ? WHERE item_id = ?`).bind(cursor, new Date().toISOString(), it.item_id).run();
+      }
+      const b = await plaid(env, "/accounts/balance/get", { access_token: it.access_token });
+      if (b.ok) {
+        const bal = {}; let checking = 0, any = false;
+        for (const a of b.data.accounts || []) { bal[a.account_id] = { name: a.name, mask: a.mask, type: a.type, subtype: a.subtype, current: Math.round((a.balances.current || 0) * 100), available: a.balances.available == null ? null : Math.round(a.balances.available * 100) }; if (a.type === "depository") { checking += Math.round((a.balances.available != null ? a.balances.available : a.balances.current || 0) * 100); any = true; } }
+        await env.DB.prepare(`UPDATE plaid_items SET balances = ? WHERE item_id = ?`).bind(JSON.stringify(bal), it.item_id).run();
+        if (any) await saveFinSettings(env, { cash_balance_cents: await totalDepository(env), cash_as_of: new Date().toISOString().slice(0, 10) });
+      }
+    } catch (e) { out.errors.push(`${it.institution}: ${e && e.message || e}`); }
+  }
+  if (items.length) await reconcile(env);
+  return out;
+}
+async function totalDepository(env) {
+  const items = (await env.DB.prepare(`SELECT balances FROM plaid_items`).all()).results; let sum = 0;
+  for (const it of items) for (const a of Object.values(JSON.parse(it.balances || "{}"))) if (a.type === "depository") sum += a.available != null ? a.available : a.current;
+  return sum;
+}
+async function plaidItems(env) {
+  const items = (await env.DB.prepare(`SELECT item_id, institution, accounts, balances, status, last_error, synced_at, created_at FROM plaid_items ORDER BY created_at`).all()).results;
+  return items.map((it) => ({ ...it, accounts: JSON.parse(it.accounts || "[]"), balances: Object.values(JSON.parse(it.balances || "{}")) }));
+}
+async function plaidRemove(env, itemId) {
+  const it = await env.DB.prepare(`SELECT access_token FROM plaid_items WHERE item_id = ?`).bind(itemId).first();
+  if (!it) return { ok: false, error: "Unknown item" };
+  await plaid(env, "/item/remove", { access_token: it.access_token });
+  await env.DB.prepare(`DELETE FROM plaid_items WHERE item_id = ?`).bind(itemId).run();
+  return { ok: true };
 }
