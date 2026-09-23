@@ -35,6 +35,10 @@ Workers & Pages → Create → Create Worker → `hdlaser-checkout` → Deploy �
 | `SUPPORT_EMAIL` | `contact@hdlaser.net` | Text |
 | `ALERT_TO` | e.g. `8585551234@vtext.com, hugh@example.com` | Text, optional. Extra addresses that get a one-line alert on new orders, payments and resale permits. Use your carrier's email-to-text address to get it as a text message: Verizon `number@vtext.com`, T-Mobile `number@tmomail.net`, AT&T `number@txt.att.net` (AT&T has been retiring this). |
 | `NTFY_TOPIC` | e.g. `hdlaser-orders-7f3k9q` | Text, optional. Sends the same one-line alert as a push notification to the free ntfy app (iOS/Android). Install ntfy, subscribe to the exact topic name, and set it here. Pick a long random name: anyone who guesses it can read the alerts. |
+| `TWILIO_ACCOUNT_SID` | `AC…` | Text, optional. From the Twilio console home page. |
+| `TWILIO_AUTH_TOKEN` | | **Secret**, optional. From the Twilio console home page. |
+| `TWILIO_FROM` | `+18885551234` | Text, optional. The Twilio number you bought (toll-free is simplest to verify). |
+| `ALERT_SMS_TO` | `8585551234, 6195551234` | Text, optional. Phones that get a real SMS on new orders, payments and permits. All four Twilio settings must be set for texts to go out. |
 | `RESEND_API_KEY` | API key from resend.com (step F). Turns on worker-sent email for forms, payments, resale and the digest | **Secret** |
 | `FROM_EMAIL` | `HD Laser Studio <orders@hdlaser.net>` (must be on the domain verified in Resend) | Text |
 | `FORMSPREE_ENDPOINT` | `https://formspree.io/f/xaenoorj` (fallback only, used until RESEND_API_KEY is set) | Text |
@@ -69,3 +73,13 @@ Sandbox test card: 4111 1111 1111 1111, any future date, any CVV, any ZIP. In sa
 ## Later
 - Auto-create the sales-tax invoice in Square from the "Tax to invoice" list (needs Customers + Invoices API; do after a few real orders).
 - Logo intake is by email/text today. Candidate upgrade: accept uploads in this worker and store in R2.
+
+## Text alerts through Twilio (optional)
+
+Carrier email-to-text (ALERT_TO with an address like `number@vtext.com`) is free but T-Mobile drops it. For guaranteed texts:
+
+1. Sign up at twilio.com, upgrade out of trial (add a payment method; trial accounts can only text verified numbers).
+2. Phone Numbers → Buy a number → pick a **toll-free** US number with SMS. About $2/month.
+3. Messaging → Regulatory compliance → **Toll-Free Verification**. Business name HD Laser Studio INC, address, website hdlaser.net, use case "order notifications to the business owner", sample message `HD Laser: PAID $850 by Boards n' Beans (HD-7K2Q). 50 cups. Logo + proof next.`, volume under 100/month, opt-in "internal staff only". Approval usually takes 1–3 business days. Texts to unverified toll-free numbers are blocked, so wait for approval.
+4. In Cloudflare set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` (Secret), `TWILIO_FROM`, `ALERT_SMS_TO`, then Deploy.
+

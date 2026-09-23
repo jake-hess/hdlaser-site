@@ -7,6 +7,7 @@
 //   POST /submit              quote / order-details form from the website: stores it, emails Hugh and the customer (Resend)
 //   ALERT_TO (optional)       extra addresses that get a one-line text alert on new orders, payments and permits
 //   NTFY_TOPIC (optional)     ntfy.sh topic that gets the same one-line alert as a phone push notification
+//   TWILIO_* + ALERT_SMS_TO   (optional) real SMS alerts through Twilio; see README
 //   POST /resale              resale permit info from the thank-you page
 //   POST /webhooks/square     Square webhook (payment.*, refund.*), verified with the signature key
 //   GET  /health
@@ -287,6 +288,16 @@ async function sendAlert(env, text) {
   const to = String(env.ALERT_TO || "").split(",").map((s) => s.trim()).filter(Boolean);
   if (to.length && env.RESEND_API_KEY) jobs.push(sendEmail(env, { to, subject: "HD Laser", text: msg }));
   if (env.NTFY_TOPIC) jobs.push(fetch("https://ntfy.sh/" + encodeURIComponent(env.NTFY_TOPIC), { method: "POST", headers: { "Title": "HD Laser", "Priority": "high", "Tags": "moneybag" }, body: msg }).then((r) => ({ ok: r.ok })).catch((e) => ({ ok: false, error: String(e) })));
+  // Real SMS through Twilio: TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN (secret) + TWILIO_FROM (your Twilio number) + ALERT_SMS_TO (comma-separated phones)
+  if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM && env.ALERT_SMS_TO) {
+    const auth = "Basic " + btoa(env.TWILIO_ACCOUNT_SID + ":" + env.TWILIO_AUTH_TOKEN);
+    for (const raw of String(env.ALERT_SMS_TO).split(",")) {
+      const to = e164(raw); if (!to) continue;
+      const form = new URLSearchParams({ To: to, From: e164(env.TWILIO_FROM) || env.TWILIO_FROM, Body: "HD Laser: " + msg.slice(0, 140) });
+      jobs.push(fetch(`https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`, { method: "POST", headers: { "Authorization": auth, "Content-Type": "application/x-www-form-urlencoded" }, body: form })
+        .then(async (r) => { if (!r.ok) console.error("twilio", r.status, (await r.text()).slice(0, 300)); return { ok: r.ok }; }).catch((e) => ({ ok: false, error: String(e) })));
+    }
+  }
   if (!jobs.length) return { ok: false, skipped: true };
   const results = await Promise.all(jobs);
   return { ok: results.some((r) => r && r.ok) };
