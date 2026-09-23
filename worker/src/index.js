@@ -11,6 +11,8 @@
 //   /staff/*                  employee portal API (login, clock, checklist, jobs, team KPIs); site page at /staff/
 //   POST /webhooks/twilio     inbound texts (owner replies 1/2 to the staffing alert)
 //   STAFF_ALERTS (optional)   which staff events text the owner: clockin,clockout,noshow (default all)
+//   GET  /admin/money         P&L, bank ledger, reconciliation, unit economics, 13-week cash forecast (Basic auth)
+//   /api/money, /api/bank/*   data behind it; bank statements are imported as CSV rows from the page
 //   POST /resale              resale permit info from the thank-you page
 //   POST /webhooks/square     Square webhook (payment.*, refund.*), verified with the signature key
 //   GET  /health
@@ -55,9 +57,14 @@ CREATE TABLE IF NOT EXISTS checklist (id INTEGER PRIMARY KEY AUTOINCREMENT, shif
 CREATE TABLE IF NOT EXISTS jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, staff_id INTEGER, customer TEXT, phone TEXT, product TEXT NOT NULL, qty INTEGER DEFAULT 1, minutes INTEGER, amount_cents INTEGER DEFAULT 0, due_at TEXT, status TEXT DEFAULT 'queued', started_at TEXT, done_at TEXT, done_by INTEGER, note TEXT, ref TEXT);
 CREATE INDEX IF NOT EXISTS jobs_status ON jobs(status);
 CREATE TABLE IF NOT EXISTS staff_log (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, staff_id INTEGER, action TEXT NOT NULL, detail TEXT);
-CREATE INDEX IF NOT EXISTS staff_log_ts ON staff_log(ts);`;
+CREATE INDEX IF NOT EXISTS staff_log_ts ON staff_log(ts);
+CREATE TABLE IF NOT EXISTS bank_txns (id INTEGER PRIMARY KEY AUTOINCREMENT, hash TEXT UNIQUE, source TEXT, posted_at TEXT NOT NULL, amount_cents INTEGER NOT NULL, description TEXT, category TEXT DEFAULT 'uncategorized', vendor TEXT, memo TEXT, matched_payout_id TEXT, balance_cents INTEGER, imported_at TEXT);
+CREATE INDEX IF NOT EXISTS bank_txns_posted ON bank_txns(posted_at);
+CREATE INDEX IF NOT EXISTS bank_txns_cat ON bank_txns(category);
+CREATE TABLE IF NOT EXISTS bank_rules (id INTEGER PRIMARY KEY AUTOINCREMENT, pattern TEXT NOT NULL, category TEXT NOT NULL, vendor TEXT, created_at TEXT);
+CREATE TABLE IF NOT EXISTS payouts (payout_id TEXT PRIMARY KEY, created_at TEXT, arrival_date TEXT, status TEXT, amount_cents INTEGER DEFAULT 0, location_id TEXT, type TEXT, matched_txn_id INTEGER);`;
 // Columns added after the first release. Each ALTER is tried once and ignored if the column already exists.
-const ALTERS = ["ALTER TABLE orders ADD COLUMN notified_paid_at TEXT", "ALTER TABLE payments ADD COLUMN team_member_id TEXT"];
+const ALTERS = ["ALTER TABLE orders ADD COLUMN notified_paid_at TEXT", "ALTER TABLE payments ADD COLUMN team_member_id TEXT", "ALTER TABLE staff ADD COLUMN hourly_rate_cents INTEGER DEFAULT 0", "ALTER TABLE staff ADD COLUMN commission_pct REAL DEFAULT 0"];
 
 let migrated = false;
 async function ensureSchema(env) {
@@ -98,7 +105,7 @@ export default {
       if (path.startsWith("/staff/")) return requireOrigin(cors) || staffRoutes(request, env, cors, path, url);
 
       // ---- admin ----
-      if (path === "/admin" || path.startsWith("/api/")) {
+      if (path === "/admin" || path.startsWith("/admin/") || path.startsWith("/api/")) {
         const denied = requireAdmin(request, env);
         if (denied) return denied;
         if (path === "/admin") return new Response(dashboardHtml(env), { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
@@ -110,6 +117,14 @@ export default {
           return json(await syncSquare(env, days, from, to), 200);
         }
         if (path === "/api/whoami") return json(await whoami(env), 200);
+        if (path === "/admin/money") return new Response(moneyHtml(env), { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+        if (path === "/api/money") return json(await moneyReport(env, url.searchParams.get("from"), url.searchParams.get("to"), Object.fromEntries(url.searchParams)), 200, { "Cache-Control": "no-store" });
+        if (path === "/api/money/settings" && request.method === "POST") return json({ ok: true, settings: await saveFinSettings(env, await request.json()) }, 200);
+        if (path === "/api/bank/import" && request.method === "POST") return json(await importBank(env, await request.json()), 200);
+        if (path === "/api/bank/txns") return json(await txnsFor(env, url.searchParams.get("month"), url.searchParams.get("category")), 200, { "Cache-Control": "no-store" });
+        if (path === "/api/bank/export.csv") return bankCsv(env);
+        const bm = path.match(/^\/api\/bank\/txns\/(\d+)$/);
+        if (bm && request.method === "POST") { const r = await categorize(env, +bm[1], await request.json()); return json(r, r.ok ? 200 : 400); }
         if (path === "/api/team") return json(await teamKpis(env, url.searchParams.get("from"), url.searchParams.get("to")), 200, { "Cache-Control": "no-store" });
         if (path === "/api/staff" && request.method === "POST") { const r = await upsertStaff(env, await request.json()); await staffLog(env, null, "team_update_admin", JSON.stringify({ id: r.id })); return json(r, r.ok ? 200 : 400); }
         if (path === "/api/noshow-check" && request.method === "POST") return json(await noShowCheck(env), 200);
@@ -360,7 +375,7 @@ async function syncSquare(env, days, fromIso, toIso) {
   const begin = fromIso && !isNaN(Date.parse(fromIso)) ? new Date(fromIso).toISOString() : new Date(Date.now() - days * 86400000).toISOString();
   const end = toIso && !isNaN(Date.parse(toIso)) ? new Date(toIso).toISOString() : null;
   const errors = [];
-  let payments = 0, refunds = 0, orders = 0, items = 0, locations = [];
+  let payments = 0, refunds = 0, orders = 0, items = 0, locations = [], payoutsN = 0, payoutError = null;
   try {
     const res = await squareFetch(env, "/v2/locations");
     const data = await res.json().catch(() => ({}));
@@ -383,6 +398,15 @@ async function syncSquare(env, days, fromIso, toIso) {
     };
     await page("/v2/payments", "payments", async (p) => { await upsertPayment(env, p); payments++; });
     await page("/v2/refunds", "refunds", async (r) => { await upsertRefund(env, r); refunds++; });
+    try {
+      const pq = new URLSearchParams({ begin_time: begin, sort_order: "ASC", limit: "100" }); if (end) pq.set("end_time", end);
+      let cursor = "", pages = 0;
+      do { if (cursor) pq.set("cursor", cursor); const res = await squareFetch(env, `/v2/payouts?${pq}`); const data = await res.json().catch(() => ({}));
+        if (!res.ok) { payoutError = `${res.status} ${squareErr(data)}`; break; }
+        for (const po of data.payouts || []) { await upsertPayout(env, po); payoutsN++; }
+        cursor = data.cursor || ""; } while (cursor && ++pages < 12);
+      await reconcile(env);
+    } catch (e) { payoutError = String(e && e.message || e); }
 
     if (locations.length) {
       let cursor = "", pages = 0;
@@ -411,7 +435,7 @@ async function syncSquare(env, days, fromIso, toIso) {
     console.error("sync exception", e && e.stack || e);
     errors.push("exception: " + (e && e.message || String(e)));
   }
-  return { ok: errors.length === 0, payments, refunds, orders, items, locations: locations.length, since: begin, until: end, errors };
+  return { ok: errors.length === 0, payments, refunds, orders, items, payouts: payoutsN, payout_error: payoutError, locations: locations.length, since: begin, until: end, errors };
 }
 
 async function whoami(env) {
@@ -630,7 +654,7 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
 </style></head><body>
 <header><h1>HD Laser numbers</h1>
 <div class="ranges" id="ranges"><button data-d="7">7 days</button><button data-d="30" class="on">30 days</button><button data-d="90">90 days</button><button data-d="365">12 months</button><input type="date" id="from"><input type="date" id="to"><button id="go">Apply</button></div>
-<div><button class="act" id="sync">Sync Square now</button> <button class="act" id="backfill">Import 2 years of history</button> <a class="act" href="/api/orders.csv" style="text-decoration:none;color:inherit">Download CSV</a> <button class="act" id="digest">Email digest</button></div></header>
+<div><a class="act" href="/admin/money" style="text-decoration:none;color:inherit;background:var(--ink);color:#fff;border-color:var(--ink)">Money</a> <button class="act" id="sync">Sync Square now</button> <button class="act" id="backfill">Import 2 years of history</button> <a class="act" href="/api/orders.csv" style="text-decoration:none;color:inherit">Download CSV</a> <button class="act" id="digest">Email digest</button></div></header>
 <main>
 <div id="err"></div>
 <p class="small" id="meta"></p>
@@ -952,7 +976,7 @@ async function staffRoutes(request, env, cors, path, url) {
   }
   return json({ error: "Not found" }, 404, cors);
 }
-function pub(p) { return { id: p.id, name: p.name, role: p.role, phone: p.phone || "", email: p.email || "", on_call: !!p.on_call, active: p.active !== 0 }; }
+function pub(p) { return { id: p.id, name: p.name, role: p.role, phone: p.phone || "", email: p.email || "", on_call: !!p.on_call, active: p.active !== 0, hourly_rate_cents: p.hourly_rate_cents || 0, commission_pct: p.commission_pct || 0 }; }
 
 async function upsertStaff(env, b) {
   const name = String(b.name || "").trim().slice(0, 60);
@@ -962,6 +986,8 @@ async function upsertStaff(env, b) {
     if (name) { sets.push("name = ?"); args.push(name); }
     if (b.role) { sets.push("role = ?"); args.push(role); }
     for (const k of ["phone", "email"]) if (k in b) { sets.push(`${k} = ?`); args.push(String(b[k] || "").slice(0, 120)); }
+    if ("hourly_rate_cents" in b) { sets.push("hourly_rate_cents = ?"); args.push(Math.max(0, Math.round(+b.hourly_rate_cents || 0))); }
+    if ("commission_pct" in b) { sets.push("commission_pct = ?"); args.push(Math.max(0, Math.min(100, +b.commission_pct || 0))); }
     if ("on_call" in b) { sets.push("on_call = ?"); args.push(b.on_call ? 1 : 0); }
     if ("active" in b) { sets.push("active = ?"); args.push(b.active ? 1 : 0); if (!b.active) await env.DB.prepare(`DELETE FROM staff_sessions WHERE staff_id = ?`).bind(+b.id).run(); }
     if (b.pin) { if (!/^\d{4,8}$/.test(String(b.pin))) return { ok: false, error: "PIN must be 4 to 8 digits" }; const salt = randomHex(16); sets.push("pin_salt = ?", "pin_hash = ?"); args.push(salt, await pbkdf(String(b.pin), salt)); }
@@ -975,8 +1001,8 @@ async function upsertStaff(env, b) {
   const dup = await env.DB.prepare(`SELECT id FROM staff WHERE lower(name) = lower(?)`).bind(name).first();
   if (dup) return { ok: false, error: "That name is already on the team. Use a last initial." };
   const salt = randomHex(16);
-  const r = await env.DB.prepare(`INSERT INTO staff (name, role, phone, email, pin_hash, pin_salt, on_call, active, created_at) VALUES (?,?,?,?,?,?,?,1,?)`)
-    .bind(name, role, String(b.phone || "").slice(0, 40), String(b.email || "").slice(0, 120), await pbkdf(String(b.pin), salt), salt, b.on_call ? 1 : 0, new Date().toISOString()).run();
+  const r = await env.DB.prepare(`INSERT INTO staff (name, role, phone, email, pin_hash, pin_salt, on_call, active, created_at, hourly_rate_cents, commission_pct) VALUES (?,?,?,?,?,?,?,1,?,?,?)`)
+    .bind(name, role, String(b.phone || "").slice(0, 40), String(b.email || "").slice(0, 120), await pbkdf(String(b.pin), salt), salt, b.on_call ? 1 : 0, new Date().toISOString(), Math.max(0, Math.round(+b.hourly_rate_cents || 0)), Math.max(0, Math.min(100, +b.commission_pct || 0))).run();
   return { ok: true, id: r.meta && r.meta.last_row_id };
 }
 
@@ -996,7 +1022,7 @@ async function staffHome(env, me) {
     shift: shift ? { id: shift.id, in_at: shift.in_at, minutes: Math.round((Date.now() - new Date(shift.in_at)) / 60000) } : null,
     checklist: { open: OPEN_STEPS.map((s, i) => ({ step: s, done: done.some((d) => d.kind === "open" && d.step === i) })), close: CLOSE_STEPS.map((s, i) => ({ step: s, done: done.some((d) => d.kind === "close" && d.step === i) })) },
     on_today: onToday.map((r) => ({ name: r.name, in_at: r.in_at, out_at: r.out_at })),
-    queue, capacity: cap, products: products(env), week: mine,
+    queue, capacity: cap, products: products(env), week: mine, pay: await staffPay(env, me),
     is_manager: ROLE_RANK[me.role] >= 2,
   };
 }
@@ -1160,4 +1186,437 @@ async function sendSms(env, to, body) {
     if (!r.ok) console.error("twilio", r.status, (await r.text()).slice(0, 300));
     return { ok: r.ok };
   } catch (e) { return { ok: false, error: String(e) }; }
+}
+
+// ================================================================ money: bank ledger, P&L, reconciliation, forecast
+// Chart of accounts. group: income | cogs | opex | excluded (not part of EBITDA). target: rough share of net sales to aim under.
+const CATEGORIES = [
+  { key: "square_payout", name: "Square deposits", group: "income" },
+  { key: "other_income", name: "Other income", group: "income" },
+  { key: "blanks", name: "Cups, tumblers & blanks", group: "cogs", target: 0.22 },
+  { key: "ink", name: "Ink & consumables", group: "cogs", target: 0.04 },
+  { key: "packaging", name: "Packaging", group: "cogs", target: 0.02 },
+  { key: "shipping_in", name: "Freight & shipping", group: "cogs", target: 0.02 },
+  { key: "rent", name: "Rent", group: "opex", target: 0.12 },
+  { key: "utilities", name: "Utilities", group: "opex", target: 0.02 },
+  { key: "payroll", name: "Payroll", group: "opex", target: 0.25 },
+  { key: "contractors", name: "Contractors", group: "opex", target: 0.03 },
+  { key: "software", name: "Software & subscriptions", group: "opex", target: 0.02 },
+  { key: "marketing", name: "Marketing", group: "opex", target: 0.05 },
+  { key: "insurance", name: "Insurance", group: "opex", target: 0.02 },
+  { key: "supplies", name: "Shop supplies", group: "opex", target: 0.03 },
+  { key: "repairs", name: "Repairs & maintenance", group: "opex", target: 0.02 },
+  { key: "vehicle", name: "Vehicle & delivery", group: "opex", target: 0.01 },
+  { key: "professional", name: "Legal & accounting", group: "opex", target: 0.02 },
+  { key: "bank_fees", name: "Bank & card fees", group: "opex", target: 0.01 },
+  { key: "taxes_licenses", name: "Taxes & licenses", group: "opex", target: 0.02 },
+  { key: "meals", name: "Meals & travel", group: "opex", target: 0.01 },
+  { key: "other_opex", name: "Other expenses", group: "opex", target: 0.03 },
+  { key: "cash_deposit", name: "Cash deposit (already counted in Square)", group: "excluded" },
+  { key: "transfer", name: "Transfer between accounts", group: "excluded" },
+  { key: "owner_draw", name: "Owner draw / contribution", group: "excluded" },
+  { key: "loan", name: "Loan principal", group: "excluded" },
+  { key: "credit_card_payment", name: "Credit card payment", group: "excluded" },
+  { key: "equipment", name: "Equipment purchase (capital)", group: "excluded" },
+  { key: "uncategorized", name: "Uncategorized", group: "excluded" },
+];
+const CAT = Object.fromEntries(CATEGORIES.map((c) => [c.key, c]));
+const DEFAULT_RULES = [
+  ["SQUARE INC", "square_payout"], ["SQUARE ", "square_payout"], ["SQ *", "square_payout"],
+  ["SDG&E", "utilities"], ["SAN DIEGO GAS", "utilities"], ["COX COMM", "utilities"], ["SPECTRUM", "utilities"], ["AT&T", "utilities"], ["T-MOBILE", "utilities"], ["VERIZON", "utilities"],
+  ["ADOBE", "software"], ["GOOGLE *", "software"], ["GOOGLE WORKSPACE", "software"], ["CLOUDFLARE", "software"], ["TWILIO", "software"], ["RESEND", "software"], ["FORMSPREE", "software"], ["GODADDY", "software"], ["INTUIT", "software"], ["QUICKBOOKS", "software"], ["CANVA", "software"], ["DROPBOX", "software"], ["MICROSOFT", "software"], ["OPENAI", "software"], ["ANTHROPIC", "software"], ["LIGHTBURN", "software"],
+  ["ULINE", "packaging"], ["PAPER MART", "packaging"],
+  ["UPS", "shipping_in"], ["FEDEX", "shipping_in"], ["USPS", "shipping_in"], ["DHL", "shipping_in"],
+  ["GUSTO", "payroll"], ["ADP", "payroll"], ["PAYCHEX", "payroll"], ["SQUARE PAYROLL", "payroll"],
+  ["STATE FARM", "insurance"], ["HARTFORD", "insurance"], ["NEXT INSURANCE", "insurance"], ["HISCOX", "insurance"], ["GEICO", "insurance"], ["PROGRESSIVE", "insurance"],
+  ["FRANCHISE TAX", "taxes_licenses"], ["IRS ", "taxes_licenses"], ["CDTFA", "taxes_licenses"], ["CITY OF SAN DIEGO", "taxes_licenses"], ["EDD ", "taxes_licenses"],
+  ["FACEBK", "marketing"], ["META PLATFORMS", "marketing"], ["GOOGLE ADS", "marketing"], ["YELP", "marketing"], ["NEXTDOOR", "marketing"], ["VISTAPRINT", "marketing"],
+  ["ONLINE TRANSFER", "transfer"], ["TRANSFER TO", "transfer"], ["TRANSFER FROM", "transfer"], ["ZELLE", "transfer"], ["VENMO", "transfer"],
+  ["PAYMENT THANK YOU", "credit_card_payment"], ["AUTOPAY", "credit_card_payment"], ["CHASE CARD", "credit_card_payment"], ["AMEX EPAYMENT", "credit_card_payment"], ["CAPITAL ONE", "credit_card_payment"],
+  ["COSTCO", "supplies"], ["HOME DEPOT", "supplies"], ["LOWES", "supplies"], ["HARBOR FREIGHT", "supplies"], ["MCMASTER", "supplies"], ["AMAZON", "supplies"], ["AMZN", "supplies"], ["STAPLES", "supplies"], ["OFFICE DEPOT", "supplies"],
+  ["JDS INDUSTRIES", "blanks"], ["JDS ", "blanks"], ["ROWMARK", "blanks"], ["JOHNSON PLASTICS", "blanks"], ["YETI", "blanks"], ["POLAR CAMEL", "blanks"], ["ALIBABA", "blanks"], ["ALIEXPRESS", "blanks"], ["DHGATE", "blanks"], ["LASERBITS", "blanks"], ["INVENTABLES", "blanks"],
+  ["ROLAND", "ink"], ["MIMAKI", "ink"], ["EPSON", "ink"], ["INKJET", "ink"], ["MUTOH", "ink"],
+  ["CASH DEPOSIT", "cash_deposit"], ["ATM DEPOSIT", "cash_deposit"],
+  ["MONTHLY SERVICE FEE", "bank_fees"], ["WIRE FEE", "bank_fees"], ["OVERDRAFT", "bank_fees"],
+  ["LEGALZOOM", "professional"], ["CPA", "professional"], ["H&R BLOCK", "professional"],
+  ["SHELL", "vehicle"], ["CHEVRON", "vehicle"], ["ARCO", "vehicle"], ["76 ", "vehicle"], ["MOBIL", "vehicle"],
+  ["STARBUCKS", "meals"], ["DOORDASH", "meals"], ["UBER EATS", "meals"],
+  // generic words, matched last because shorter patterns sort after longer ones
+  ["PROPERTY MGMT", "rent"], ["PROPERTY MANAGEMENT", "rent"], [" RENT", "rent"], ["PAYROLL", "payroll"], ["INSURANCE", "insurance"], ["TAX PMT", "taxes_licenses"], ["INTEREST", "other_income"], ["DEPOSIT", "other_income"],
+];
+const DEFAULT_SETTINGS = {
+  cash_balance_cents: 0, cash_as_of: null, reserve_months: 1, pay_period_days: 14, pay_period_anchor: "2026-09-14",
+  monthly_fixed_costs_cents: 0, // fallback when no bank data yet
+  unit: { cup12_blank: 450, cup16_blank: 525, ink12: 35, ink16: 45, engrave_consumable: 8, packaging: 30, labor_rate_hour: 2200, minutes_engraved: 2.5, minutes_printed: 3 },
+};
+async function finSettings(env) {
+  const row = await env.DB.prepare(`SELECT v FROM meta WHERE k = 'fin_settings'`).first();
+  const s = row ? JSON.parse(row.v) : {};
+  return { ...DEFAULT_SETTINGS, ...s, unit: { ...DEFAULT_SETTINGS.unit, ...(s.unit || {}) } };
+}
+async function saveFinSettings(env, patch) {
+  const cur = await finSettings(env);
+  const next = { ...cur, ...patch, unit: { ...cur.unit, ...(patch.unit || {}) } };
+  for (const k of Object.keys(next.unit)) next.unit[k] = +next.unit[k] || 0;
+  await env.DB.prepare(`INSERT OR REPLACE INTO meta (k, v) VALUES ('fin_settings', ?)`).bind(JSON.stringify(next)).run();
+  return next;
+}
+async function sha256hex(s) { return [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join(""); }
+function parseAmount(v) { if (v == null) return NaN; const s = String(v).replace(/[$,\s]/g, ""); if (!s) return NaN; const neg = /^\(.*\)$/.test(s) || s.startsWith("-"); const n = parseFloat(s.replace(/[()\-+]/g, "")); return isNaN(n) ? NaN : (neg ? -n : n); }
+function parseDate(v) {
+  const s = String(v || "").trim(); let m;
+  if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/))) { const y = m[3].length === 2 ? "20" + m[3] : m[3]; return `${y}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`; }
+  const d = new Date(s); return isNaN(d) ? null : d.toISOString().slice(0, 10);
+}
+async function rulesFor(env) {
+  const rows = (await env.DB.prepare(`SELECT id, pattern, category, vendor FROM bank_rules ORDER BY length(pattern) DESC`).all()).results;
+  return rows.map((r) => ({ ...r, up: r.pattern.toUpperCase() })).concat(DEFAULT_RULES.map(([p, c]) => ({ id: 0, pattern: p, category: c, vendor: null, up: p.toUpperCase() })).sort((a, b) => b.up.length - a.up.length));
+}
+function applyRules(rules, desc) { const u = String(desc || "").toUpperCase(); for (const r of rules) if (u.includes(r.up)) return r; return null; }
+
+// Bank CSV rows come already split by the dashboard: [{date, description, amount, balance?}]
+async function importBank(env, body) {
+  const source = String(body.source || "bank").slice(0, 40);
+  const rows = Array.isArray(body.rows) ? body.rows.slice(0, 5000) : [];
+  const rules = await rulesFor(env);
+  let added = 0, dupes = 0, bad = 0, lastBal = null, lastDate = null;
+  const now = new Date().toISOString();
+  for (const r of rows) {
+    const date = parseDate(r.date); let amt = parseAmount(r.amount);
+    if (isNaN(amt) && (r.debit != null || r.credit != null)) { const d = parseAmount(r.debit), c = parseAmount(r.credit); amt = (isNaN(c) ? 0 : Math.abs(c)) - (isNaN(d) ? 0 : Math.abs(d)); }
+    const desc = String(r.description || "").trim().slice(0, 200);
+    if (!date || isNaN(amt) || !desc) { bad++; continue; }
+    const cents = Math.round(amt * 100);
+    const hash = await sha256hex(`${source}|${date}|${desc}|${cents}`);
+    const rule = applyRules(rules, desc);
+    const bal = r.balance != null && r.balance !== "" ? Math.round(parseAmount(r.balance) * 100) : null;
+    const res = await env.DB.prepare(`INSERT OR IGNORE INTO bank_txns (hash, source, posted_at, amount_cents, description, category, vendor, balance_cents, imported_at) VALUES (?,?,?,?,?,?,?,?,?)`)
+      .bind(hash, source, date, cents, desc, rule ? rule.category : "uncategorized", rule && rule.vendor || null, isNaN(bal) ? null : bal, now).run();
+    if (res.meta && res.meta.changes) added++; else dupes++;
+    if (bal != null && !isNaN(bal) && (!lastDate || date >= lastDate)) { lastDate = date; lastBal = bal; }
+  }
+  if (lastBal != null) await saveFinSettings(env, { cash_balance_cents: lastBal, cash_as_of: lastDate });
+  await reconcile(env);
+  return { ok: true, added, duplicates: dupes, skipped: bad, balance_cents: lastBal, balance_as_of: lastDate };
+}
+async function categorize(env, id, body) {
+  const cat = CAT[body.category] ? body.category : null;
+  if (!cat) return { ok: false, error: "Unknown category" };
+  const t = await env.DB.prepare(`SELECT * FROM bank_txns WHERE id = ?`).bind(id).first();
+  if (!t) return { ok: false, error: "Not found" };
+  await env.DB.prepare(`UPDATE bank_txns SET category = ?, vendor = COALESCE(?, vendor), memo = COALESCE(?, memo) WHERE id = ?`).bind(cat, body.vendor ? String(body.vendor).slice(0, 80) : null, body.memo != null ? String(body.memo).slice(0, 300) : null, id).run();
+  let applied = 0;
+  if (body.make_rule) {
+    const pattern = String(body.pattern || t.description.replace(/\d{3,}/g, " ").split(/\s+/).slice(0, 2).join(" ")).trim().slice(0, 60);
+    if (pattern.length >= 3) {
+      await env.DB.prepare(`INSERT INTO bank_rules (pattern, category, vendor, created_at) VALUES (?,?,?,?)`).bind(pattern, cat, body.vendor || null, new Date().toISOString()).run();
+      const r = await env.DB.prepare(`UPDATE bank_txns SET category = ? WHERE category = 'uncategorized' AND upper(description) LIKE ?`).bind(cat, "%" + pattern.toUpperCase() + "%").run();
+      applied = r.meta ? r.meta.changes : 0;
+    }
+  }
+  return { ok: true, applied };
+}
+
+// Square payouts (money Square sent to the bank). Matched against bank deposits within 5 days.
+async function upsertPayout(env, p) {
+  await env.DB.prepare(`INSERT INTO payouts (payout_id, created_at, arrival_date, status, amount_cents, location_id, type) VALUES (?,?,?,?,?,?,?)
+    ON CONFLICT(payout_id) DO UPDATE SET status = excluded.status, amount_cents = excluded.amount_cents, arrival_date = excluded.arrival_date`)
+    .bind(p.id, p.created_at || null, p.arrival_date || (p.end_time ? String(p.end_time).slice(0, 10) : null), p.status || null, money(p.amount_money), p.location_id || null, p.type || null).run();
+}
+async function reconcile(env) {
+  const payouts = (await env.DB.prepare(`SELECT * FROM payouts WHERE matched_txn_id IS NULL AND status IN ('PAID','SENT') AND amount_cents > 0`).all()).results;
+  let matched = 0;
+  for (const p of payouts) {
+    const day = (p.arrival_date || p.created_at || "").slice(0, 10); if (!day) continue;
+    const lo = new Date(new Date(day).getTime() - 2 * 86400000).toISOString().slice(0, 10), hi = new Date(new Date(day).getTime() + 6 * 86400000).toISOString().slice(0, 10);
+    const t = await env.DB.prepare(`SELECT id FROM bank_txns WHERE matched_payout_id IS NULL AND amount_cents = ? AND posted_at BETWEEN ? AND ? AND category IN ('square_payout','uncategorized') ORDER BY posted_at LIMIT 1`).bind(p.amount_cents, lo, hi).first();
+    if (t) { await env.DB.batch([env.DB.prepare(`UPDATE payouts SET matched_txn_id = ? WHERE payout_id = ?`).bind(t.id, p.payout_id), env.DB.prepare(`UPDATE bank_txns SET matched_payout_id = ?, category = 'square_payout' WHERE id = ?`).bind(p.payout_id, t.id)]); matched++; }
+  }
+  return { matched };
+}
+
+function monthKey(iso) { return String(iso || "").slice(0, 7); }
+function monthsBetween(fromIso, toIso) { const out = []; let d = new Date(fromIso.slice(0, 7) + "-01T00:00:00Z"); const end = new Date(toIso); while (d <= end) { out.push(d.toISOString().slice(0, 7)); d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)); } return out; }
+
+// Everything the money page needs.
+async function moneyReport(env, fromIn, toIn, whatIf = {}) {
+  const q = (sql, ...a) => env.DB.prepare(sql).bind(...a);
+  const toIso = toIn ? new Date(toIn).toISOString() : new Date().toISOString();
+  const fromIso = fromIn ? new Date(fromIn).toISOString() : new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 5, 1)).toISOString();
+  const months = monthsBetween(fromIso, toIso);
+  const settings = await finSettings(env);
+  const fromDay = fromIso.slice(0, 10), toDay = toIso.slice(0, 10);
+
+  // Square side per month
+  const sq = {}; for (const m of months) sq[m] = { gross: 0, fees: 0, refunds: 0, payments: 0, cash: 0, web: 0 };
+  for (const r of (await q(`SELECT substr(created_at,1,7) m, COUNT(*) n, SUM(amount_cents) gross, SUM(fee_cents) fees, SUM(CASE WHEN source='CASH' THEN amount_cents ELSE 0 END) cash, SUM(CASE WHEN ref IS NOT NULL THEN amount_cents ELSE 0 END) web FROM payments WHERE status='COMPLETED' AND created_at >= ? AND created_at < ? GROUP BY m`, fromIso, toIso).all()).results) if (sq[r.m]) Object.assign(sq[r.m], { gross: r.gross, fees: r.fees, payments: r.n, cash: r.cash, web: r.web });
+  for (const r of (await q(`SELECT substr(created_at,1,7) m, SUM(amount_cents) refunds FROM refunds WHERE status='COMPLETED' AND created_at >= ? AND created_at < ? GROUP BY m`, fromIso, toIso).all()).results) if (sq[r.m]) sq[r.m].refunds = r.refunds;
+  // Bank side per month per category
+  const bank = {}; for (const m of months) bank[m] = {};
+  for (const r of (await q(`SELECT substr(posted_at,1,7) m, category, SUM(amount_cents) amt, COUNT(*) n FROM bank_txns WHERE posted_at >= ? AND posted_at <= ? GROUP BY m, category`, fromDay, toDay).all()).results) if (bank[r.m]) bank[r.m][r.category] = { amount_cents: r.amt, n: r.n };
+  const bankRows = (await q(`SELECT COUNT(*) n, MIN(posted_at) first, MAX(posted_at) last FROM bank_txns`).first());
+  const hasBank = bankRows.n > 0;
+
+  const pnl = months.map((m) => {
+    const s = sq[m], b = bank[m];
+    const cat = (k) => Math.abs((b[k] && b[k].amount_cents) || 0);
+    const grp = (g) => CATEGORIES.filter((c) => c.group === g).reduce((n, c) => n + cat(c.key), 0);
+    const net = s.gross - s.refunds - s.fees;
+    const cogs = grp("cogs"), opex = grp("opex");
+    const ebitda = net - cogs - opex;
+    const bankIncome = (b.square_payout && b.square_payout.amount_cents || 0) + (b.other_income && b.other_income.amount_cents || 0);
+    return { month: m, gross_cents: s.gross, refunds_cents: s.refunds, square_fees_cents: s.fees, net_sales_cents: net, web_cents: s.web, cash_cents: s.cash, payments: s.payments,
+      cogs_cents: cogs, opex_cents: opex, ebitda_cents: ebitda, ebitda_pct: net ? +((ebitda / net) * 100).toFixed(1) : null, gross_margin_pct: net ? +(((net - cogs) / net) * 100).toFixed(1) : null,
+      bank_income_cents: bankIncome, bank_vs_square_cents: bankIncome - net, uncategorized_cents: cat("uncategorized"), excluded_cents: grp("excluded") - cat("uncategorized"),
+      categories: Object.fromEntries(CATEGORIES.map((c) => [c.key, cat(c.key)])) };
+  });
+  const tot = pnl.reduce((a, r) => { for (const k of ["gross_cents", "refunds_cents", "square_fees_cents", "net_sales_cents", "cogs_cents", "opex_cents", "ebitda_cents", "web_cents", "cash_cents", "bank_income_cents", "uncategorized_cents"]) a[k] = (a[k] || 0) + r[k]; return a; }, {});
+  tot.ebitda_pct = tot.net_sales_cents ? +((tot.ebitda_cents / tot.net_sales_cents) * 100).toFixed(1) : null;
+  tot.categories = Object.fromEntries(CATEGORIES.map((c) => [c.key, pnl.reduce((n, r) => n + r.categories[c.key], 0)]));
+  const catRows = CATEGORIES.map((c) => ({ ...c, total_cents: tot.categories[c.key], pct_of_net: tot.net_sales_cents ? +((tot.categories[c.key] / tot.net_sales_cents) * 100).toFixed(1) : null, status: c.target == null || !tot.net_sales_cents ? null : (tot.categories[c.key] / tot.net_sales_cents <= c.target ? "good" : tot.categories[c.key] / tot.net_sales_cents <= c.target * 1.3 ? "warn" : "over") }));
+
+  // Reconciliation
+  const unmatchedPayouts = (await q(`SELECT payout_id, created_at, arrival_date, amount_cents, status FROM payouts WHERE matched_txn_id IS NULL AND status IN ('PAID','SENT') AND created_at >= ? ORDER BY created_at DESC LIMIT 50`, fromIso).all()).results;
+  const unmatchedDeposits = hasBank ? (await q(`SELECT id, posted_at, amount_cents, description FROM bank_txns WHERE category = 'square_payout' AND matched_payout_id IS NULL AND posted_at >= ? ORDER BY posted_at DESC LIMIT 50`, fromDay).all()).results : [];
+  const payoutTotals = await q(`SELECT COUNT(*) n, COALESCE(SUM(amount_cents),0) amt, SUM(CASE WHEN matched_txn_id IS NOT NULL THEN 1 ELSE 0 END) matched FROM payouts WHERE status IN ('PAID','SENT') AND created_at >= ? AND created_at < ?`, fromIso, toIso).first();
+  const cashDeposits = hasBank ? Math.abs((await q(`SELECT COALESCE(SUM(amount_cents),0) a FROM bank_txns WHERE category = 'cash_deposit' AND posted_at >= ? AND posted_at <= ?`, fromDay, toDay).first()).a) : 0;
+  const uncategorized = hasBank ? (await q(`SELECT id, posted_at, amount_cents, description FROM bank_txns WHERE category = 'uncategorized' ORDER BY posted_at DESC LIMIT 200`).all()).results : [];
+  const unpaid = (await q(`SELECT COUNT(*) n, COALESCE(SUM(total_cents),0) amt FROM orders WHERE status IN ('pay_later','checkout_started') AND created_at >= ?`, new Date(Date.now() - 60 * 86400000).toISOString()).first());
+  const lastPayout = await q(`SELECT MAX(created_at) t FROM payouts`).first();
+  const inTransit = await q(`SELECT COALESCE(SUM(amount_cents - fee_cents - refunded_cents),0) a FROM payments WHERE status='COMPLETED' AND source != 'CASH' AND created_at > ?`, lastPayout.t || new Date(Date.now() - 3 * 86400000).toISOString()).first();
+
+  // Unit economics for cups (modeled, from settings)
+  const u = settings.unit; const lab = (min) => Math.round(u.labor_rate_hour * min / 60);
+  const unitRows = [
+    { product: "12 oz engraved", price_cents: 1500, cost_cents: u.cup12_blank + u.engrave_consumable + u.packaging + lab(u.minutes_engraved) },
+    { product: "12 oz printed", price_cents: 1700, cost_cents: u.cup12_blank + u.ink12 + u.packaging + lab(u.minutes_printed) },
+    { product: "16 oz engraved", price_cents: 1700, cost_cents: u.cup16_blank + u.engrave_consumable + u.packaging + lab(u.minutes_engraved) },
+    { product: "16 oz printed", price_cents: 1900, cost_cents: u.cup16_blank + u.ink16 + u.packaging + lab(u.minutes_printed) },
+  ].map((r) => ({ ...r, margin_cents: r.price_cents - r.cost_cents, margin_pct: +(((r.price_cents - r.cost_cents) / r.price_cents) * 100).toFixed(1) }));
+  const cupsSold = (await q(`SELECT l.size, l.finish, SUM(l.qty) qty, SUM(l.qty*l.unit_cents) rev FROM order_lines l JOIN orders o ON o.ref = l.ref WHERE o.status IN ('paid','refunded') AND o.paid_at >= ? AND o.paid_at < ? GROUP BY l.size, l.finish`, fromIso, toIso).all()).results;
+  let modeledCogs = 0; for (const r of cupsSold) { const key = (r.size === "16" ? "16 oz " : "12 oz ") + (r.finish === "printed" ? "printed" : "engraved"); const ur = unitRows.find((x) => x.product === key); if (ur) modeledCogs += ur.cost_cents * r.qty; }
+
+  // Forecast: 13 weeks of cash
+  const wk = 7 * 86400000; const now = Date.now();
+  const w8 = new Date(now - 8 * wk).toISOString();
+  const inflow8 = (await q(`SELECT COALESCE(SUM(amount_cents - fee_cents - refunded_cents),0) a FROM payments WHERE status='COMPLETED' AND created_at >= ?`, w8).first()).a;
+  const bankOut8 = hasBank ? Math.abs((await q(`SELECT COALESCE(SUM(amount_cents),0) a FROM bank_txns WHERE amount_cents < 0 AND posted_at >= ? AND category NOT IN ('transfer','owner_draw','credit_card_payment','loan','equipment','cash_deposit')`, w8.slice(0, 10)).first()).a) : 0;
+  const bankWeeks = hasBank ? Math.max(1, Math.min(8, (now - new Date(bankRows.first).getTime()) / wk)) : 8;
+  const weeklyIn = inflow8 / 8;
+  const payrollWeekly = await payrollWeeklyEstimate(env);
+  const weeklyOut = hasBank ? bankOut8 / bankWeeks : (settings.monthly_fixed_costs_cents / 4.33) + payrollWeekly;
+  const hireW = (+whatIf.hire_monthly_cents || 0) / 4.33, growthW = (+whatIf.growth_monthly_cents || 0) / 4.33, restock = +whatIf.restock_cents || 0, salesPct = +whatIf.sales_change_pct || 0;
+  const start = settings.cash_balance_cents + (inTransit.a || 0);
+  const series = []; let cash = start, minCash = start, minWeek = 0;
+  for (let i = 1; i <= 13; i++) {
+    const inflow = weeklyIn * (1 + salesPct / 100), outflow = weeklyOut + hireW + growthW + (i === 1 ? restock : 0);
+    cash += inflow - outflow; series.push({ week: i, cash_cents: Math.round(cash), in_cents: Math.round(inflow), out_cents: Math.round(outflow) });
+    if (cash < minCash) { minCash = cash; minWeek = i; }
+  }
+  const reserve = Math.round(weeklyOut * 4.33 * settings.reserve_months);
+  const burn = weeklyOut + hireW + growthW - weeklyIn * (1 + salesPct / 100);
+  const forecast = { start_cash_cents: start, cash_balance_cents: settings.cash_balance_cents, cash_as_of: settings.cash_as_of, in_transit_cents: inTransit.a || 0, receivable_cents: unpaid.amt, receivable_n: unpaid.n,
+    weekly_in_cents: Math.round(weeklyIn), weekly_out_cents: Math.round(weeklyOut), payroll_weekly_cents: Math.round(payrollWeekly), basis: hasBank ? `bank, ${bankWeeks.toFixed(1)} weeks of data` : "fixed-cost setting", weeks_of_data: +bankWeeks.toFixed(1),
+    reserve_cents: reserve, min_cash_cents: Math.round(minCash), min_cash_week: minWeek, safe_to_spend_cents: Math.round(minCash - reserve), runway_weeks: burn > 0 ? Math.max(0, Math.floor(start / burn)) : null, series, what_if: { hire_monthly_cents: +whatIf.hire_monthly_cents || 0, growth_monthly_cents: +whatIf.growth_monthly_cents || 0, restock_cents: restock, sales_change_pct: salesPct } };
+
+  // Health score: EBITDA 30, reserve 25, categorized 20, reconciled 15, receivables 10
+  const catShare = hasBank ? 1 - (tot.uncategorized_cents / Math.max(1, Object.values(tot.categories).reduce((a, b) => a + b, 0))) : 0;
+  const reconRate = payoutTotals.n ? payoutTotals.matched / payoutTotals.n : (hasBank ? 0 : 0);
+  const reserveMonths = weeklyOut > 0 ? start / (weeklyOut * 4.33) : 0;
+  const e = tot.ebitda_pct == null ? 0 : tot.ebitda_pct;
+  const score = Math.round(Math.max(0, Math.min(30, e * 1.5)) + Math.min(25, reserveMonths / 3 * 25) + catShare * 20 + reconRate * 15 + (unpaid.n === 0 ? 10 : Math.max(0, 10 - unpaid.n)));
+  let streak = 0; for (let i = pnl.length - 1; i >= 0; i--) { if (pnl[i].ebitda_cents > 0 && pnl[i].net_sales_cents > 0) streak++; else break; }
+  const health = { score, level: score >= 85 ? "Fortress" : score >= 65 ? "Strong" : score >= 40 ? "Steady" : "Bootstrapping", profitable_streak_months: streak, parts: { ebitda_pct: e, reserve_months: +reserveMonths.toFixed(1), categorized_pct: Math.round(catShare * 100), reconciled_pct: Math.round(reconRate * 100), open_receivables: unpaid.n } };
+
+  return { range: { from: fromIso, to: toIso }, months, pnl, totals: tot, categories: catRows, has_bank: hasBank, bank_span: { first: bankRows.first, last: bankRows.last, n: bankRows.n },
+    reconciliation: { unmatched_payouts: unmatchedPayouts, unmatched_deposits: unmatchedDeposits, payouts: payoutTotals, cash_collected_cents: tot.cash_cents, cash_deposited_cents: cashDeposits, uncategorized },
+    unit: { settings: u, rows: unitRows, cups_sold: cupsSold, modeled_cogs_cents: modeledCogs, actual_cogs_cents: tot.cogs_cents }, forecast, health, settings, chart: CATEGORIES };
+}
+async function payrollWeeklyEstimate(env) {
+  const staff = (await env.DB.prepare(`SELECT id, hourly_rate_cents FROM staff WHERE active = 1 AND hourly_rate_cents > 0`).all()).results;
+  if (!staff.length) return 0;
+  const since = new Date(Date.now() - 28 * 86400000).toISOString();
+  let total = 0;
+  for (const s of staff) { const m = (await env.DB.prepare(`SELECT COALESCE(SUM(COALESCE(minutes, 0)),0) m FROM shifts WHERE staff_id = ? AND in_at >= ?`).bind(s.id, since).first()).m; total += (m / 60 / 4) * s.hourly_rate_cents; }
+  return total;
+}
+async function txnsFor(env, month, category, limit = 300) {
+  const args = []; let where = "1=1";
+  if (month) { where += " AND substr(posted_at,1,7) = ?"; args.push(month); }
+  if (category) { where += " AND category = ?"; args.push(category); }
+  const rows = (await env.DB.prepare(`SELECT id, posted_at, amount_cents, description, category, vendor, memo, matched_payout_id FROM bank_txns WHERE ${where} ORDER BY posted_at DESC LIMIT ${limit}`).bind(...args).all()).results;
+  const total = rows.reduce((a, r) => a + Math.abs(r.amount_cents), 0);
+  return { rows: rows.map((r) => ({ ...r, share_pct: total ? +((Math.abs(r.amount_cents) / total) * 100).toFixed(1) : 0 })), total_cents: total };
+}
+
+// Employee pay: hours × rate for the current pay period, plus optional commission on jobs marked done.
+async function staffPay(env, me) {
+  const s = await finSettings(env);
+  const rate = me.hourly_rate_cents || 0, comm = me.commission_pct || 0;
+  const anchor = new Date(s.pay_period_anchor + "T00:00:00Z"); const len = (s.pay_period_days || 14) * 86400000;
+  const now = Date.now(); const k = Math.floor((now - anchor.getTime()) / len);
+  const from = new Date(anchor.getTime() + k * len).toISOString(), to = new Date(anchor.getTime() + (k + 1) * len).toISOString();
+  const prevFrom = new Date(anchor.getTime() + (k - 1) * len).toISOString();
+  const q = (sql, ...a) => env.DB.prepare(sql).bind(...a);
+  const mins = async (a, b) => (await q(`SELECT COALESCE(SUM(CASE WHEN out_at IS NULL THEN (strftime('%s','now') - strftime('%s', in_at)) / 60 ELSE COALESCE(minutes,0) END),0) m FROM shifts WHERE staff_id = ? AND in_at >= ? AND in_at < ?`, me.id, a, b).first()).m;
+  const jobs = async (a, b) => (await q(`SELECT COALESCE(SUM(amount_cents),0) a FROM jobs WHERE done_by = ? AND done_at >= ? AND done_at < ?`, me.id, a, b).first()).a;
+  const curMin = await mins(from, to), prevMin = await mins(prevFrom, from);
+  const curJobs = await jobs(from, to), prevJobs = await jobs(prevFrom, from);
+  const yearStart = new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1)).toISOString();
+  const ytdMin = await mins(yearStart, to), ytdJobs = await jobs(yearStart, to);
+  const avgWeekMin = (await mins(new Date(now - 28 * 86400000).toISOString(), new Date(now).toISOString())) / 4;
+  const daysLeft = Math.max(0, (new Date(to).getTime() - now) / 86400000);
+  const projectedMin = curMin + avgWeekMin * (daysLeft / 7);
+  const pay = (m, j) => Math.round(m / 60 * rate + j * comm / 100);
+  return { rate_cents: rate, commission_pct: comm, period_from: from, period_to: to, days_left: Math.ceil(daysLeft),
+    hours: +(curMin / 60).toFixed(1), earned_cents: pay(curMin, curJobs), commission_cents: Math.round(curJobs * comm / 100), projected_hours: +(projectedMin / 60).toFixed(1), projected_cents: pay(projectedMin, curJobs),
+    last_period_hours: +(prevMin / 60).toFixed(1), last_period_cents: pay(prevMin, prevJobs), ytd_hours: +(ytdMin / 60).toFixed(1), ytd_cents: pay(ytdMin, ytdJobs) };
+}
+
+async function bankCsv(env) {
+  const rows = (await env.DB.prepare(`SELECT posted_at, source, description, amount_cents, category, vendor, memo, matched_payout_id FROM bank_txns ORDER BY posted_at DESC`).all()).results;
+  const esc = (v) => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+  const csv = ["date,account,description,amount,category,vendor,memo,square_payout"].concat(rows.map((r) => [r.posted_at, r.source, r.description, (r.amount_cents / 100).toFixed(2), r.category, r.vendor, r.memo, r.matched_payout_id].map(esc).join(","))).join("\n");
+  return new Response(csv, { headers: { "Content-Type": "text/csv", "Content-Disposition": "attachment; filename=hdlaser-ledger.csv" } });
+}
+
+function moneyHtml(env) {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HD Laser money</title>
+<style>
+:root{--bg:#F6F4EF;--ink:#15191E;--muted:#545B63;--red:#C8372A;--line:#E4E0D8;--card:#fff;--green:#2F6B4F;--gold:#F2B63D;--amber:#D9822B}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Figtree,"Helvetica Neue",Arial,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line);background:#fff}
+h1{font-size:20px;margin:0}h2{font-size:17px;margin:24px 0 10px}h3{font-size:15px;margin:0 0 8px}main{max-width:1200px;margin:0 auto;padding:16px 20px 80px}
+.act,select,input[type=text],input[type=number],input[type=date]{font:inherit;padding:7px 12px;border:1px solid var(--line);background:#fff;border-radius:999px;cursor:pointer}input,select{border-radius:8px}
+.act.red{background:var(--red);color:#fff;border-color:var(--red)}.act.dark{background:var(--ink);color:#fff;border-color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;overflow:auto}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}.tile .l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}.tile .n{font-size:24px;font-weight:700;margin-top:4px}.tile .d{font-size:12px;color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #EDE8DF;vertical-align:top}th{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}td.num,th.num{text-align:right;white-space:nowrap}
+tr.click{cursor:pointer}tr.click:hover{background:#FBF3D6}tr.tot td{font-weight:700;border-top:2px solid var(--ink)}tr.sub td{color:var(--muted)}
+.pill{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:#EDE8DF}.good{background:#E7F2EC;color:var(--green)}.warn{background:#FBF3D6;color:#8a5a00}.over{background:#FBE9E6;color:var(--red)}
+.small{font-size:12px;color:var(--muted)}.empty{color:var(--muted);font-style:italic}
+.score{display:flex;align-items:center;gap:18px}.ring{width:96px;height:96px;border-radius:50%;display:grid;place-items:center;font-size:30px;font-weight:800;color:#fff;background:conic-gradient(var(--green) calc(var(--p)*1%),#E4E0D8 0)}.ring span{width:76px;height:76px;border-radius:50%;background:var(--ink);display:grid;place-items:center}
+.bar{height:8px;background:#EDE8DF;border-radius:999px;overflow:hidden}.bar i{display:block;height:100%;background:var(--green)}.bar i.warn{background:var(--amber)}.bar i.over{background:var(--red)}
+#drawer{position:fixed;top:0;right:0;width:min(560px,100%);height:100%;background:#fff;box-shadow:-8px 0 30px rgba(0,0,0,.15);transform:translateX(100%);transition:.2s;overflow:auto;padding:18px;z-index:20}#drawer.open{transform:none}
+textarea{width:100%;min-height:90px;font:13px/1.4 ui-monospace,Menlo,monospace;border:1px solid var(--line);border-radius:8px;padding:8px}
+.what{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.what label{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:4px}
+svg text{font-size:11px;fill:var(--muted)}
+#err{background:#FBE9E6;color:var(--red);padding:10px 14px;border-radius:10px;margin:12px 0;display:none}
+@media (max-width:640px){.score{flex-direction:column;align-items:flex-start}}
+</style></head><body>
+<header><h1>HD Laser money</h1><div><a class="act" href="/admin" style="text-decoration:none;color:inherit">Sales dashboard</a> <button class="act" id="sync">Sync Square</button> <a class="act" href="/api/bank/export.csv" style="text-decoration:none;color:inherit">Export ledger</a></div></header>
+<main>
+<div id="err"></div>
+<div class="grid" style="grid-template-columns:1.2fr 2fr">
+  <div class="card"><h3>Financial health</h3><div class="score"><div class="ring" id="ring" style="--p:0"><span id="scoreN">–</span></div><div><div id="level" style="font-size:18px;font-weight:700"></div><div class="small" id="streak"></div><div class="small" id="parts" style="margin-top:6px;line-height:1.6"></div></div></div></div>
+  <div class="card"><h3>Last 6 months</h3><div class="tiles" id="tiles"></div></div>
+</div>
+
+<h2>Profit &amp; loss by month <span class="small">click a row for the itemized list</span></h2>
+<div class="card"><table id="pnl"></table><p class="small" id="pnlnote" style="margin:8px 0 0"></p></div>
+
+<h2>Cash forecast, next 13 weeks</h2>
+<div class="grid" style="grid-template-columns:2fr 1fr">
+  <div class="card"><div id="chart"></div><div class="tiles" id="fctiles" style="margin-top:10px"></div></div>
+  <div class="card"><h3>What if…</h3><div class="what">
+    <label>Hire, $ per month<input type="number" id="w-hire" value="0" step="100"></label>
+    <label>Restock, one-time $<input type="number" id="w-restock" value="0" step="100"></label>
+    <label>Growth spend, $ per month<input type="number" id="w-growth" value="0" step="100"></label>
+    <label>Sales change, %<input type="number" id="w-sales" value="0" step="5"></label>
+    <label>Cash in bank now, $<input type="number" id="w-cash" step="100"></label>
+    <label>Reserve, months of costs<input type="number" id="w-reserve" step="0.5" min="0"></label>
+    <label>Monthly fixed costs, $ (used until bank data exists)<input type="number" id="w-fixed" step="100"></label>
+  </div><p style="margin:10px 0 0"><button class="act dark" id="w-run">Recalculate</button> <button class="act" id="w-save">Save cash &amp; reserve</button></p><p class="small" id="verdict" style="margin-top:10px;line-height:1.5"></p></div>
+</div>
+
+<h2>Bank ledger</h2>
+<div class="grid">
+  <div class="card"><h3>Import bank or card statement (CSV)</h3>
+    <p class="small">Download a CSV from the bank (any date range), pick it here. Columns are detected automatically: date, description, amount (or debit/credit), balance. Re-importing the same rows is safe; duplicates are skipped.</p>
+    <p><input type="text" id="src" placeholder="Account name, e.g. Chase checking" style="width:60%"> <input type="file" id="csv" accept=".csv,text/csv"></p>
+    <p><button class="act dark" id="imp">Import</button> <span class="small" id="impmsg"></span></p></div>
+  <div class="card"><h3>Reconciliation with Square <span class="pill" id="recpill"></span></h3><div id="recon"></div></div>
+</div>
+<div class="card" style="margin-top:14px"><h3>Uncategorized <span class="pill" id="uncpill">0</span></h3><p class="small">Pick a category. Tick "rule" to apply it to everything with the same name, now and in future imports.</p><div id="unc"></div></div>
+
+<h2>Unit economics, logo cups</h2>
+<div class="grid">
+  <div class="card"><table id="unit"></table><p class="small" id="unitnote" style="margin-top:8px"></p></div>
+  <div class="card"><h3>Cost assumptions, cents per cup</h3><div class="what" id="unitform"></div><p style="margin-top:10px"><button class="act dark" id="unitsave">Save assumptions</button> <span class="small" id="unitmsg"></span></p></div>
+</div>
+</main>
+<div id="drawer"><p style="text-align:right;margin:0"><button class="act" id="dclose">Close</button></p><h3 id="dtitle"></h3><p class="small" id="dsub"></p><table id="dtable"></table></div>
+<script>
+const $=s=>document.querySelector(s), esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const money=c=>(c<0?'-':'')+'$'+Math.abs((c||0)/100).toLocaleString('en-US',{maximumFractionDigits:0});
+const mon=m=>new Date(m+'-02').toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+let R=null, CATS=[];
+function whatIf(){ return {hire_monthly_cents:Math.round((+$('#w-hire').value||0)*100),restock_cents:Math.round((+$('#w-restock').value||0)*100),growth_monthly_cents:Math.round((+$('#w-growth').value||0)*100),sales_change_pct:+$('#w-sales').value||0}; }
+async function load(){ $('#err').style.display='none'; const w=whatIf(); const q=new URLSearchParams(Object.entries(w).map(([k,v])=>[k,String(v)]));
+  const r=await fetch('/api/money?'+q); if(!r.ok){ $('#err').textContent='Could not load: '+r.status; $('#err').style.display='block'; return; }
+  R=await r.json(); if(R.error){ $('#err').textContent=R.error; $('#err').style.display='block'; return; } CATS=R.chart; render(); }
+function render(){
+  const h=R.health; $('#ring').style.setProperty('--p',h.score); $('#scoreN').textContent=h.score; $('#level').textContent=h.level; $('#streak').textContent=h.profitable_streak_months?h.profitable_streak_months+' profitable month'+(h.profitable_streak_months>1?'s':'')+' in a row':'No profitable-month streak yet';
+  $('#parts').innerHTML='EBITDA '+(h.parts.ebitda_pct)+'% · Cash reserve '+h.parts.reserve_months+' months · Ledger categorized '+h.parts.categorized_pct+'% · Payouts reconciled '+h.parts.reconciled_pct+'% · Open receivables '+h.parts.open_receivables;
+  const t=R.totals;
+  $('#tiles').innerHTML=tile('Net sales',money(t.net_sales_cents),'after refunds & Square fees')+tile('COGS',money(t.cogs_cents),R.has_bank?'from bank ledger':'no bank data yet')+tile('Operating expenses',money(t.opex_cents),'')+tile('EBITDA',money(t.ebitda_cents),(t.ebitda_pct==null?'–':t.ebitda_pct+'%')+' of net sales')+tile('Web cup sales',money(t.web_cents),'')+tile('Cash sales',money(t.cash_cents),'must be deposited')+tile('Bank vs Square',money(t.bank_income_cents-t.net_sales_cents),'deposits minus net sales');
+  const ms=R.months; const row=(label,fn,cls,key)=>'<tr class="'+(cls||'')+(key?' click':'')+'"'+(key?' data-cat="'+key+'"':'')+'><td>'+label+'</td>'+ms.map(m=>'<td class="num">'+fn(R.pnl.find(p=>p.month===m))+'</td>').join('')+'<td class="num"><b>'+fn(t)+'</b></td></tr>';
+  let html='<tr><th>'+(R.has_bank?'':'<span class="pill warn">import a bank CSV to fill expenses</span>')+'</th>'+ms.map(m=>'<th class="num">'+mon(m)+'</th>').join('')+'<th class="num">Total</th></tr>';
+  html+=row('Gross sales (Square)',p=>money(p.gross_cents))+row('Refunds',p=>money(-p.refunds_cents),'sub')+row('Square fees',p=>money(-p.square_fees_cents),'sub')+row('<b>Net sales</b>',p=>money(p.net_sales_cents),'tot');
+  const cat=(g)=>CATS.filter(c=>c.group===g).map(c=>row(c.name,p=>p.categories?money(-p.categories[c.key]):money(-(t.categories[c.key]||0)),'',c.key)).join('');
+  html+='<tr><td colspan="'+(ms.length+2)+'" class="small" style="padding-top:12px"><b>Cost of goods</b></td></tr>'+cat('cogs')+row('<b>Gross profit</b>',p=>money(p.net_sales_cents-p.cogs_cents)+(p.gross_margin_pct!=null?' <span class="small">'+p.gross_margin_pct+'%</span>':''),'tot');
+  html+='<tr><td colspan="'+(ms.length+2)+'" class="small" style="padding-top:12px"><b>Operating expenses</b></td></tr>'+cat('opex')+row('<b>EBITDA</b>',p=>money(p.ebitda_cents)+(p.ebitda_pct!=null?' <span class="small">'+p.ebitda_pct+'%</span>':''),'tot');
+  html+='<tr><td colspan="'+(ms.length+2)+'" class="small" style="padding-top:12px"><b>Not in EBITDA</b> (transfers, draws, loans, card payments, equipment)</td></tr>'+CATS.filter(c=>c.group==='excluded').map(c=>row(c.name,p=>money(-(p.categories?p.categories[c.key]:t.categories[c.key])),'sub',c.key)).join('');
+  $('#pnl').innerHTML=html;
+  $('#pnlnote').innerHTML=R.categories.filter(c=>c.status).map(c=>'<span class="pill '+c.status+'">'+esc(c.name)+' '+c.pct_of_net+'% (target ≤'+Math.round(c.target*100)+'%)</span> ').join('');
+  // forecast
+  const f=R.forecast; drawChart(f); 
+  $('#fctiles').innerHTML=tile('Cash now',money(f.cash_balance_cents),f.cash_as_of?'as of '+f.cash_as_of:'set it in What if')+tile('Square in transit',money(f.in_transit_cents),'not yet paid out')+tile('Receivable',money(f.receivable_cents),f.receivable_n+' unpaid web orders')+tile('Weekly in',money(f.weekly_in_cents),'avg last 8 weeks')+tile('Weekly out',money(f.weekly_out_cents),'basis: '+f.basis)+tile('Lowest cash',money(f.min_cash_cents),'week '+f.min_cash_week)+tile('Safe to spend',money(f.safe_to_spend_cents),'above a '+R.settings.reserve_months+'-month reserve');
+  const v=[]; if(f.safe_to_spend_cents>0) v.push('<b>You can commit about '+money(f.safe_to_spend_cents)+'</b> over the next 13 weeks and still keep '+R.settings.reserve_months+' month'+(R.settings.reserve_months==1?'':'s')+' of costs in reserve.'); else v.push('<b>Not safe to add spending yet.</b> Cash would dip '+money(-f.safe_to_spend_cents)+' below your reserve in week '+f.min_cash_week+'.');
+  if(f.runway_weeks!=null) v.push('At the current pace, cash runs out in about '+f.runway_weeks+' weeks unless sales rise.'); const w=f.what_if; if(w.hire_monthly_cents||w.growth_monthly_cents||w.restock_cents||w.sales_change_pct) v.push('Includes your what-if: '+[w.hire_monthly_cents?'hire '+money(w.hire_monthly_cents)+'/mo':'',w.restock_cents?'restock '+money(w.restock_cents):'',w.growth_monthly_cents?'growth '+money(w.growth_monthly_cents)+'/mo':'',w.sales_change_pct?'sales '+(w.sales_change_pct>0?'+':'')+w.sales_change_pct+'%':''].filter(Boolean).join(', ')+'.');
+  if(!R.has_bank) v.push('No bank data yet, so weekly costs come from the fixed-cost setting. Import a statement for real numbers.');
+  $('#verdict').innerHTML=v.join(' ');
+  if(!$('#w-cash').value) $('#w-cash').value=Math.round(f.cash_balance_cents/100); if(!$('#w-reserve').value) $('#w-reserve').value=R.settings.reserve_months; if(!$('#w-fixed').value) $('#w-fixed').value=Math.round(R.settings.monthly_fixed_costs_cents/100);
+  // reconciliation
+  const rc=R.reconciliation; $('#recpill').textContent=(rc.payouts.matched||0)+'/'+(rc.payouts.n||0)+' payouts matched';
+  $('#recon').innerHTML=(rc.unmatched_payouts.length?'<p><b>Square says it sent these, not found in the bank:</b></p><table>'+rc.unmatched_payouts.map(p=>'<tr><td class="small">'+(p.arrival_date||p.created_at||'').slice(0,10)+'</td><td>'+esc(p.status)+'</td><td class="num">'+money(p.amount_cents)+'</td></tr>').join('')+'</table>':'<p class="small">Every Square payout in range matches a bank deposit'+(rc.payouts.n?'.':', once payouts are synced.')+'</p>')
+    +(rc.unmatched_deposits.length?'<p><b>Bank deposits from Square with no payout record:</b> <span class="small">usually older than the synced window; run Import 2 years on the sales dashboard</span></p><table>'+rc.unmatched_deposits.map(d=>'<tr><td class="small">'+d.posted_at+'</td><td class="small">'+esc(d.description)+'</td><td class="num">'+money(d.amount_cents)+'</td></tr>').join('')+'</table>':'')
+    +'<p style="margin-top:8px"><b>Cash:</b> Square recorded '+money(rc.cash_collected_cents)+' in cash sales; the bank shows '+money(rc.cash_deposited_cents)+' in cash deposits'+(rc.cash_collected_cents>rc.cash_deposited_cents+5000?' <span class="pill over">'+money(rc.cash_collected_cents-rc.cash_deposited_cents)+' not deposited</span>':' <span class="pill good">ok</span>')+'.</p>';
+  $('#uncpill').textContent=rc.uncategorized.length;
+  const opts=CATS.map(c=>'<option value="'+c.key+'">'+esc(c.name)+'</option>').join('');
+  $('#unc').innerHTML=rc.uncategorized.length?'<table>'+rc.uncategorized.map(u=>'<tr><td class="small">'+u.posted_at+'</td><td>'+esc(u.description)+'</td><td class="num">'+money(u.amount_cents)+'</td><td><select data-id="'+u.id+'"><option value="">choose…</option>'+opts+'</select> <label class="small"><input type="checkbox" data-rule="'+u.id+'" checked> rule</label></td></tr>').join('')+'</table>':'<p class="empty">Nothing to categorize.</p>';
+  // unit economics
+  const un=R.unit; $('#unit').innerHTML='<tr><th>Cup</th><th class="num">Sells at (50-tier)</th><th class="num">Our cost</th><th class="num">Margin</th></tr>'+un.rows.map(r=>'<tr><td>'+r.product+'</td><td class="num">'+money(r.price_cents)+'</td><td class="num">'+money(r.cost_cents)+'</td><td class="num">'+money(r.margin_cents)+' <span class="pill '+(r.margin_pct>=50?'good':r.margin_pct>=35?'warn':'over')+'">'+r.margin_pct+'%</span></td></tr>').join('');
+  $('#unitnote').textContent='Modeled cost of cups sold in range: '+money(un.modeled_cogs_cents)+' vs '+money(un.actual_cogs_cents)+' actual COGS in the bank ledger. A big gap means blanks or ink were bought in a different month, or the assumptions need tuning.';
+  const labels={cup12_blank:'12 oz blank',cup16_blank:'16 oz blank',ink12:'UV ink, 12 oz',ink16:'UV ink, 16 oz',engrave_consumable:'Engraving consumables',packaging:'Packaging',labor_rate_hour:'Labor, cents per hour',minutes_engraved:'Minutes per engraved cup',minutes_printed:'Minutes per printed cup'};
+  $('#unitform').innerHTML=Object.keys(labels).map(k=>'<label>'+labels[k]+'<input type="number" step="1" data-unit="'+k+'" value="'+un.settings[k]+'"></label>').join('');
+}
+function tile(l,n,d){ return '<div class="tile"><div class="l">'+l+'</div><div class="n">'+n+'</div><div class="d">'+(d||'')+'</div></div>'; }
+function drawChart(f){ const W=640,H=220,P=36; const vals=[f.start_cash_cents].concat(f.series.map(s=>s.cash_cents)); const lo=Math.min(0,...vals,f.reserve_cents), hi=Math.max(...vals,f.reserve_cents,1); const x=i=>P+i*(W-2*P)/13, y=v=>H-P-(v-lo)/(hi-lo)*(H-2*P);
+  let s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'">'; s+='<line x1="'+P+'" y1="'+y(0)+'" x2="'+(W-P)+'" y2="'+y(0)+'" stroke="#E4E0D8"/>'; s+='<line x1="'+P+'" y1="'+y(f.reserve_cents)+'" x2="'+(W-P)+'" y2="'+y(f.reserve_cents)+'" stroke="#D9822B" stroke-dasharray="4 4"/><text x="'+(W-P)+'" y="'+(y(f.reserve_cents)-4)+'" text-anchor="end">reserve '+money(f.reserve_cents)+'</text>';
+  s+='<polyline fill="none" stroke="#15191E" stroke-width="2.5" points="'+vals.map((v,i)=>x(i)+','+y(v)).join(' ')+'"/>'; vals.forEach((v,i)=>{ s+='<circle cx="'+x(i)+'" cy="'+y(v)+'" r="3" fill="'+(v<f.reserve_cents?'#C8372A':'#2F6B4F')+'"/>'; if(i%2===0) s+='<text x="'+x(i)+'" y="'+(H-P+14)+'" text-anchor="middle">'+(i===0?'now':'wk '+i)+'</text>'; });
+  s+='<text x="'+P+'" y="'+(y(hi)+4)+'">'+money(hi)+'</text><text x="'+P+'" y="'+(y(lo)-2)+'">'+money(lo)+'</text></svg>'; $('#chart').innerHTML=s; }
+async function openCat(key){ const c=CATS.find(x=>x.key===key); const r=await fetch('/api/bank/txns?category='+key+'&from='+R.range.from.slice(0,10)); const d=await r.json();
+  $('#dtitle').textContent=c?c.name:key; $('#dsub').textContent=money(d.total_cents)+' across '+d.rows.length+' transactions in range. Share is each item\\'s portion of this category.';
+  const opts=CATS.map(x=>'<option value="'+x.key+'">'+esc(x.name)+'</option>').join('');
+  $('#dtable').innerHTML='<tr><th>Date</th><th>Description</th><th class="num">Amount</th><th class="num">Share</th><th></th></tr>'+d.rows.map(t=>'<tr><td class="small">'+t.posted_at+'</td><td>'+esc(t.description)+(t.memo?'<div class="small">'+esc(t.memo)+'</div>':'')+'</td><td class="num">'+money(t.amount_cents)+'</td><td class="num">'+t.share_pct+'%</td><td><select data-id="'+t.id+'" data-cur="'+t.category+'"><option value="">move…</option>'+opts+'</select></td></tr>').join('');
+  $('#drawer').classList.add('open'); }
+document.addEventListener('click',e=>{ const tr=e.target.closest('tr[data-cat]'); if(tr&&!e.target.closest('select')) openCat(tr.dataset.cat); });
+$('#dclose').onclick=()=>$('#drawer').classList.remove('open');
+document.addEventListener('change',async e=>{ const s=e.target.closest('select[data-id]'); if(!s||!s.value) return; const rule=document.querySelector('input[data-rule="'+s.dataset.id+'"]'); const r=await fetch('/api/bank/txns/'+s.dataset.id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:s.value,make_rule:!!(rule&&rule.checked)})}); const j=await r.json(); if(!j.ok) alert(j.error||'Failed'); else { const row=s.closest('tr'); row.style.opacity='.4'; if(j.applied) $('#impmsg').textContent='Rule applied to '+j.applied+' more.'; setTimeout(load,300); } });
+$('#w-run').onclick=load;
+$('#w-save').onclick=async()=>{ const body={cash_balance_cents:Math.round((+$('#w-cash').value||0)*100),cash_as_of:new Date().toISOString().slice(0,10),reserve_months:+$('#w-reserve').value||1,monthly_fixed_costs_cents:Math.round((+$('#w-fixed').value||0)*100)}; await fetch('/api/money/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); load(); };
+$('#unitsave').onclick=async()=>{ const unit={}; document.querySelectorAll('input[data-unit]').forEach(i=>unit[i.dataset.unit]=+i.value); await fetch('/api/money/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({unit})}); $('#unitmsg').textContent='Saved.'; load(); };
+$('#sync').onclick=async()=>{ $('#sync').disabled=true; $('#sync').textContent='Working…'; const r=await fetch('/api/sync?days=30',{method:'POST'}); const j=await r.json(); $('#sync').disabled=false; $('#sync').textContent='Sync Square'; if(j.payout_error) alert('Payments synced, but payouts could not be read: '+j.payout_error+'\\n\\nIn Square Developer, give the app the PAYOUTS_READ permission and create a new access token.'); load(); };
+function parseCsv(text){ const rows=[]; let row=[],field='',q=false; for(let i=0;i<text.length;i++){ const c=text[i]; if(q){ if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else q=false; } else field+=c; } else if(c==='"') q=true; else if(c===','){ row.push(field); field=''; } else if(c==='\\n'||c==='\\r'){ if(c==='\\r'&&text[i+1]==='\\n') i++; row.push(field); rows.push(row); row=[]; field=''; } else field+=c; } if(field||row.length){ row.push(field); rows.push(row);} return rows.filter(r=>r.some(x=>x&&x.trim())); }
+$('#imp').onclick=async()=>{ const f=$('#csv').files[0]; if(!f){ alert('Choose a CSV file first.'); return; } const text=await f.text(); const rows=parseCsv(text); if(rows.length<2){ alert('That file has no rows.'); return; }
+  const head=rows[0].map(h=>h.toLowerCase().trim()); const find=(...names)=>head.findIndex(h=>names.some(n=>h===n||h.includes(n)));
+  const iDate=find('posting date','post date','transaction date','date'), iDesc=find('description','memo','payee','details','name'), iAmt=find('amount'), iDeb=find('debit','withdrawal'), iCred=find('credit','deposit'), iBal=find('balance');
+  if(iDate<0||iDesc<0||(iAmt<0&&iDeb<0&&iCred<0)){ alert('Could not find date, description and amount columns. Header row: '+head.join(', ')); return; }
+  const out=rows.slice(1).map(r=>({date:r[iDate],description:r[iDesc],amount:iAmt>=0?r[iAmt]:undefined,debit:iDeb>=0?r[iDeb]:undefined,credit:iCred>=0?r[iCred]:undefined,balance:iBal>=0?r[iBal]:undefined}));
+  $('#impmsg').textContent='Importing '+out.length+' rows…'; const r=await fetch('/api/bank/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:$('#src').value||f.name.replace(/\\.csv$/i,''),rows:out})}); const j=await r.json();
+  $('#impmsg').textContent=j.ok?('Added '+j.added+', skipped '+j.duplicates+' duplicates, '+j.skipped+' unreadable.'+(j.balance_cents!=null?' Balance '+money(j.balance_cents)+' as of '+j.balance_as_of+'.':'')):(j.error||'Import failed'); load(); };
+load();
+</script></body></html>`;
 }

@@ -97,3 +97,15 @@ Setup, once:
 
 Endpoints (all under `/staff/`, Bearer token from `/staff/login`): `me`, `clock`, `checklist`, `jobs`, `jobs/:id`, `orders/:ref`, `team` (managers). Admin: `/api/team`, `/api/staff`, `/api/noshow-check`.
 
+## Money page (`/admin/money`)
+
+Live P&L, bank ledger, Square reconciliation, unit economics and a 13-week cash forecast. Same login as the dashboard.
+
+- **Bank data comes in as CSV.** Download a statement CSV from the bank or card (any range), pick it on the page, Import. Columns are detected (date, description, amount or debit/credit, balance). Re-imports skip duplicates. Rows are auto-categorized by built-in rules (Square, SDG&E, Gusto, Adobe, JDS, Uline, transfers, card payments…); anything left lands in *Uncategorized*, where picking a category with the *rule* box ticked teaches the ledger for next time.
+- **P&L.** Revenue side comes from Square (gross, refunds, fees → net sales); cost side from the categorized ledger. Transfers, owner draws, loan principal, card payments and equipment are shown but kept out of EBITDA. Click any row for the itemized list with each item's share.
+- **Reconciliation.** Square payouts (synced with the hourly job; needs the PAYOUTS_READ permission on the Square app) are matched to bank deposits of the same amount within a few days. Unmatched payouts and deposits are listed. Cash sales in Square are compared with cash deposits in the bank.
+- **Forecast.** Cash now (from the latest imported balance, or typed in) + Square money in transit, then 13 weeks of average inflow (last 8 weeks of Square) minus average outflow (bank ledger, or the fixed-cost setting until bank data exists). *Safe to spend* is the lowest projected cash minus the reserve. What-if fields add a hire, a restock, growth spend or a sales change.
+- **Health score** (0–100): EBITDA %, months of reserve, share of ledger categorized, share of payouts reconciled, open receivables.
+- **Employee pay.** Set an hourly rate and optional commission % per person (Team tab or dashboard). The portal's *My pay* tab shows hours, earned, commission, projected pay for the period, last period and year to date. Pay periods are 14 days from `pay_period_anchor` in the money settings.
+- Direct bank feeds (Plaid) can replace the CSV step later; the ledger and rules stay the same.
+
