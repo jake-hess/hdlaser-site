@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Information Security Policy | HD Laser Studio</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+:root{--bg:#F6F4EF;--ink:#15191E;--muted:#545B63;--red:#C8372A;--line:#E4E0D8}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Figtree,"Helvetica Neue",Arial,sans-serif;line-height:1.5}
+main{max-width:760px;margin:0 auto;padding:28px 20px 80px;background:#fff}
+h1{font-size:28px;margin:0 0 4px}h2{font-size:17px;margin:22px 0 6px;padding-top:8px;border-top:1px solid var(--line)}
+p,li{font-size:15px}p{margin:0 0 8px}ol,ul{margin:0 0 8px;padding-left:22px}li{margin-bottom:3px}
+.meta{font-size:13px;color:var(--muted);margin-bottom:14px}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:6px 0 10px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #EDE8DF;vertical-align:top}th{font-size:12px;color:var(--muted);text-transform:uppercase}
+.sign{margin-top:26px;padding-top:12px;border-top:2px solid var(--ink);font-size:14px}
+@media print{body{background:#fff}main{padding:0;max-width:none}h2{break-after:avoid}}
+</style>
+</head>
+<body>
+<main>
+<h1>Information Security Policy</h1>
+<p class="meta">HD Laser Studio INC · 759 Turquoise St, San Diego, CA 92109 · Version 1.0 · Effective September 23, 2026 · Review annually and after any material change</p>
+
+<h2>1. Purpose and scope</h2>
+<p>This policy sets out how HD Laser Studio protects the information it holds: customer contact details and orders, employee records, and the company's own financial data, including bank and card transactions retrieved through Plaid. It applies to the owner, every employee and contractor, and every system the company uses.</p>
+
+<h2>2. Responsibility</h2>
+<p>The owner, Hugh Demiral (contact@hdlaser.net), is responsible for information security: approving access, responding to incidents, and reviewing this policy. There is no separate IT department; the systems are hosted services managed by the owner.</p>
+
+<h2>3. Systems and where data lives</h2>
+<table><tr><th>System</th><th>What it holds</th><th>Who has access</th></tr>
+<tr><td>Cloudflare (Workers, D1 database, secrets)</td><td>Order records, customer contacts, employee records and shift history, financial ledger, bank access tokens</td><td>Owner only, via the Cloudflare account</td></tr>
+<tr><td>Owner dashboard (hdlaser.net → Owner login)</td><td>Sales, financial and team reports</td><td>Owner and managers, by admin password</td></tr>
+<tr><td>Staff portal (hdlaser.net/staff)</td><td>Each employee's own shifts, checklists, jobs and pay estimate</td><td>Each employee, by personal PIN; managers see team data; no financial data</td></tr>
+<tr><td>Square</td><td>Payments, refunds, payouts</td><td>Owner; employees by individual passcode with limited permissions</td></tr>
+<tr><td>Plaid</td><td>Read-only connection to company bank and card accounts</td><td>Owner only</td></tr>
+<tr><td>Twilio, Resend, Google Workspace</td><td>Texts, transactional email, company email</td><td>Owner</td></tr>
+<tr><td>GitHub (website source)</td><td>Website code; no customer or financial data</td><td>Owner and the site maintainer</td></tr></table>
+
+<h2>4. Access control and authentication</h2>
+<ol>
+<li>Every person has their own login. Shared or "master" accounts are not used. Employees sign in to the portal with an individual PIN and to Square with an individual passcode.</li>
+<li>Access follows the job: employees see only their own data and the work queue; managers see team data; only the owner sees financial data and bank connections.</li>
+<li>Multi-factor authentication is enabled on the Cloudflare, Plaid, Square, Google Workspace and GitHub accounts.</li>
+<li>When someone leaves, the owner deactivates their portal login the same day, which ends their sessions immediately, and removes their Square passcode.</li>
+<li>Access rights are reviewed at least every six months.</li>
+</ol>
+
+<h2>5. Secrets and credentials</h2>
+<ol>
+<li>API keys, tokens and passwords are stored only as encrypted secrets in Cloudflare. They are never written into code, documents, chat, or email.</li>
+<li>Any credential that is exposed, or suspected exposed, is rotated at the provider and replaced in Cloudflare the same day.</li>
+<li>Bank access tokens issued by Plaid are stored in the Cloudflare database, reachable only through the owner's account. Disconnecting a bank from the dashboard revokes the token at Plaid and deletes it locally.</li>
+</ol>
+
+<h2>6. Data handling</h2>
+<ol>
+<li>All data moves over encrypted connections (HTTPS/TLS). Stored data is encrypted at rest by Cloudflare.</li>
+<li>Financial and bank data is used only to run the company's own accounting: categorizing transactions, reconciling with Square, and forecasting cash. It is not sold and not shared with third parties. Customer marketing consent is handled under the Terms of Sale and Privacy Notice at hdlaser.net/terms.</li>
+<li>Bank data is retrieved read-only. The company's systems cannot move money.</li>
+<li>Exports (CSV) are made only by the owner, stored on company devices, and deleted when no longer needed.</li>
+<li>Customers may request a copy or deletion of their data by emailing contact@hdlaser.net; requests are handled within 30 days.</li>
+</ol>
+
+<h2>7. Devices</h2>
+<ol>
+<li>Company systems are accessed from devices with a screen lock and current operating system updates.</li>
+<li>Financial systems are not accessed from shared or public computers.</li>
+<li>Lost or stolen devices are reported to the owner immediately; sessions are ended and passwords changed.</li>
+</ol>
+
+<h2>8. Vendors</h2>
+<p>The company relies on established providers for hosting and financial data: Cloudflare, Square, Plaid, Twilio, Resend, Google and GitHub. Each is used under its standard terms, with access limited to what the company needs. New vendors that would hold customer or financial data are approved by the owner before use.</p>
+
+<h2>9. Incident response</h2>
+<ol>
+<li>Anyone who notices something wrong (unexpected access, a lost device, a suspicious email, a credential in the wrong place) tells the owner at once.</li>
+<li>The owner contains the issue first: rotate credentials, deactivate logins, disconnect the affected service.</li>
+<li>The owner records what happened, when, what data was involved, and what was done, and keeps the record for three years.</li>
+<li>If personal data of customers or employees was exposed, affected people and any authorities required by California law are notified without undue delay.</li>
+</ol>
+
+<h2>10. Backups and availability</h2>
+<p>Website source is version-controlled on GitHub. The operational database is hosted by Cloudflare with provider-managed durability; the owner exports the financial ledger and order records to CSV at least monthly and keeps the exports on a company device.</p>
+
+<h2>11. Training and acknowledgment</h2>
+<p>Every employee reads this policy and the Standard Operating Procedure on their first day and confirms it to the owner. Key points are repeated in the SOP's checkout and refund rules: individual logins only, never share a PIN or passcode.</p>
+
+<h2>12. Review</h2>
+<p>The owner reviews this policy at least once a year and whenever a system, vendor, or the way data is used changes. Changes are dated and the version number is increased.</p>
+
+<div class="sign">Adopted by: ____________________________ &nbsp; Hugh Demiral, Owner &nbsp; &nbsp; Date: ______________</div>
+</main>
+</body>
+</html>
