@@ -5,6 +5,7 @@
 //   POST /checkout            create a Square checkout for a calculator order (called by the website)
 //   POST /event               funnel beacon from the website (cookieless)
 //   POST /submit              quote / order-details form from the website: stores it, emails Hugh and the customer (Resend)
+//   ALERT_TO (optional)       extra addresses that get a one-line text alert on new orders, payments and permits
 //   POST /resale              resale permit info from the thank-you page
 //   POST /webhooks/square     Square webhook (payment.*, refund.*), verified with the signature key
 //   GET  /health
@@ -250,6 +251,7 @@ async function submitInquiry(request, env, cors) {
   const subject = kind === "order" ? `Cup order ${ref || ""} from ${who}`.replace("  ", " ") : `Quote request from ${who}`;
   const toHugh = `${kind === "order" ? "New cup order details" : "New quote request"} via hdlaser.net\n\nFrom: ${name}${business ? ", " + business : ""}\nEmail: ${email}\nPhone: ${phone || "-"}\n${ref ? "Reference: " + ref + "\n" : ""}${b.Payment ? "Payment: " + b.Payment + "\n" : ""}\n${lines}\n\nReply to this email to answer them directly.`;
   const r1 = await sendEmail(env, { to: env.SUPPORT_EMAIL, replyTo: email, subject, text: toHugh });
+  await sendAlert(env, kind === "order" ? `New cup order ${ref || ""}: ${who}, ${fields["Order"] || ""}. Watch for payment.`.replace(/\s+/g, " ") : `Quote request from ${who}. ${phone ? "Ph " + phone + ". " : ""}Details in ${env.SUPPORT_EMAIL}.`);
 
   const first = name.split(" ")[0] || "there";
   const toCustomer = kind === "order"
@@ -275,6 +277,14 @@ async function sendEmail(env, { to, subject, text, html, replyTo }) {
   } catch (e) { return { ok: false, error: "exception: " + (e && e.message || e) }; }
 }
 
+// Short text-only alerts to extra addresses (ALERT_TO, comma-separated). Works with carrier email-to-text
+// gateways such as 5551234567@vtext.com, so a phone gets a text the moment something happens.
+async function sendAlert(env, text) {
+  const to = String(env.ALERT_TO || "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (!to.length || !env.RESEND_API_KEY) return { ok: false, skipped: true };
+  return sendEmail(env, { to, subject: "HD Laser", text: String(text).slice(0, 300) });
+}
+
 async function recordResale(request, env, cors) {
   if (!env.DB) return json({ ok: false }, 200, cors);
   let b; try { b = await request.json(); } catch { return json({ error: "Bad JSON" }, 400, cors); }
@@ -284,6 +294,7 @@ async function recordResale(request, env, cors) {
   if (!permit) return json({ error: "Permit required" }, 400, cors);
   const r = await env.DB.prepare(`UPDATE orders SET resale_permit = ?, resale_business = ?, resale_received_at = ? WHERE ref = ?`).bind(permit, business, new Date().toISOString(), ref).run();
   const o = await env.DB.prepare(`SELECT name, email, phone FROM orders WHERE ref = ?`).bind(ref).first();
+  await sendAlert(env, `Resale permit received for ${ref} (${business}).`);
   if (env.RESEND_API_KEY) await sendEmail(env, { to: env.SUPPORT_EMAIL, replyTo: o && o.email || undefined, subject: `Resale permit for order ${ref}: ${business}`, text: `Order ${ref}
 Business on permit: ${business}
 CA seller's permit: ${permit}
@@ -427,6 +438,7 @@ HD Laser Studio
 759 Turquoise St, Pacific Beach
 (858) 373-9866 · hdlaser.net` });
   await sendEmail(env, { to: env.SUPPORT_EMAIL, replyTo: o.email || undefined, subject: `PAID ${total}: ${o.business || o.name} (${ref})`, text: `Order ${ref} is paid.\n\nCustomer: ${[o.name, o.business, o.email, o.phone].filter(Boolean).join(" · ")}\n${items}\nTotal paid: ${total}\nResale permit: ${o.resale_permit || "not yet"}\n\nNext: watch for their logo, then send the proof. Dashboard: ${env.WORKER_URL || ""}/admin` });
+  await sendAlert(env, `PAID ${total} by ${o.business || o.name} (${ref}). ${lines.reduce((n, l) => n + l.qty, 0)} cups. Logo + proof next.`);
   await env.DB.prepare(`UPDATE orders SET notified_paid_at = ? WHERE ref = ?`).bind(new Date().toISOString(), ref).run();
 }
 

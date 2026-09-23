@@ -33,6 +33,7 @@ Workers & Pages → Create → Create Worker → `hdlaser-checkout` → Deploy �
 | `ALLOWED_ORIGINS` | `https://hdlaser.net,https://www.hdlaser.net` | Text |
 | `DEPOSIT_PERCENT` | `100` (or `50` for half now, balance invoiced) | Text |
 | `SUPPORT_EMAIL` | `contact@hdlaser.net` | Text |
+| `ALERT_TO` | e.g. `8585551234@vtext.com, hugh@example.com` | Text, optional. Extra addresses that get a one-line alert on new orders, payments and resale permits. Use your carrier's email-to-text address to get it as a text message: Verizon `number@vtext.com`, T-Mobile `number@tmomail.net`, AT&T `number@txt.att.net` (AT&T has been retiring this). |
 | `RESEND_API_KEY` | API key from resend.com (step F). Turns on worker-sent email for forms, payments, resale and the digest | **Secret** |
 | `FROM_EMAIL` | `HD Laser Studio <orders@hdlaser.net>` (must be on the domain verified in Resend) | Text |
 | `FORMSPREE_ENDPOINT` | `https://formspree.io/f/xaenoorj` (fallback only, used until RESEND_API_KEY is set) | Text |
