@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boards n' Beans Coffee, Order Ahead | Pacific Beach</title>
+<meta name="description" content="Order Boards n' Beans coffee ahead and skip the line. Lattes, cold brew, The Longboard and more, paid online, ready at the counter in Pacific Beach.">
+<link rel="canonical" href="https://hdlaser.net/coffee/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="HD Laser Studio">
+<meta property="og:title" content="Boards n' Beans Coffee, Order Ahead">
+<meta property="og:description" content="Pick your drinks, pay online, grab them at the counter in Pacific Beach. Where coffee and community coexist.">
+<meta property="og:url" content="https://hdlaser.net/coffee/">
+<meta property="og:image" content="https://hdlaser.net/assets/bnb-cups-printed-group.jpg">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Boards n' Beans Coffee, Order Ahead">
+<meta name="twitter:description" content="Pick your drinks, pay online, grab them at the counter in Pacific Beach.">
+<meta name="twitter:image" content="https://hdlaser.net/assets/bnb-cups-printed-group.jpg">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#1E3350">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&amp;family=Figtree:wght@400;500;700;800&amp;display=swap">
+<style>
+:root{--cream:#F4EBDA;--pink:#F3D6DC;--navy:#1E3350;--ink:#22303C;--teal:#3E5A66;--muted:#5F6E77;--red:#C23B2E;--orange:#E3763B;--sand:#E9DCC3;--line:#E2D6C0;--white:#FFFDF8}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--cream);color:var(--ink);font-family:Figtree,"Helvetica Neue",Helvetica,Arial,sans-serif;line-height:1.5}
+a{color:var(--red)}
+:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+button{font:inherit;cursor:pointer}
+.wm{font-family:Oswald,"Arial Narrow",Impact,sans-serif;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--teal)}
+.wm b{color:var(--orange);font-weight:700}
+header{background:var(--navy);color:#fff}
+.top{max-width:1180px;margin:0 auto;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;color:#C9D3E0}
+.top a{color:#fff;text-decoration:none;font-weight:700}
+.hero{background:var(--pink);border-bottom:1px solid #E7C4CC}
+.hero-in{max-width:1180px;margin:0 auto;padding:44px 24px 40px;display:grid;grid-template-columns:1.1fr 1fr;gap:40px;align-items:center}
+.hero h1{margin:0;font-size:56px;line-height:.98}
+.hero h1 .wm{font-size:64px;display:block;color:var(--teal)}
+.hero .tag{font-family:Oswald,sans-serif;font-weight:500;letter-spacing:.14em;text-transform:uppercase;font-size:13px;color:var(--teal);margin:14px 0 0;display:flex;align-items:center;gap:10px}
+.hero .tag svg{width:26px;height:14px}
+.hero p.lead{font-size:19px;color:var(--ink);margin:18px 0 0;max-width:520px}
+.hero .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:24px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--red);color:#fff;border:0;border-radius:999px;padding:15px 26px;font-weight:700;font-size:17px;text-decoration:none;min-height:50px}
+.btn:hover{background:#A82F24}
+.btn.ghost{background:transparent;color:var(--ink);border:2px solid var(--ink)}
+.btn.ghost:hover{background:rgba(0,0,0,.05)}
+.hero img{width:100%;height:380px;object-fit:cover;border-radius:24px;display:block;box-shadow:0 20px 40px rgba(30,51,80,.18)}
+.hero .steps{display:flex;gap:18px;margin-top:22px;font-size:14px;color:var(--teal)}
+.hero .steps span b{display:block;font-family:Oswald,sans-serif;font-size:22px;color:var(--orange);letter-spacing:.04em}
+main{max-width:1180px;margin:0 auto;padding:40px 24px 120px;display:grid;grid-template-columns:1fr 380px;gap:32px;align-items:start}
+h2{font-family:Oswald,sans-serif;font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:24px;color:var(--teal);margin:0 0 14px}
+.menu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.item{background:var(--white);border:1px solid var(--line);border-radius:18px;padding:18px 18px 16px;display:flex;flex-direction:column;gap:8px}
+.item .row{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.item h3{margin:0;font-size:19px;font-weight:800}
+.item .price{font-family:Oswald,sans-serif;font-size:18px;color:var(--teal);white-space:nowrap}
+.item p{margin:0;color:var(--muted);font-size:15px}
+.item .add{align-self:flex-start;background:var(--navy);color:#fff;border:0;border-radius:999px;padding:9px 16px;font-weight:700;font-size:14px;margin-top:4px}
+.item .add:hover{background:#15263C}
+.cfg{display:none;border-top:1px dashed var(--line);margin-top:6px;padding-top:12px;flex-direction:column;gap:10px}
+.item.open .cfg{display:flex}
+.item.open .add{display:none}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opts label{position:relative}
+.opts input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
+.opts span{display:inline-flex;align-items:center;min-height:38px;padding:6px 13px;border:2px solid var(--line);border-radius:12px;font-weight:700;font-size:14px;background:#fff}
+.opts input:checked+span{border-color:var(--orange);background:#FDEBDD}
+.opts input:focus-visible+span{outline:3px solid var(--orange);outline-offset:2px}
+.lbl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.qty{display:inline-flex;align-items:center;border:2px solid var(--line);border-radius:12px;overflow:hidden}
+.qty button{width:40px;height:38px;border:0;background:#fff;font-size:20px;font-weight:700;color:var(--teal)}
+.qty output{min-width:34px;text-align:center;font-weight:800}
+.cfg .act{display:flex;gap:10px;align-items:center;margin-top:2px}
+.cfg .act .btn{padding:10px 18px;min-height:42px;font-size:15px}
+.cfg .act .cancel{background:none;border:0;color:var(--muted);font-weight:700}
+aside{position:sticky;top:16px;background:var(--white);border:1px solid var(--line);border-radius:22px;padding:22px;display:flex;flex-direction:column;gap:14px}
+aside h2{font-size:20px;margin:0}
+.cart{display:flex;flex-direction:column;gap:8px}
+.cart .ln{display:flex;justify-content:space-between;gap:10px;font-size:15px;align-items:flex-start}
+.cart .ln small{display:block;color:var(--muted)}
+.cart .ln button{border:0;background:none;color:var(--red);font-weight:700;padding:0 0 0 6px}
+.cart .empty{color:var(--muted);font-size:15px;margin:0}
+.total{display:flex;justify-content:space-between;font-weight:800;font-size:18px;border-top:2px solid var(--ink);padding-top:10px}
+.f{display:flex;flex-direction:column;gap:5px}
+.f label{font-weight:700;font-size:14px}
+.f small{color:var(--muted);font-weight:400}
+input[type=text],input[type=tel],input[type=email],select,textarea{font:inherit;font-size:16px;padding:12px 13px;border:1px solid #B9AE99;border-radius:12px;background:#fff;color:var(--ink);width:100%}
+textarea{min-height:64px;resize:vertical}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--muted);line-height:1.45}
+.check input{width:20px;height:20px;accent-color:var(--red);flex:none;margin-top:1px}
+.pay{width:100%;font-size:18px}
+.pay:disabled{opacity:.55;cursor:default}
+.err{background:#FBE3DF;color:#8F2418;border-radius:12px;padding:10px 12px;font-size:14px}
+.fine{font-size:12px;color:var(--muted);margin:0}
+.bar[hidden]{display:none !important}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--navy);color:#fff;padding:12px 18px;display:none;justify-content:space-between;align-items:center;gap:12px;box-shadow:0 -6px 20px rgba(0,0,0,.18);z-index:5}
+.bar b{font-size:17px}
+.bar .btn{padding:11px 18px;min-height:44px;font-size:15px}
+.done{grid-column:1/-1;background:var(--white);border:1px solid var(--line);border-radius:24px;padding:36px;max-width:720px;margin:0 auto;text-align:center}
+.done .wm{font-size:34px}
+.done h1{font-size:34px;margin:10px 0 8px}
+.done p{font-size:17px;color:var(--muted);margin:0 0 10px}
+.done .ref{display:inline-block;font-family:Oswald,sans-serif;font-size:28px;letter-spacing:.08em;background:var(--pink);color:var(--teal);border-radius:14px;padding:8px 18px;margin:12px 0}
+.done .pulse{display:inline-block;width:10px;height:10px;border-radius:5px;background:var(--orange);margin-right:8px;animation:p 1.2s infinite}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.25}}
+footer{background:var(--navy);color:#C9D3E0;padding:40px 24px;font-size:14px}
+footer .in{max-width:1180px;margin:0 auto;display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px}
+footer a{color:#fff}
+@media (max-width:980px){main{grid-template-columns:1fr}aside{position:static}.hero-in{grid-template-columns:1fr}.hero img{height:260px}.bar{display:flex}}
+@media (max-width:640px){.menu{grid-template-columns:1fr}.hero h1{font-size:42px}.hero h1 .wm{font-size:48px}.hero-in{padding:30px 18px 28px}main{padding:28px 18px 130px}.done{padding:26px 18px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <div><span class="wm" style="color:#fff;font-size:15px">Boards <b>N'</b> Beans</span> &nbsp;·&nbsp; Order ahead, Pacific Beach</div>
+    <div>Questions? <a href="tel:+18583739866">(858) 373-9866</a></div>
+  </div>
+</header>
+
+<section class="hero" id="hero">
+  <div class="hero-in">
+    <div>
+      <h1><span class="wm">Boards <b>N'</b> Beans</span>Order ahead. Skip the line.</h1>
+      <p class="tag"><svg viewBox="0 0 52 28" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M2 20c8 0 8-12 16-12s8 12 16 12 8-12 16-12"/><path d="M6 26c6 0 6-6 12-6"/></svg>Where coffee and community coexist &middot; Pacific Beach, CA</p>
+      <p class="lead">Pick your drinks, pay on your phone, and they&#8217;ll be waiting at the counter with your name on the cup. Every paid order pings the bar the second it lands.</p>
+      <div class="cta"><a class="btn" href="#menu">See the menu</a><a class="btn ghost" href="/grounds-for-profit/">Get cups like these for your caf&eacute;</a></div>
+      <div class="steps"><span><b>1</b>Choose drinks</span><span><b>2</b>Pay with Square</span><span><b>3</b>Grab it in ~10 min</span></div>
+    </div>
+    <img src="/assets/bnb-cups-printed-group.jpg" alt="Boards n' Beans reusable cups in pink, gray, red, cream and navy" width="820" height="582">
+  </div>
+</section>
+
+<main id="main">
+  <div id="shop">
+    <h2 id="menu">The menu</h2>
+    <div class="menu" id="menu-grid"><p class="empty">Loading the menu&hellip;</p></div>
+  </div>
+
+  <aside id="cartbox" aria-live="polite">
+    <h2>Your order</h2>
+    <div class="cart" id="cart"><p class="empty">Nothing yet. Add a drink from the menu.</p></div>
+    <div class="total"><span>Total</span><span id="total">$0.00</span></div>
+    <form id="order" novalidate>
+      <div class="f" style="margin-bottom:10px"><label for="name">Name for the cup</label><input id="name" type="text" autocomplete="given-name" required maxlength="60"></div>
+      <div class="f" style="margin-bottom:10px"><label for="phone">Mobile number <small>so the bar can reach you</small></label><input id="phone" type="tel" autocomplete="tel" inputmode="tel" required></div>
+      <div class="f" style="margin-bottom:10px"><label for="email">Email <small>(optional, for a receipt)</small></label><input id="email" type="email" autocomplete="email"></div>
+      <div class="f" style="margin-bottom:10px"><label for="pickup">Pickup</label><select id="pickup"></select></div>
+      <div class="f" style="margin-bottom:10px"><label for="note">Anything else? <small>(optional)</small></label><textarea id="note" maxlength="300" placeholder="Extra hot, light ice, for the whole crew&hellip;"></textarea></div>
+      <label class="check" style="margin-bottom:12px"><input type="checkbox" id="consent"><span><b>Text me when it&#8217;s ready.</b> One text per order from HD Laser Studio on behalf of Boards n&#8217; Beans. Not required to order. Msg &amp; data rates may apply. Reply STOP to cancel.</span></label>
+      <div class="err" id="err" hidden></div>
+      <button class="btn pay" id="pay" type="submit" disabled>Pay &amp; send to the bar</button>
+      <p class="fine" style="margin-top:10px">Secure payment by Square. Add a tip on the payment page if you like. Drinks are made by Boards n&#8217; Beans; online ordering and payment are run by HD Laser Studio, their neighbor, so your card statement will say HD Laser Studio. By paying you agree to our <a href="/terms/">terms and privacy notice</a>.</p>
+    </form>
+  </aside>
+</main>
+
+<div class="bar" id="bar"><div><b id="bar-total">$0.00</b> <span id="bar-count" style="font-size:13px;color:#C9D3E0"></span></div><a class="btn" href="#cartbox">Check out</a></div>
+
+<footer><div class="in">
+  <div><span class="wm" style="color:#fff;font-size:18px">Boards <b>N'</b> Beans</span><br>Where coffee and community coexist &middot; Pacific Beach, CA</div>
+  <div>Online ordering by <a href="/">HD Laser Studio</a> &middot; 759 Turquoise St, Pacific Beach &middot; <a href="tel:+18583739866">(858) 373-9866</a></div>
+</div></footer>
+
+<script src="/assets/site-config.js?v=3"></script>
+<script>
+(function () {
+  var FALLBACK = {"menu":[{"key":"drip","name":"Drip coffee","desc":"House roast, brewed fresh all morning.","price_cents":[325,375],"iced":true,"milk":false},{"key":"coldbrew","name":"Cold brew","desc":"Steeped 18 hours. Smooth, strong, never bitter.","price_cents":[475,525],"iced":true,"milk":false,"alwaysIced":true},{"key":"americano","name":"Americano","desc":"Double shot, hot water, nothing to hide behind.","price_cents":[375,425],"iced":true,"milk":false},{"key":"latte","name":"Latte","desc":"Double shot and steamed milk. Our most-ordered drink.","price_cents":[500,575],"iced":true,"milk":true},{"key":"cappuccino","name":"Cappuccino","desc":"Equal parts espresso, milk, and foam. 12 oz only.","price_cents":[475,null],"iced":false,"milk":true},{"key":"mocha","name":"Mocha","desc":"Espresso, dark chocolate, steamed milk, a little whip.","price_cents":[550,625],"iced":true,"milk":true},{"key":"longboard","name":"The Longboard","desc":"Honey-cinnamon latte. The house signature since day one.","price_cents":[575,650],"iced":true,"milk":true},{"key":"dawnpatrol","name":"Dawn Patrol","desc":"Cold brew with vanilla sweet cream. Built for 6 a.m. sessions.","price_cents":[550,625],"iced":true,"milk":false,"alwaysIced":true},{"key":"matcha","name":"Matcha latte","desc":"Ceremonial-grade matcha whisked into steamed milk.","price_cents":[550,625],"iced":true,"milk":true},{"key":"chai","name":"Chai latte","desc":"Spiced black tea concentrate and steamed milk.","price_cents":[500,575],"iced":true,"milk":true},{"key":"cocoa","name":"Hot chocolate","desc":"Dark chocolate and steamed milk. Kid-approved.","price_cents":[425,475],"iced":false,"milk":true}],"milks":[{"key":"whole","name":"Whole","add_cents":0},{"key":"nonfat","name":"Nonfat","add_cents":0},{"key":"oat","name":"Oat","add_cents":75},{"key":"almond","name":"Almond","add_cents":75}],"extras":[{"key":"shot","name":"Extra shot","add_cents":100},{"key":"vanilla","name":"Vanilla","add_cents":50},{"key":"caramel","name":"Caramel","add_cents":50},{"key":"decaf","name":"Decaf","add_cents":0}],"pickups":["ASAP","15 min","30 min","45 min","1 hour"]};
+  var CFG = window.HD_CONFIG || {}, BASE = CFG.WORKER_BASE || '';
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var money = function (c) { return '$' + (c / 100).toFixed(2); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var M = FALLBACK, cart = [];
+  try { cart = JSON.parse(sessionStorage.getItem('bnb_cart') || '[]'); } catch (e) { cart = []; }
+
+  // ---- paid return: ?paid=1&ref=BB-XXXX ----
+  var qs = new URLSearchParams(location.search), ref = qs.get('ref');
+  if (qs.get('paid') === '1' && ref) { try { sessionStorage.removeItem('bnb_cart'); } catch (e) {} return showDone(ref); }
+
+  function byKey(list, k) { for (var i = 0; i < list.length; i++) if (list[i].key === k) return list[i]; return null; }
+  function priceLine(l) {
+    var m = byKey(M.menu, l.key); if (!m) return 0;
+    var u = m.price_cents[l.size === '16' ? 1 : 0] || 0;
+    if (m.milk) { var mk = byKey(M.milks, l.milk || 'whole'); if (mk) u += mk.add_cents; }
+    (l.extras || []).forEach(function (e) { var x = byKey(M.extras, e); if (x) u += x.add_cents; });
+    return u * l.qty;
+  }
+  function label(l) {
+    var m = byKey(M.menu, l.key), mods = [];
+    if (m.milk && l.milk && l.milk !== 'whole') mods.push(byKey(M.milks, l.milk).name.toLowerCase() + ' milk');
+    (l.extras || []).forEach(function (e) { mods.push(byKey(M.extras, e).name.toLowerCase()); });
+    return l.size + ' oz ' + (l.iced ? 'iced ' : '') + m.name + (mods.length ? ' (' + mods.join(', ') + ')' : '');
+  }
+  function save() { try { sessionStorage.setItem('bnb_cart', JSON.stringify(cart)); } catch (e) {} }
+
+  function renderMenu() {
+    $('#menu-grid').innerHTML = M.menu.map(function (m) {
+      var p12 = m.price_cents[0], p16 = m.price_cents[1];
+      return '<div class="item" data-key="' + m.key + '">' +
+        '<div class="row"><h3>' + esc(m.name) + '</h3><span class="price">' + money(p12) + (p16 ? ' / ' + money(p16) : '') + '</span></div>' +
+        '<p>' + esc(m.desc) + '</p>' +
+        '<button class="add" type="button">Add</button>' +
+        '<div class="cfg">' +
+          (p16 ? '<div><div class="lbl">Size</div><div class="opts"><label><input type="radio" name="size-' + m.key + '" value="12" checked><span>12 oz</span></label><label><input type="radio" name="size-' + m.key + '" value="16"><span>16 oz</span></label></div></div>' : '<div class="lbl">12 oz only</div>') +
+          (m.iced && !m.alwaysIced ? '<div><div class="lbl">Temperature</div><div class="opts"><label><input type="radio" name="iced-' + m.key + '" value="0" checked><span>Hot</span></label><label><input type="radio" name="iced-' + m.key + '" value="1"><span>Iced</span></label></div></div>' : '') +
+          (m.milk ? '<div><div class="lbl">Milk</div><div class="opts">' + M.milks.map(function (k, i) { return '<label><input type="radio" name="milk-' + m.key + '" value="' + k.key + '"' + (i === 0 ? ' checked' : '') + '><span>' + esc(k.name) + (k.add_cents ? ' +' + money(k.add_cents) : '') + '</span></label>'; }).join('') + '</div></div>' : '') +
+          '<div><div class="lbl">Extras</div><div class="opts">' + M.extras.map(function (x) { return '<label><input type="checkbox" name="extra-' + m.key + '" value="' + x.key + '"><span>' + esc(x.name) + (x.add_cents ? ' +' + money(x.add_cents) : '') + '</span></label>'; }).join('') + '</div></div>' +
+          '<div class="act"><div class="qty"><button type="button" data-q="-1" aria-label="Fewer">&minus;</button><output>1</output><button type="button" data-q="1" aria-label="More">+</button></div><button class="btn confirm" type="button">Add to order</button><button class="cancel" type="button">Cancel</button></div>' +
+        '</div></div>';
+    }).join('');
+    $('#menu-grid').addEventListener('click', function (e) {
+      var item = e.target.closest('.item'); if (!item) return;
+      var key = item.dataset.key, m = byKey(M.menu, key), out = $('output', item);
+      if (e.target.closest('.add')) { document.querySelectorAll('.item.open').forEach(function (o) { o.classList.remove('open'); }); item.classList.add('open'); out.value = '1'; return; }
+      if (e.target.closest('.cancel')) { item.classList.remove('open'); return; }
+      var q = e.target.closest('[data-q]'); if (q) { out.value = Math.max(1, Math.min(12, (+out.value || 1) + (+q.dataset.q))); return; }
+      if (e.target.closest('.confirm')) {
+        var sizeEl = $('input[name="size-' + key + '"]:checked', item), icedEl = $('input[name="iced-' + key + '"]:checked', item), milkEl = $('input[name="milk-' + key + '"]:checked', item);
+        var line = { key: key, size: sizeEl ? sizeEl.value : '12', iced: !!m.alwaysIced || (icedEl ? icedEl.value === '1' : false), milk: m.milk ? (milkEl ? milkEl.value : 'whole') : null,
+          extras: Array.prototype.map.call(item.querySelectorAll('input[name="extra-' + key + '"]:checked'), function (x) { return x.value; }), qty: +out.value || 1 };
+        var same = cart.filter(function (c) { return JSON.stringify([c.key, c.size, c.iced, c.milk, c.extras]) === JSON.stringify([line.key, line.size, line.iced, line.milk, line.extras]); })[0];
+        if (same) same.qty = Math.min(12, same.qty + line.qty); else cart.push(line);
+        item.classList.remove('open'); save(); renderCart();
+        if (window.hdTrack) hdTrack('add_line', null);
+        if (window.matchMedia('(max-width:980px)').matches) { var b = $('#bar'); b.style.transform = 'scale(1.02)'; setTimeout(function () { b.style.transform = ''; }, 180); }
+      }
+    });
+  }
+
+  function renderCart() {
+    var total = cart.reduce(function (a, l) { return a + priceLine(l); }, 0), n = cart.reduce(function (a, l) { return a + l.qty; }, 0);
+    $('#cart').innerHTML = cart.length ? cart.map(function (l, i) { return '<div class="ln"><div><b>' + l.qty + ' &times;</b> ' + esc(label(l)) + '<small>' + money(priceLine(l) / l.qty) + ' each</small></div><div>' + money(priceLine(l)) + '<button type="button" data-rm="' + i + '" aria-label="Remove">&times;</button></div></div>'; }).join('') : '<p class="empty">Nothing yet. Add a drink from the menu.</p>';
+    $('#total').textContent = money(total); $('#bar-total').textContent = money(total); $('#bar-count').textContent = n ? n + (n === 1 ? ' drink' : ' drinks') : '';
+    $('#pay').disabled = !cart.length; $('#bar').style.display = (cart.length && window.matchMedia('(max-width:980px)').matches) ? 'flex' : '';
+    $('#cart').querySelectorAll('[data-rm]').forEach(function (b) { b.addEventListener('click', function () { cart.splice(+b.dataset.rm, 1); save(); renderCart(); }); });
+  }
+
+  function showDone(ref) {
+    $('#hero').hidden = true; $('#bar').style.display = 'none'; $('#bar').hidden = true;
+    var main = $('#main'); main.innerHTML = '<div class="done"><span class="wm">Boards <b>N\'</b> Beans</span><h1>Paid. Sending it to the bar&hellip;</h1><p><span class="pulse"></span>Confirming your payment with Square.</p><div class="ref">' + esc(ref) + '</div><p id="done-sum"></p><p class="fine">Give the name on the order at the counter. Questions: <a href="tel:+18583739866">(858) 373-9866</a>.</p><p style="margin-top:18px"><a class="btn ghost" href="/coffee/">Order something else</a></p></div>';
+    if (window.hdTrack) hdTrack('paid_return', ref);
+    var tries = 0;
+    (function poll() {
+      if (!BASE) return;
+      fetch(BASE + '/coffee/status?ref=' + encodeURIComponent(ref)).then(function (r) { return r.json(); }).then(function (d) {
+        if (d && d.summary) $('#done-sum').textContent = d.summary;
+        if (d && (d.status === 'paid' || d.status === 'ready' || d.status === 'picked_up')) {
+          $('.done h1').textContent = 'The bar has it' + (d.name ? ', ' + d.name : '') + '.';
+          $('.done p').innerHTML = 'Paid ' + money(d.paid_cents || d.total_cents) + (d.tip_cents ? ' with a ' + money(d.tip_cents) + ' tip, thank you' : '') + '. Ready ' + (d.pickup === 'ASAP' ? 'in about ' + (d.pickup_minutes || 10) + ' minutes' : 'in ' + esc(d.pickup)) + ' at the counter.';
+          return;
+        }
+        if (++tries < 20) setTimeout(poll, 3000);
+        else { $('.done h1').textContent = 'Payment is processing.'; $('.done p').textContent = 'If Square showed you a receipt, you\'re all set and the bar will get your order within a minute. Otherwise call the shop.'; }
+      }).catch(function () { if (++tries < 20) setTimeout(poll, 3000); });
+    })();
+  }
+
+  $('#order').addEventListener('submit', function (e) {
+    e.preventDefault(); var err = $('#err'), btn = $('#pay'); err.hidden = true;
+    if (!cart.length) return;
+    var name = $('#name').value.trim(), phone = $('#phone').value.trim();
+    if (name.length < 2) { err.textContent = 'Tell us a name for the cup.'; err.hidden = false; $('#name').focus(); return; }
+    if (phone.replace(/\D/g, '').length < 10) { err.textContent = 'We need a mobile number in case the bar has a question.'; err.hidden = false; $('#phone').focus(); return; }
+    if (!BASE) { err.textContent = 'Online ordering is offline right now. Call (858) 373-9866.'; err.hidden = false; return; }
+    btn.disabled = true; btn.textContent = 'Opening secure payment…';
+    if (window.hdTrack) hdTrack('checkout_click', null);
+    fetch(BASE + '/coffee/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: cart, name: name, phone: phone, email: $('#email').value.trim(), pickup: $('#pickup').value, note: $('#note').value.trim(), textConsent: $('#consent').checked }) })
+      .then(function (r) { return r.json().then(function (d) { d._status = r.status; return d; }); })
+      .then(function (d) {
+        if (d && d.url) { if (window.hdTrack) hdTrack('payment_started', d.ref); location.href = d.url; return; }
+        err.textContent = (d && d.error) || 'Something went wrong (' + (d && d._status) + '). Try again or call the shop.'; err.hidden = false; btn.disabled = false; btn.textContent = 'Pay & send to the bar';
+      }).catch(function () { err.textContent = 'Could not reach the ordering service. Check your connection and try again.'; err.hidden = false; btn.disabled = false; btn.textContent = 'Pay & send to the bar'; });
+  });
+
+  function fillPickups() { $('#pickup').innerHTML = (M.pickups || ['ASAP']).map(function (p) { return '<option>' + esc(p) + '</option>'; }).join(''); }
+  fillPickups(); renderMenu(); renderCart();
+  if (BASE) fetch(BASE + '/coffee/menu').then(function (r) { return r.json(); }).then(function (d) { if (d && d.menu && d.menu.length) { M = { menu: d.menu, milks: d.milks, extras: d.extras, pickups: M.pickups }; renderMenu(); renderCart(); } }).catch(function () {});
+  window.addEventListener('resize', renderCart);
+  if (window.hdTrack) hdTrack('calc_view', null);
+})();
+</script>
+</body>
+</html>

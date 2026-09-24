@@ -111,3 +111,17 @@ Live P&L, bank ledger, Square reconciliation, unit economics and a 13-week cash 
 
 Plaid setup, once: dashboard.plaid.com → sign up as HD Laser Studio INC → Team Settings → Keys gives the client_id and the sandbox and production secrets. Sandbox works immediately (test bank "First Platypus Bank", user `user_good` / `pass_good`). Production needs Plaid's short application (business details, use case "own business accounting") and, for Chase, Plaid's OAuth institution registration, which Plaid runs on your behalf; both are usually approved within a few business days. Pricing is pay-as-you-go, roughly $0.30 per connected account per month.
 
+
+
+## Boards n' Beans coffee counter
+
+`hdlaser.net/coffee/` sells Boards n' Beans drinks for pickup. The menu and prices live in the `COFFEE` constant at the top of the coffee section in `src/index.js` (the page fetches `/coffee/menu`, so editing the worker updates the site).
+
+Flow: the page posts the cart to `POST /coffee/checkout`, the worker prices it, creates a Square payment link (tipping on) and stores a `coffee_orders` row with status `checkout_started`. When Square's payment webhook (or the hourly sync) reports the payment `COMPLETED`, the row becomes `paid` and `notifyCoffee` runs once:
+
+- a text to the bar (`COFFEE_SMS_TO`, default 858-349-3522; comma-separate to text several phones),
+- an email to `SUPPORT_EMAIL`,
+- a text to the customer if they ticked "Text me when it's ready",
+- an email receipt if they gave an email.
+
+The customer's return page polls `GET /coffee/status?ref=` until the order is paid. The admin dashboard has a coffee card with today's totals and Ready / Picked up / Re-text bar buttons (`GET /api/coffee`, `POST /api/coffee/:ref`). Texts need the Twilio toll-free number verified; until then the bar gets the email only.

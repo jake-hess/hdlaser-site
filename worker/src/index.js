@@ -64,7 +64,9 @@ CREATE INDEX IF NOT EXISTS bank_txns_posted ON bank_txns(posted_at);
 CREATE INDEX IF NOT EXISTS bank_txns_cat ON bank_txns(category);
 CREATE TABLE IF NOT EXISTS bank_rules (id INTEGER PRIMARY KEY AUTOINCREMENT, pattern TEXT NOT NULL, category TEXT NOT NULL, vendor TEXT, created_at TEXT);
 CREATE TABLE IF NOT EXISTS payouts (payout_id TEXT PRIMARY KEY, created_at TEXT, arrival_date TEXT, status TEXT, amount_cents INTEGER DEFAULT 0, location_id TEXT, type TEXT, matched_txn_id INTEGER);
-CREATE TABLE IF NOT EXISTS plaid_items (item_id TEXT PRIMARY KEY, access_token TEXT NOT NULL, institution TEXT, accounts TEXT, balances TEXT, cursor TEXT, status TEXT, last_error TEXT, synced_at TEXT, created_at TEXT);`;
+CREATE TABLE IF NOT EXISTS plaid_items (item_id TEXT PRIMARY KEY, access_token TEXT NOT NULL, institution TEXT, accounts TEXT, balances TEXT, cursor TEXT, status TEXT, last_error TEXT, synced_at TEXT, created_at TEXT);
+CREATE TABLE IF NOT EXISTS coffee_orders (ref TEXT PRIMARY KEY, created_at TEXT NOT NULL, status TEXT NOT NULL, name TEXT, phone TEXT, email TEXT, items TEXT, summary TEXT, total_cents INTEGER, pickup TEXT, note TEXT, text_consent INTEGER DEFAULT 0, square_order_id TEXT, square_payment_id TEXT, paid_at TEXT, paid_cents INTEGER DEFAULT 0, tip_cents INTEGER DEFAULT 0, notified_at TEXT, ready_at TEXT, picked_up_at TEXT);
+CREATE INDEX IF NOT EXISTS coffee_created ON coffee_orders(created_at);`;
 // Columns added after the first release. Each ALTER is tried once and ignored if the column already exists.
 const ALTERS = ["ALTER TABLE orders ADD COLUMN notified_paid_at TEXT", "ALTER TABLE payments ADD COLUMN team_member_id TEXT", "ALTER TABLE staff ADD COLUMN hourly_rate_cents INTEGER DEFAULT 0", "ALTER TABLE staff ADD COLUMN commission_pct REAL DEFAULT 0"];
 
@@ -101,6 +103,10 @@ export default {
       if (path === "/event" && request.method === "POST") return requireOrigin(cors) || recordEvent(request, env, cors);
       if (path === "/submit" && request.method === "POST") return requireOrigin(cors) || submitInquiry(request, env, cors);
       if (path === "/resale" && request.method === "POST") return requireOrigin(cors) || recordResale(request, env, cors);
+      // ---- Boards n' Beans coffee counter (order ahead, pay through Square, the bar gets a text) ----
+      if (path === "/coffee/menu") return json({ menu: COFFEE.menu, milks: COFFEE.milks, extras: COFFEE.extras, shop: COFFEE.shop }, 200, { ...cors, "Cache-Control": "public, max-age=300" });
+      if (path === "/coffee/checkout" && request.method === "POST") return requireOrigin(cors) || coffeeCheckout(request, env, cors);
+      if (path === "/coffee/status") return requireOrigin(cors) || coffeeStatus(env, url.searchParams.get("ref"), cors);
       if (path === "/webhooks/square" && request.method === "POST") return squareWebhook(request, env);
       if (path === "/webhooks/twilio" && request.method === "POST") return twilioInbound(request, env);
       // ---- staff portal (per-employee sign-in, Bearer token) ----
@@ -136,6 +142,9 @@ export default {
         if (path === "/api/team") return json(await teamKpis(env, url.searchParams.get("from"), url.searchParams.get("to")), 200, { "Cache-Control": "no-store" });
         if (path === "/api/staff" && request.method === "POST") { const r = await upsertStaff(env, await request.json()); await staffLog(env, null, "team_update_admin", JSON.stringify({ id: r.id })); return json(r, r.ok ? 200 : 400); }
         if (path === "/api/noshow-check" && request.method === "POST") return json(await noShowCheck(env), 200);
+        if (path === "/api/coffee") return json(await coffeeOrders(env), 200, { "Cache-Control": "no-store" });
+        const cm = path.match(/^\/api\/coffee\/(BB-[A-Z0-9]+)$/);
+        if (cm && request.method === "POST") return json(await coffeeUpdate(env, cm[1], await request.json()), 200);
         if (path === "/api/digest" && request.method === "POST") return json(await sendDigest(env), 200);
         const m = path.match(/^\/api\/orders\/(HD-[A-Z0-9]+)$/);
         if (m && request.method === "POST") return json(await updateOrder(env, m[1], await request.json()), 200);
@@ -464,11 +473,19 @@ async function upsertPayment(env, p) {
   const amount = money(p.amount_money), fee = (p.processing_fee || []).reduce((a, f) => a + money(f.amount_money), 0), refunded = money(p.refunded_money);
   const brand = p.card_details && p.card_details.card && p.card_details.card.card_brand || null;
   const orderRow = p.order_id ? await env.DB.prepare(`SELECT ref FROM orders WHERE square_order_id = ?`).bind(p.order_id).first() : null;
-  const ref = orderRow ? orderRow.ref : null;
+  const coffeeRow = !orderRow && p.order_id ? await env.DB.prepare(`SELECT ref FROM coffee_orders WHERE square_order_id = ?`).bind(p.order_id).first() : null;
+  const ref = orderRow ? orderRow.ref : (coffeeRow ? coffeeRow.ref : null);
   await env.DB.prepare(`INSERT INTO payments (payment_id, created_at, updated_at, status, amount_cents, fee_cents, refunded_cents, square_order_id, ref, source, card_brand) VALUES (?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(payment_id) DO UPDATE SET updated_at=excluded.updated_at, status=excluded.status, amount_cents=excluded.amount_cents, fee_cents=excluded.fee_cents, refunded_cents=excluded.refunded_cents, ref=COALESCE(excluded.ref, payments.ref), card_brand=COALESCE(excluded.card_brand, payments.card_brand)`)
     .bind(p.id, p.created_at || null, p.updated_at || null, p.status || null, amount, fee, refunded, p.order_id || null, ref, p.source_type || null, brand).run();
   if (p.team_member_id) await env.DB.prepare(`UPDATE payments SET team_member_id = ? WHERE payment_id = ?`).bind(p.team_member_id, p.id).run().catch(() => {});
+  if (coffeeRow && p.status === "COMPLETED") {
+    const tip = money(p.tip_money);
+    await env.DB.prepare(`UPDATE coffee_orders SET status = CASE WHEN ? >= total_cents AND ? > 0 THEN 'refunded' ELSE (CASE WHEN status IN ('ready','picked_up') THEN status ELSE 'paid' END) END, square_payment_id = ?, paid_at = COALESCE(paid_at, ?), paid_cents = ?, tip_cents = ? WHERE ref = ?`)
+      .bind(refunded, refunded, p.id, p.created_at || new Date().toISOString(), amount, tip, ref).run();
+    await notifyCoffee(env, ref);
+    return;
+  }
   if (ref && p.status === "COMPLETED") {
     await env.DB.prepare(`UPDATE orders SET status = CASE WHEN ? >= total_cents AND ? > 0 THEN 'refunded' ELSE 'paid' END, square_payment_id = ?, paid_at = COALESCE(paid_at, ?), paid_cents = ?, fee_cents = ?, refunded_cents = ? WHERE ref = ?`)
       .bind(refunded, refunded, p.id, p.created_at || new Date().toISOString(), amount, fee, refunded, ref).run();
@@ -676,6 +693,7 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
 <h2>Needs attention</h2><div class="grid" id="attention"></div>
 <h2>Recent orders</h2><div class="card"><table id="orders"></table></div>
 <h2>Quote requests &amp; form submissions</h2><div class="card"><table id="inq"></table></div>
+<h2>Boards n' Beans coffee counter</h2><div class="tiles" id="coffee-tiles"></div><div class="card" style="margin-top:14px"><table id="coffee"></table></div>
 <h2>Team</h2>
 <div class="grid" id="team"></div>
 <div class="card" style="margin-top:14px"><h3 style="margin:0 0 6px">Add a team member</h3>
@@ -721,9 +739,13 @@ async function load(){
     list('Sales tax to invoice',a.tax_due,r=>'<tr><td><b>'+r.ref+'</b><div class="small">paid '+fmtDate(r.paid_at)+'</div></td><td>'+who(r)+'</td><td class="num">'+money(r.tax_cents)+'<div class="small">on '+money(r.base_cents)+'</div></td><td>'+flag(r.ref,'tax_invoiced_at',0,'Invoiced')+flag(r.ref,'resale_received_at',0,'Cert received')+'</td></tr>')+
     list('In production',a.in_production,r=>'<tr><td><b>'+r.ref+'</b><div class="small">approved '+fmtDate(r.proof_approved_at)+'</div></td><td>'+esc(r.business||r.name)+'<div class="small">'+r.cups+' cups</div></td><td>'+flag(r.ref,'completed_at',0,'Done')+'</td></tr>');
   $('#orders').innerHTML='<tr><th>Ref</th><th>Customer</th><th>Items</th><th class="num">Total</th><th>Status</th><th>Progress</th></tr>'+k.recent.map(r=>'<tr><td><b>'+r.ref+'</b><div class="small">'+fmtDate(r.created_at)+'</div></td><td>'+who(r)+'</td><td class="small">'+esc(r.items||'')+'</td><td class="num">'+money(r.total_cents)+(r.refunded_cents?'<div class="small">refunded '+money(r.refunded_cents)+'</div>':'')+(r.fee_cents?'<div class="small">fee '+money(r.fee_cents)+'</div>':'')+'</td><td><span class="pill '+r.status+'">'+r.status.replace('_',' ')+'</span></td><td>'+flag(r.ref,'logo_received_at',r.logo_received_at,'Logo')+flag(r.ref,'proof_approved_at',r.proof_approved_at,'Proof OK')+flag(r.ref,'completed_at',r.completed_at,'Done')+flag(r.ref,'resale_received_at',r.resale_received_at,'Resale cert')+flag(r.ref,'tax_invoiced_at',r.tax_invoiced_at,'Tax invoiced')+'</td></tr>').join('');
-  loadTeam();
+  loadTeam(); loadCoffee();
   $('#inq').innerHTML=k.inquiries.length?'<tr><th>When</th><th>Type</th><th>Who</th><th>Details</th><th>Sent</th></tr>'+k.inquiries.map(i=>'<tr><td class="small">'+fmtDate(i.created_at)+'</td><td><span class="pill">'+esc(i.kind)+(i.ref?' '+i.ref:'')+'</span></td><td>'+who(i)+'</td><td class="small">'+esc(Object.entries(i.fields).filter(([k])=>!['Name','Business','Phone','Agreed to Terms of Sale','Terms version','Text message consent'].includes(k)).map(([k,v])=>k+': '+v).join(' · ')).slice(0,400)+'</td><td class="small">'+(i.emailed&1?'shop ✓ ':'')+(i.emailed&2?'customer ✓':'')+'</td></tr>').join(''):'<tr><td class="empty">'+(k.email_configured?'No submissions yet.':'Forms still go through Formspree until RESEND_API_KEY is set on the worker.')+'</td></tr>';
 }
+async function loadCoffee(){ const r=await fetch('/api/coffee'); if(!r.ok) return; const c=await r.json();
+  $('#coffee-tiles').innerHTML=tile('Today',c.today.orders+' drinks orders','')+tile('Today revenue','$'+(c.today.revenue_cents/100).toFixed(2),'')+tile('Tips today','$'+(c.today.tips_cents/100).toFixed(2),'')+tile('Bar gets texts at',esc(c.sms_to),'COFFEE_SMS_TO to change');
+  $('#coffee').innerHTML=c.orders.length?'<tr><th>Ref</th><th>Customer</th><th>Order</th><th class="num">Paid</th><th>Status</th><th></th></tr>'+c.orders.map(o=>'<tr><td><b>'+o.ref+'</b><div class="small">'+new Date(o.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+'</div></td><td>'+esc(o.name)+'<div class="small">'+esc(o.phone)+'</div></td><td class="small">'+esc(o.summary)+(o.note?'<div><i>'+esc(o.note)+'</i></div>':'')+'<div>Pickup '+esc(o.pickup)+'</div></td><td class="num">'+(o.paid_cents?'$'+(o.paid_cents/100).toFixed(2)+(o.tip_cents?'<div class="small">+$'+(o.tip_cents/100).toFixed(2)+' tip</div>':''):'<span class="small">$'+(o.total_cents/100).toFixed(2)+' due</span>')+'</td><td><span class="pill '+esc(o.status)+'">'+esc(o.status.replace('_',' '))+'</span>'+(o.paid_at&&!o.notified_at?'<div class="small">not texted</div>':'')+'</td><td>'+(o.status==='paid'?'<button class="btn" data-cref="'+o.ref+'" data-act="ready">Ready</button>':'')+(o.status==='paid'||o.status==='ready'?'<button class="btn" data-cref="'+o.ref+'" data-act="picked_up">Picked up</button>':'')+(o.paid_at?'<button class="btn" data-cref="'+o.ref+'" data-act="resend">Re-text bar</button>':'')+'</td></tr>').join(''):'<tr><td class="empty">No coffee orders yet. Customers order at hdlaser.net/coffee</td></tr>';
+  $('#coffee').querySelectorAll('button[data-cref]').forEach(b=>b.addEventListener('click',async()=>{ b.disabled=true; await fetch('/api/coffee/'+b.dataset.cref,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:b.dataset.act})}); loadCoffee(); })); }
 async function loadTeam(){ const q=new URLSearchParams(); if(from){q.set('from',from);} if(to){q.set('to',to);} if(!from){q.set('from',new Date(Date.now()-days*864e5).toISOString());}
   const r=await fetch('/api/team?'+q); if(!r.ok) return; const t=await r.json(); const a=t.aggregate;
   const rows=t.team.map(p=>'<tr><td><b>'+esc(p.name)+'</b><div class="small">'+esc(p.role)+(p.on_call?' · on call':'')+(p.active?'':' · inactive')+'</div></td><td class="num">'+p.shifts+'</td><td class="num">'+p.hours+'</td><td class="num">'+(p.opens?p.on_time_opens+'/'+p.opens:'-')+'</td><td class="num">'+(p.checklist_pct==null?'-':p.checklist_pct+'%')+'</td><td class="num">'+p.jobs_done+'</td><td class="num">'+money(p.jobs_done_amount_cents)+'</td></tr>').join('');
@@ -1195,6 +1217,146 @@ async function sendSms(env, to, body) {
     if (!r.ok) console.error("twilio", r.status, (await r.text()).slice(0, 300));
     return { ok: r.ok };
   } catch (e) { return { ok: false, error: String(e) }; }
+}
+
+// ================================================================ Boards n' Beans coffee counter
+// Order-ahead drinks sold through the same Square account. Prices live here so the site and the worker always agree.
+// COFFEE_SMS_TO (optional env) overrides the number the bar is texted at when a drink is paid for.
+const COFFEE = {
+  shop: { name: "Boards n' Beans", tagline: "Where coffee and community coexist", city: "Pacific Beach, CA", smsTo: "8583493522", pickupMinutes: 10 },
+  // price_cents: [12 oz, 16 oz]; a null 16 oz means one size only. iced: can be ordered iced. milk: takes a milk choice.
+  menu: [
+    { key: "drip",       name: "Drip coffee",         desc: "House roast, brewed fresh all morning.",                        price_cents: [325, 375], iced: true,  milk: false },
+    { key: "coldbrew",   name: "Cold brew",           desc: "Steeped 18 hours. Smooth, strong, never bitter.",               price_cents: [475, 525], iced: true,  milk: false, alwaysIced: true },
+    { key: "americano",  name: "Americano",           desc: "Double shot, hot water, nothing to hide behind.",               price_cents: [375, 425], iced: true,  milk: false },
+    { key: "latte",      name: "Latte",               desc: "Double shot and steamed milk. Our most-ordered drink.",         price_cents: [500, 575], iced: true,  milk: true },
+    { key: "cappuccino", name: "Cappuccino",          desc: "Equal parts espresso, milk, and foam. 12 oz only.",             price_cents: [475, null], iced: false, milk: true },
+    { key: "mocha",      name: "Mocha",               desc: "Espresso, dark chocolate, steamed milk, a little whip.",        price_cents: [550, 625], iced: true,  milk: true },
+    { key: "longboard",  name: "The Longboard",       desc: "Honey-cinnamon latte. The house signature since day one.",      price_cents: [575, 650], iced: true,  milk: true },
+    { key: "dawnpatrol", name: "Dawn Patrol",         desc: "Cold brew with vanilla sweet cream. Built for 6 a.m. sessions.",price_cents: [550, 625], iced: true,  milk: false, alwaysIced: true },
+    { key: "matcha",     name: "Matcha latte",        desc: "Ceremonial-grade matcha whisked into steamed milk.",            price_cents: [550, 625], iced: true,  milk: true },
+    { key: "chai",       name: "Chai latte",          desc: "Spiced black tea concentrate and steamed milk.",                price_cents: [500, 575], iced: true,  milk: true },
+    { key: "cocoa",      name: "Hot chocolate",       desc: "Dark chocolate and steamed milk. Kid-approved.",                price_cents: [425, 475], iced: false, milk: true },
+  ],
+  milks: [{ key: "whole", name: "Whole", add_cents: 0 }, { key: "nonfat", name: "Nonfat", add_cents: 0 }, { key: "oat", name: "Oat", add_cents: 75 }, { key: "almond", name: "Almond", add_cents: 75 }],
+  extras: [{ key: "shot", name: "Extra shot", add_cents: 100 }, { key: "vanilla", name: "Vanilla", add_cents: 50 }, { key: "caramel", name: "Caramel", add_cents: 50 }, { key: "decaf", name: "Decaf", add_cents: 0 }],
+  pickups: ["ASAP", "15 min", "30 min", "45 min", "1 hour"],
+};
+const COFFEE_ITEM = Object.fromEntries(COFFEE.menu.map((m) => [m.key, m]));
+
+// Turns the browser's cart into priced, validated lines. Returns { error } or { lines, totalCents, summary }.
+function coffeePrice(items) {
+  if (!Array.isArray(items) || !items.length || items.length > 20) return { error: "Add at least one drink" };
+  const lines = []; let total = 0;
+  for (const it of items) {
+    const m = COFFEE_ITEM[String(it.key)]; if (!m) return { error: "Unknown drink" };
+    const size = String(it.size) === "16" ? "16" : "12";
+    const base = m.price_cents[size === "16" ? 1 : 0]; if (base == null) return { error: `${m.name} comes in 12 oz only` };
+    const qty = parseInt(it.qty, 10); if (!(qty >= 1 && qty <= 12)) return { error: "Bad quantity" };
+    const iced = m.alwaysIced || (m.iced && !!it.iced);
+    let unit = base; const mods = [];
+    if (m.milk) { const milk = COFFEE.milks.find((x) => x.key === String(it.milk || "whole")); if (!milk) return { error: "Bad milk choice" }; unit += milk.add_cents; if (milk.key !== "whole") mods.push(milk.name.toLowerCase() + " milk"); }
+    const extras = Array.isArray(it.extras) ? it.extras.slice(0, 4) : [];
+    for (const e of extras) { const x = COFFEE.extras.find((y) => y.key === String(e)); if (!x) return { error: "Bad extra" }; unit += x.add_cents; mods.push(x.name.toLowerCase()); }
+    const label = `${size} oz ${iced ? "iced " : ""}${m.name}${mods.length ? " (" + mods.join(", ") + ")" : ""}`;
+    lines.push({ key: m.key, name: m.name, size, iced, milk: m.milk ? String(it.milk || "whole") : null, extras, qty, unit_cents: unit, label });
+    total += unit * qty;
+  }
+  return { lines, totalCents: total, summary: lines.map((l) => `${l.qty} x ${l.label}`).join("; ") };
+}
+
+async function coffeeCheckout(request, env, cors) {
+  let b; try { b = await request.json(); } catch { return json({ error: "Bad JSON" }, 400, cors); }
+  const ip = request.headers.get("CF-Connecting-IP") || "";
+  if (rateLimited(ip, 12)) return json({ error: "Too many orders from this connection. Try again in a few minutes." }, 429, cors);
+  const priced = coffeePrice(b.items);
+  if (priced.error) return json({ error: priced.error }, 400, cors);
+  const name = String(b.name || "").trim().slice(0, 60); if (name.length < 2) return json({ error: "Tell us a name for the cup" }, 400, cors);
+  const phone = String(b.phone || "").trim().slice(0, 40); if (!e164(phone)) return json({ error: "A mobile number we can text when it's ready" }, 400, cors);
+  const email = String(b.email || "").trim().toLowerCase().slice(0, 120); if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "That email doesn't look right" }, 400, cors);
+  const pickup = COFFEE.pickups.includes(String(b.pickup)) ? String(b.pickup) : "ASAP";
+  const note = String(b.note || "").trim().slice(0, 300);
+  const textConsent = !!b.textConsent;
+  const ref = "BB-" + Date.now().toString(36).toUpperCase().slice(-6) + randomHex(1).toUpperCase();
+  const order = { location_id: env.SQUARE_LOCATION_ID, reference_id: ref, line_items: priced.lines.map((l) => ({ name: `${COFFEE.shop.name}: ${l.label}`, quantity: String(l.qty), base_price_money: { amount: l.unit_cents, currency: "USD" } })) };
+  const payload = {
+    idempotency_key: `${ref}-${Date.now()}`, order,
+    checkout_options: { redirect_url: `${env.SITE_URL}/coffee/?paid=1&ref=${encodeURIComponent(ref)}`, ask_for_shipping_address: false, merchant_support_email: env.SUPPORT_EMAIL, allow_tipping: true },
+    pre_populated_data: { buyer_email: email || undefined, buyer_phone_number: e164(phone) },
+    payment_note: `${COFFEE.shop.name} order ${ref} for ${name}, pickup ${pickup}${note ? " | " + note : ""}`.slice(0, 500),
+  };
+  const res = await squareFetch(env, "/v2/online-checkout/payment-links", { method: "POST", body: JSON.stringify(payload) });
+  const data = await res.json().catch(() => ({}));
+  const linkOk = res.ok && data.payment_link;
+  if (!linkOk) console.error("Square coffee error", res.status, JSON.stringify(data).slice(0, 600));
+  if (env.DB) await env.DB.prepare(`INSERT INTO coffee_orders (ref, created_at, status, name, phone, email, items, summary, total_cents, pickup, note, text_consent, square_order_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .bind(ref, new Date().toISOString(), linkOk ? "checkout_started" : "failed", name, phone, email || null, JSON.stringify(priced.lines), priced.summary, priced.totalCents, pickup, note, textConsent ? 1 : 0, linkOk ? (data.payment_link.order_id || null) : null).run();
+  if (!linkOk) return json({ error: squareErr(data) || "Square did not return a checkout link" }, 502, cors);
+  return json({ ok: true, url: data.payment_link.url, ref, total_cents: priced.totalCents, summary: priced.summary }, 200, cors);
+}
+
+// The customer's return page polls this until the payment webhook has marked the order paid.
+async function coffeeStatus(env, ref, cors) {
+  if (!env.DB || !/^BB-[A-Z0-9]{4,12}$/.test(String(ref || ""))) return json({ error: "Not found" }, 404, cors);
+  let o = await env.DB.prepare(`SELECT ref, status, name, summary, total_cents, paid_cents, tip_cents, pickup, paid_at, ready_at, square_order_id, created_at FROM coffee_orders WHERE ref = ?`).bind(ref).first();
+  if (!o) return json({ error: "Not found" }, 404, cors);
+  // Still unpaid on our side while the customer is back from Square? Ask Square directly, so the bar's text does not wait for the webhook.
+  if (o.status === "checkout_started" && o.square_order_id && Date.now() - Date.parse(o.created_at) < 3 * 3600000) {
+    if (await coffeePullPayment(env, o.square_order_id)) o = await env.DB.prepare(`SELECT ref, status, name, summary, total_cents, paid_cents, tip_cents, pickup, paid_at, ready_at FROM coffee_orders WHERE ref = ?`).bind(ref).first();
+  }
+  return json({ ref: o.ref, status: o.status, name: (o.name || "").split(" ")[0], summary: o.summary, total_cents: o.total_cents, paid_cents: o.paid_cents, tip_cents: o.tip_cents, pickup: o.pickup, paid_at: o.paid_at, ready_at: o.ready_at, pickup_minutes: COFFEE.shop.pickupMinutes }, 200, { ...cors, "Cache-Control": "no-store" });
+}
+
+// Looks a Square order up and, if it has a completed payment, runs it through the normal payment path. Returns true when something was recorded.
+async function coffeePullPayment(env, squareOrderId) {
+  try {
+    const r = await squareFetch(env, `/v2/orders/${encodeURIComponent(squareOrderId)}`);
+    const d = await r.json().catch(() => ({}));
+    const tenders = (d.order && d.order.tenders) || [];
+    let did = false;
+    for (const t of tenders) {
+      if (!t.payment_id) continue;
+      const pr = await squareFetch(env, `/v2/payments/${encodeURIComponent(t.payment_id)}`);
+      const pd = await pr.json().catch(() => ({}));
+      if (pd.payment && pd.payment.status === "COMPLETED") { await upsertPayment(env, pd.payment); did = true; }
+    }
+    return did;
+  } catch (e) { console.error("coffee pull", e && e.message || e); return false; }
+}
+
+// Paid drink: text the bar, email the shop, confirm to the customer. Runs once per order.
+async function notifyCoffee(env, ref) {
+  const o = await env.DB.prepare(`SELECT * FROM coffee_orders WHERE ref = ? AND status IN ('paid','ready','picked_up') AND notified_at IS NULL`).bind(ref).first();
+  if (!o) return { ok: false, skipped: true };
+  await env.DB.prepare(`UPDATE coffee_orders SET notified_at = ? WHERE ref = ?`).bind(new Date().toISOString(), ref).run();
+  const total = "$" + (o.paid_cents / 100).toFixed(2), tip = o.tip_cents ? ` (+$${(o.tip_cents / 100).toFixed(2)} tip)` : "";
+  const when = o.pickup === "ASAP" ? "ASAP" : "in " + o.pickup;
+  const barText = `${COFFEE.shop.name} order ${ref}: ${o.summary}. For ${o.name}, ${o.phone}. Pickup ${when}. Paid ${total}${tip}.${o.note ? " Note: " + o.note : ""}`;
+  const jobs = [];
+  const barNumbers = String(env.COFFEE_SMS_TO || COFFEE.shop.smsTo).split(",").map((x) => x.trim()).filter(e164);
+  for (const n of barNumbers) jobs.push(sendSms(env, n, barText));
+  if (env.SUPPORT_EMAIL) jobs.push(sendEmail(env, { to: env.SUPPORT_EMAIL, subject: `Coffee ${total}: ${o.name} (${ref})`, text: barText + `\n\nDashboard: ${env.WORKER_URL || ""}/admin` }));
+  if (o.text_consent) jobs.push(sendSms(env, o.phone, `${COFFEE.shop.name}: got it, ${(o.name || "").split(" ")[0]}! ${o.summary}. Ready ${o.pickup === "ASAP" ? "in about " + COFFEE.shop.pickupMinutes + " min" : when} at the counter. Order ${ref}. Reply STOP to opt out.`));
+  if (o.email) jobs.push(sendEmail(env, { to: o.email, subject: `Your ${COFFEE.shop.name} order ${ref}`, text: `Hi ${(o.name || "").split(" ")[0]},\n\nPaid ${total}${tip}. The bar has your order:\n${o.summary}\n\nPickup ${when} at the counter in Pacific Beach. Give them the name on the order.\n\n${COFFEE.shop.name}\n${COFFEE.shop.tagline}\n\nOrdered through hdlaser.net.` }));
+  const results = await Promise.all(jobs);
+  return { ok: results.some((r) => r && r.ok), sms: results[0] };
+}
+
+async function coffeeOrders(env) {
+  const rows = (await env.DB.prepare(`SELECT ref, created_at, status, name, phone, summary, total_cents, paid_cents, tip_cents, pickup, note, paid_at, ready_at, picked_up_at, notified_at FROM coffee_orders ORDER BY created_at DESC LIMIT 60`).all()).results;
+  const today = localDayRange(local().date);
+  const t = await env.DB.prepare(`SELECT COUNT(*) n, COALESCE(SUM(paid_cents),0) c, COALESCE(SUM(tip_cents),0) tips FROM coffee_orders WHERE paid_at >= ? AND paid_at < ? AND status != 'refunded'`).bind(today.from, today.to).first();
+  return { orders: rows, today: { orders: t.n, revenue_cents: t.c, tips_cents: t.tips }, sms_to: String(env.COFFEE_SMS_TO || COFFEE.shop.smsTo) };
+}
+
+async function coffeeUpdate(env, ref, body) {
+  const action = String(body.action || "");
+  const now = new Date().toISOString();
+  if (action === "ready") await env.DB.prepare(`UPDATE coffee_orders SET status = 'ready', ready_at = COALESCE(ready_at, ?) WHERE ref = ? AND status IN ('paid','ready')`).bind(now, ref).run();
+  else if (action === "picked_up") await env.DB.prepare(`UPDATE coffee_orders SET status = 'picked_up', picked_up_at = COALESCE(picked_up_at, ?) WHERE ref = ? AND status IN ('paid','ready','picked_up')`).bind(now, ref).run();
+  else if (action === "resend") { await env.DB.prepare(`UPDATE coffee_orders SET notified_at = NULL WHERE ref = ?`).bind(ref).run(); return { ok: true, ...(await notifyCoffee(env, ref)) }; }
+  else return { ok: false, error: "Unknown action" };
+  return { ok: true };
 }
 
 // ================================================================ money: bank ledger, P&L, reconciliation, forecast
