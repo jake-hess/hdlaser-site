@@ -164,7 +164,7 @@ export default {
       await noShowCheck(env);                                              // staffing watchdog: every tick during open hours
       if (d.getUTCMinutes() >= 10) return;                                 // the :15 crons exist only for the 10:15 check
       await syncSquare(env, 3);
-      if (env.PLAID_CLIENT_ID) await plaidSync(env);
+      if (env.PLAID_CLIENT_ID) await plaidSync(env, null, 12);
       if (d.getUTCDay() === 1 && d.getUTCHours() === 15) await sendDigest(env);
     })());
   },
@@ -1798,9 +1798,15 @@ $('#imp').onclick=async()=>{ const f=$('#csv').files[0]; if(!f){ alert('Choose a
 async function loadPlaid(){ const r=await fetch('/api/plaid/items'); const d=await r.json(); $('#plaidenv').textContent=d.configured?d.env:'not set up';
   $('#plaid').innerHTML=d.items.length?'<table>'+d.items.map(it=>'<tr><td><b>'+esc(it.institution)+'</b><div class="small">'+it.accounts.map(a=>esc(a.name)+(a.mask?' …'+a.mask:'')).join(', ')+'</div>'+(it.status!=='ok'?'<div class="small" style="color:var(--red)">'+esc(it.status==='reconnect'?'Needs reconnecting':it.last_error||it.status)+'</div>':'')+'</td><td class="num">'+it.balances.map(b=>money(b.available!=null?b.available:b.current)).join('<br>')+'</td><td class="small">'+(it.synced_at?'synced '+new Date(it.synced_at).toLocaleString():'')+'</td><td>'+(it.status==='reconnect'?'<button class="act" data-relink="'+it.item_id+'">Reconnect</button> ':'')+'<button class="act" data-unlink="'+it.item_id+'">Remove</button></td></tr>').join('')+'</table>':(d.configured?'<p class="empty">No accounts connected yet.</p>':'<p class="small">Add PLAID_CLIENT_ID, PLAID_SECRET and PLAID_ENV to the worker settings to enable the live feed.</p>'); }
 async function linkBank(itemId){ $('#plaidmsg').textContent='Opening…'; const r=await fetch('/api/plaid/link-token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item_id:itemId||null})}); const j=await r.json(); if(!j.ok){ $('#plaidmsg').textContent=j.error||'Could not start'; return; }
-  const h=Plaid.create({token:j.link_token,onSuccess:async(public_token,metadata)=>{ $('#plaidmsg').textContent='Connecting…'; if(itemId){ await fetch('/api/plaid/sync',{method:'POST'}); } else { const x=await (await fetch('/api/plaid/exchange',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_token:public_token,metadata:metadata})})).json(); $('#plaidmsg').textContent=x.ok?('Connected '+x.institution+'. Pulled '+x.sync.added+' transactions.'):(x.error||'Failed'); } loadPlaid(); load(); },onExit:(err)=>{ $('#plaidmsg').textContent=err?(err.display_message||err.error_message||'Closed'):''; }}); h.open(); }
+  const h=Plaid.create({token:j.link_token,onSuccess:async(public_token,metadata)=>{ $('#plaidmsg').textContent='Connecting…'; if(itemId){ await fetch('/api/plaid/sync',{method:'POST'}); } else { const x=await (await fetch('/api/plaid/exchange',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_token:public_token,metadata:metadata})})).json(); $('#plaidmsg').textContent=x.ok?('Connected '+x.institution+'.'):(x.error||'Failed'); if(x.ok&&x.sync&&x.sync.more){ await pullAll(); return; } } loadPlaid(); load(); },onExit:(err)=>{ $('#plaidmsg').textContent=err?(err.display_message||err.error_message||'Closed'):''; }}); h.open(); }
 $('#plaidlink').onclick=()=>linkBank(null);
-$('#plaidsync').onclick=async()=>{ $('#plaidmsg').textContent='Pulling…'; const j=await (await fetch('/api/plaid/sync',{method:'POST'})).json(); $('#plaidmsg').textContent='Added '+j.added+', changed '+j.modified+', removed '+j.removed+(j.errors.length?'. '+j.errors.join(' | '):'.'); loadPlaid(); load(); };
+async function pullAll(){ const b=$('#plaidsync'); b.disabled=true; let tot={added:0,modified:0,removed:0}, errs=[], rounds=0, failures=0;
+  while(rounds++<60){ $('#plaidmsg').textContent='Pulling… '+(tot.added?tot.added.toLocaleString()+' transactions so far':'');
+    let j; try{ const r=await fetch('/api/plaid/sync',{method:'POST'}); j=await r.json(); }catch(e){ if(++failures>3){ errs.push('The connection dropped; click Pull now again to continue.'); break; } continue; }
+    tot.added+=j.added||0; tot.modified+=j.modified||0; tot.removed+=j.removed||0; (j.errors||[]).forEach(x=>{ if(!errs.includes(x)) errs.push(x); });
+    if(!j.more) break; loadPlaid(); }
+  $('#plaidmsg').textContent='Done. Added '+tot.added.toLocaleString()+', changed '+tot.modified+', removed '+tot.removed+(errs.length?'. '+errs.join(' | '):'.'); b.disabled=false; loadPlaid(); load(); }
+$('#plaidsync').onclick=pullAll;
 document.addEventListener('click',async e=>{ const rl=e.target.closest('button[data-relink]'); if(rl) return linkBank(rl.dataset.relink); const ul=e.target.closest('button[data-unlink]'); if(ul&&confirm('Remove this bank connection? Transactions already in the ledger stay.')){ await fetch('/api/plaid/items/'+ul.dataset.unlink,{method:'DELETE'}); loadPlaid(); } });
 loadPlaid();
 load();
@@ -1832,22 +1838,25 @@ async function plaidExchange(env, body) {
   const accounts = (body.metadata && body.metadata.accounts) || [];
   await env.DB.prepare(`INSERT OR REPLACE INTO plaid_items (item_id, access_token, institution, accounts, cursor, status, created_at) VALUES (?,?,?,?,?,?,?)`)
     .bind(r.data.item_id, r.data.access_token, inst, JSON.stringify(accounts.map((a) => ({ id: a.id, name: a.name, mask: a.mask, type: a.type, subtype: a.subtype }))), "", "ok", new Date().toISOString()).run();
-  const sync = await plaidSync(env, r.data.item_id);
+  const sync = await plaidSync(env, r.data.item_id, 2);
   return { ok: true, item_id: r.data.item_id, institution: inst, accounts: accounts.length, sync };
 }
 // Pull new/changed/removed transactions since the stored cursor, plus current balances.
-async function plaidSync(env, onlyItem) {
+// maxPages caps the work per call (a first pull of two years can be thousands of rows); the response says more:true
+// when a bank still has pages left, and the cursor is saved after every page so the next call carries on.
+async function plaidSync(env, onlyItem, maxPages = 4) {
   const items = (await env.DB.prepare(`SELECT * FROM plaid_items${onlyItem ? " WHERE item_id = ?" : ""}`).bind(...(onlyItem ? [onlyItem] : [])).all()).results;
-  const out = { items: items.length, added: 0, modified: 0, removed: 0, errors: [] };
+  const out = { items: items.length, added: 0, modified: 0, removed: 0, errors: [], more: false };
   const rules = await rulesFor(env);
   for (const it of items) {
     try {
       const accts = JSON.parse(it.accounts || "[]"); const acctName = (id) => { const a = accts.find((x) => x.id === id); return a ? `${it.institution} ${a.name}${a.mask ? " …" + a.mask : ""}` : it.institution; };
       let cursor = it.cursor || "", more = true, guard = 0;
-      while (more && guard++ < 20) {
-        const r = await plaid(env, "/transactions/sync", { access_token: it.access_token, cursor, count: 500 });
+      while (more && guard++ < maxPages) {
+        const r = await plaid(env, "/transactions/sync", { access_token: it.access_token, cursor, count: 250 });
         if (!r.ok) { await env.DB.prepare(`UPDATE plaid_items SET status = ?, last_error = ? WHERE item_id = ?`).bind(r.code === "ITEM_LOGIN_REQUIRED" ? "reconnect" : "error", r.error, it.item_id).run(); out.errors.push(`${it.institution}: ${r.error}`); more = false; break; }
         const d = r.data;
+        const stmts = [];
         for (const t of [...(d.added || []), ...(d.modified || [])]) {
           if (t.pending) continue;
           const cents = -Math.round((t.amount || 0) * 100); // Plaid: positive = money out
@@ -1856,15 +1865,17 @@ async function plaidSync(env, onlyItem) {
           const pfc = t.personal_finance_category && t.personal_finance_category.primary;
           const cat = rule ? rule.category : (pfc === "RENT_AND_UTILITIES" && /RENT/.test(t.personal_finance_category.detailed || "") ? "rent" : (PFC_MAP[pfc] || "uncategorized"));
           const memo = rule ? null : (pfc ? "Plaid: " + pfc.toLowerCase().replace(/_/g, " ") : null);
-          await env.DB.prepare(`INSERT INTO bank_txns (hash, source, posted_at, amount_cents, description, category, vendor, memo, imported_at) VALUES (?,?,?,?,?,?,?,?,?)
+          stmts.push(env.DB.prepare(`INSERT INTO bank_txns (hash, source, posted_at, amount_cents, description, category, vendor, memo, imported_at) VALUES (?,?,?,?,?,?,?,?,?)
             ON CONFLICT(hash) DO UPDATE SET posted_at = excluded.posted_at, amount_cents = excluded.amount_cents, description = excluded.description`)
-            .bind("plaid:" + t.transaction_id, acctName(t.account_id), t.date, cents, desc, cat, rule && rule.vendor || null, memo, new Date().toISOString()).run();
+            .bind("plaid:" + t.transaction_id, acctName(t.account_id), t.date, cents, desc, cat, rule && rule.vendor || null, memo, new Date().toISOString()));
         }
         out.added += (d.added || []).length; out.modified += (d.modified || []).length;
-        for (const rm of d.removed || []) { await env.DB.prepare(`DELETE FROM bank_txns WHERE hash = ?`).bind("plaid:" + rm.transaction_id).run(); out.removed++; }
+        for (const rm of d.removed || []) { stmts.push(env.DB.prepare(`DELETE FROM bank_txns WHERE hash = ?`).bind("plaid:" + rm.transaction_id)); out.removed++; }
         cursor = d.next_cursor || cursor; more = !!d.has_more;
-        await env.DB.prepare(`UPDATE plaid_items SET cursor = ?, status = 'ok', last_error = NULL, synced_at = ? WHERE item_id = ?`).bind(cursor, new Date().toISOString(), it.item_id).run();
+        stmts.push(env.DB.prepare(`UPDATE plaid_items SET cursor = ?, status = 'ok', last_error = NULL, synced_at = ? WHERE item_id = ?`).bind(cursor, new Date().toISOString(), it.item_id));
+        for (let i = 0; i < stmts.length; i += 100) await env.DB.batch(stmts.slice(i, i + 100)); // one round trip per 100 rows, cursor last
       }
+      if (more) out.more = true;
       const b = await plaid(env, "/accounts/balance/get", { access_token: it.access_token });
       if (b.ok) {
         const bal = {}; let checking = 0, any = false;
