@@ -125,3 +125,9 @@ Flow: the page posts the cart to `POST /coffee/checkout`, the worker prices it, 
 - an email receipt if they gave an email.
 
 The customer's return page polls `GET /coffee/status?ref=` until the order is paid. The admin dashboard has a coffee card with today's totals and Ready / Picked up / Re-text bar buttons (`GET /api/coffee`, `POST /api/coffee/:ref`). Texts need the Twilio toll-free number verified; until then the bar gets the email only.
+
+### Business vs personal accounts
+
+Each connected account has a Business / Personal switch on the money page (`POST /api/plaid/items/:item/accounts/:account` with `{personal: true|false}`). A personal account's transactions are filed under `personal` (excluded from the P&L) as they arrive, existing auto-filed rows are re-filed when the switch changes, hand-categorized rows are left alone, and personal checking balances are left out of cash on hand. Move the odd business purchase on a personal card by categorizing that one row.
+
+First pulls are chunked: `plaidSync` handles a few pages per request, saves the cursor after every page, and returns `more: true`; the money page keeps calling until it is caught up.
