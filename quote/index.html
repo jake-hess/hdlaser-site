@@ -181,6 +181,12 @@ button[type=submit]:hover{background:var(--redd)}
     var r = document.querySelector('input[value="Custom cups for my shop"]'); if (r) r.checked = true;
     var b = document.querySelector('input[value="My business"]'); if (b) b.checked = true;
   }
+  // Arriving from a home-page button that already said who it's for (?for=business or ?for=personal): answer it and skip the question
+  var forWho = { business: 'My business', personal: 'A gift or personal project' }[qs.get('for')];
+  if (forWho) {
+    var fw = document.querySelector('input[name="For"][value="' + forWho + '"]');
+    if (fw) { fw.checked = true; document.getElementById('fs-for').hidden = true; }
+  }
   // An order built with the calculator on the Grounds for Profit page: show it, skip the questions it already answered
   if (qs.get('order')) {
     var lines = qs.get('order').split(';').map(function (s) { var f = s.split('|'); return { size: f[0], finish: f[1], lid: f[2], color: f[3], qty: +f[4] || 0 }; });
