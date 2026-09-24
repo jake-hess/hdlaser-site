@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>Data Retention and Disposal Policy | HD Laser Studio</title>
+<style>
+:root{--bg:#F6F4EF;--ink:#15191E;--muted:#545B63;--red:#C8372A;--line:#E4E0D8}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Figtree,"Helvetica Neue",Arial,sans-serif;line-height:1.5}
+main{max-width:760px;margin:0 auto;padding:28px 20px 80px;background:#fff}
+h1{font-size:28px;margin:0 0 4px}h2{font-size:17px;margin:22px 0 6px;padding-top:8px;border-top:1px solid var(--line)}
+p,li{font-size:15px}p{margin:0 0 8px}ol,ul{margin:0 0 8px;padding-left:22px}li{margin-bottom:3px}
+.meta{font-size:13px;color:var(--muted);margin-bottom:14px}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:6px 0 10px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #EDE8DF;vertical-align:top}th{font-size:12px;color:var(--muted);text-transform:uppercase}
+.sign{margin-top:26px;padding-top:12px;border-top:2px solid var(--ink);font-size:14px}
+@media print{body{background:#fff}main{padding:0;max-width:none}h2{break-after:avoid}}
+</style>
+</head>
+<body>
+<main>
+<h1>Data Retention and Disposal Policy</h1>
+<p class="meta">HD Laser Studio INC · 759 Turquoise St, San Diego, CA 92109 · Version 1.0 · Effective September 24, 2026 · Review annually and after any material change · Companion to the Information Security Policy</p>
+
+<h2>1. Purpose and scope</h2>
+<p>This policy defines how long HD Laser Studio keeps each kind of information, why, and how it is deleted when that period ends. It covers customer, employee and company financial data in every system the company uses, including bank and card data retrieved through Plaid. It applies to the owner and to every employee and contractor.</p>
+
+<h2>2. Principles</h2>
+<ol>
+<li>We keep data only as long as there is a business, tax or legal reason to keep it.</li>
+<li>Where the law sets a minimum (tax records, telemarketing consent), that minimum is the retention period. Nothing is kept "just in case."</li>
+<li>Financial data retrieved from bank accounts is used only for the company's own accounting. It is never sold, shared or used for marketing.</li>
+<li>Deletion means the record is removed from the live system and from any export or copy the company controls. Provider backups age out on the provider's schedule.</li>
+</ol>
+
+<h2>3. Retention schedule</h2>
+<table><tr><th>Data</th><th>Where it lives</th><th>Kept for</th><th>Reason</th></tr>
+<tr><td>Quote requests and inquiries that never become an order</td><td>Cloudflare database, company email</td><td>2 years from last contact</td><td>Follow-up and marketing consent record</td></tr>
+<tr><td>Orders, invoices, proofs and customer contact details</td><td>Cloudflare database, Square, company email</td><td>7 years from the last order</td><td>Tax and business records</td></tr>
+<tr><td>Payment records</td><td>Square (card numbers are never stored by HD Laser)</td><td>7 years</td><td>Tax and chargeback defense</td></tr>
+<tr><td>Text-message consent and opt-out records</td><td>Cloudflare database</td><td>While opted in, then 4 years after opt-out</td><td>TCPA record-keeping</td></tr>
+<tr><td>Bank and card transactions and balances (via Plaid)</td><td>Cloudflare database</td><td>7 years</td><td>Bookkeeping and tax</td></tr>
+<tr><td>Plaid access tokens</td><td>Cloudflare database</td><td>Until the account is disconnected, then deleted immediately</td><td>Needed only while the connection is active</td></tr>
+<tr><td>CSV exports of financial or order data</td><td>Company devices only</td><td>Until the task is done, at most 90 days</td><td>Working copies</td></tr>
+<tr><td>Employee records: shifts, checklists, jobs, pay estimates</td><td>Cloudflare database</td><td>4 years after employment ends</td><td>California wage and hour rules</td></tr>
+<tr><td>Employee logins and PINs</td><td>Cloudflare database</td><td>Deactivated the day employment ends; deleted after 4 years</td><td>Access control; audit trail</td></tr>
+<tr><td>Security incident records</td><td>Owner's records</td><td>3 years</td><td>Information Security Policy §9</td></tr>
+<tr><td>System and access logs</td><td>Cloudflare</td><td>Provider default, up to 30 days</td><td>Troubleshooting and security review</td></tr>
+<tr><td>Website source code</td><td>GitHub</td><td>Indefinitely (contains no personal or financial data)</td><td>Business asset</td></tr></table>
+
+<h2>4. Disposal methods</h2>
+<ol>
+<li><strong>Database records</strong> are deleted with a permanent delete, not marked hidden. The owner runs the retention review described in section 6 and deletes records past their period.</li>
+<li><strong>Bank connections</strong> are removed from the owner dashboard, which revokes access at Plaid and deletes the token from the database. The owner may also remove access through Plaid Portal (my.plaid.com).</li>
+<li><strong>Files on company devices</strong> (exports, artwork, scans) are deleted and the trash emptied. Devices are wiped before they are sold, recycled or handed to someone else.</li>
+<li><strong>Paper</strong> (printed reports, order sheets with customer details) is shredded.</li>
+<li><strong>Email</strong> containing customer or financial data is deleted from the mailbox and its trash when the related record is deleted.</li>
+<li><strong>Hosted providers</strong> (Square, Plaid, Twilio, Resend, Google) delete data under their own published schedules once we delete or disconnect it on our side.</li>
+</ol>
+
+<h2>5. Requests from individuals</h2>
+<ol>
+<li>Anyone may ask what personal information we hold about them, ask for a correction, or ask for deletion, by emailing contact@hdlaser.net or calling (858) 373-9866.</li>
+<li>The owner confirms the request, verifies the requester's identity against the details on file, and completes it within 30 days (45 days at most, as California law allows), then replies to confirm.</li>
+<li>Records we are legally required to keep (for example, tax records of a completed order) are kept for the remainder of their period and the requester is told which records those are and why.</li>
+<li>Bank account holders may disconnect their accounts at any time from the dashboard or through Plaid Portal.</li>
+</ol>
+
+<h2>6. Enforcement and review</h2>
+<ol>
+<li>The owner, Hugh Demiral, is responsible for this policy.</li>
+<li>Twice a year, in January and July, the owner reviews the retention schedule against the data actually held and deletes anything past its period. The review and what was deleted are noted in the owner's records.</li>
+<li>This policy is reviewed at least once a year and whenever a system, vendor, law or the way data is used changes. Changes are dated and the version number is increased.</li>
+<li>Employees follow this policy as part of the Information Security Policy they acknowledge on their first day.</li>
+</ol>
+
+<div class="sign">Adopted by: ____________________________ &nbsp; Hugh Demiral, Owner &nbsp; &nbsp; Date: ______________</div>
+</main>
+</body>
+</html>
