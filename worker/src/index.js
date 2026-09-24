@@ -131,6 +131,9 @@ export default {
         if (path === "/api/bank/import" && request.method === "POST") return json(await importBank(env, await request.json()), 200);
         if (path === "/api/bank/txns") return json(await txnsFor(env, url.searchParams.get("month"), url.searchParams.get("category")), 200, { "Cache-Control": "no-store" });
         if (path === "/api/bank/export.csv") return bankCsv(env);
+        if (path === "/api/bank/sources" && request.method === "GET") return json({ sources: await bankSources(env) }, 200, { "Cache-Control": "no-store" });
+        if (path === "/api/bank/sources" && request.method === "DELETE") return json(await deleteSource(env, url.searchParams.get("source")), 200);
+        if (path === "/api/bank/recategorize" && request.method === "POST") return json(await recategorizeAll(env), 200);
         if (path === "/api/plaid/link-token" && request.method === "POST") { const b = await request.json().catch(() => ({})); return json(await plaidLinkToken(env, b.item_id), 200); }
         if (path === "/api/plaid/exchange" && request.method === "POST") return json(await plaidExchange(env, await request.json()), 200);
         if (path === "/api/plaid/sync" && request.method === "POST") return json(await plaidSync(env), 200);
@@ -1385,7 +1388,8 @@ const CATEGORIES = [
   { key: "professional", name: "Legal & accounting", group: "opex", target: 0.02 },
   { key: "bank_fees", name: "Bank & card fees", group: "opex", target: 0.01 },
   { key: "taxes_licenses", name: "Taxes & licenses", group: "opex", target: 0.02 },
-  { key: "meals", name: "Meals & travel", group: "opex", target: 0.01 },
+  { key: "meals", name: "Meals", group: "opex", target: 0.01 },
+  { key: "travel", name: "Travel", group: "opex", target: 0.01 },
   { key: "other_opex", name: "Other expenses", group: "opex", target: 0.03 },
   { key: "cash_deposit", name: "Cash deposit (already counted in Square)", group: "excluded" },
   { key: "transfer", name: "Transfer between accounts", group: "excluded" },
@@ -1400,6 +1404,22 @@ const CATEGORIES = [
 const CAT = Object.fromEntries(CATEGORIES.map((c) => [c.key, c]));
 const DEFAULT_RULES = [
   ["SQUARE INC", "square_payout"], ["SQUARE ", "square_payout"], ["SQ *", "square_payout"],
+  // card payments and statement credits seen on the card side (money in on a card is never income)
+  ["MOBILE PAYMENT - THANK YOU", "credit_card_payment"], ["ELECTRONIC PAYMENT RECEIVED", "credit_card_payment"], ["AUTOMATIC PAYMENT - THANK", "credit_card_payment"], ["PAYMENT TO CHASE CARD", "credit_card_payment"],
+  ["ORIG CO NAME:AMERICAN EXPRESS", "credit_card_payment"], ["ORIG CO NAME:CITI CARD", "credit_card_payment"], ["ORIG CO NAME:DISCOVER", "credit_card_payment"], ["ORIG CO NAME:CHASE CARD", "credit_card_payment"],
+  ["POINTS FOR STATEMENT CREDIT", "other_income"], ["CASH REWARD", "other_income"], ["INTEREST CHARGE", "bank_fees"], ["RENEWAL MEMBERSHIP FEE", "bank_fees"], ["ANNUAL FEE", "bank_fees"], ["LATE FEE", "bank_fees"],
+  // money movement
+  ["ZELLE PAYMENT FROM", "other_income"], ["ATM CHECK DEPOSIT", "other_income"], ["MOBILE CHECK DEPOSIT", "other_income"], ["WITHDRAWAL", "owner_draw"], ["ATM WITHDRAWAL", "owner_draw"],
+  // travel
+  ["AIRLINES", "travel"], ["AIRWAYS", "travel"], ["AIR LINES", "travel"], ["AEROMEXICO", "travel"], ["VIVA AEROBUS", "travel"], ["TURKISH AIR", "travel"], ["SIXT", "travel"], ["AVIS", "travel"], ["BUDGET CAR", "travel"], ["BUDGET MERKEZ", "travel"], ["ALAMO RENT", "travel"], ["HERTZ", "travel"], ["ENTERPRISE RENT", "travel"], ["HOTEL", "travel"], ["MARRIOTT", "travel"], ["HILTON", "travel"], ["AIRBNB", "travel"], ["EXPEDIA", "travel"], ["PEMEX", "travel"], ["UBER", "travel"], ["LYFT", "travel"],
+  // personal by nature: groceries, clothing, convenience, entertainment
+  ["VONS", "personal"], ["GELSON", "personal"], ["TRADER JOE", "personal"], ["STATER BROS", "personal"], ["RALPHS", "personal"], ["SPROUTS", "personal"], ["WHOLE FOODS", "personal"], ["ALBERTSONS", "personal"], ["7-ELEVEN", "personal"],
+  ["NORDSTROM", "personal"], ["MARSHALLS", "personal"], ["ZAPPOS", "personal"], ["TJ MAXX", "personal"], ["ROSS DRESS", "personal"], ["SEPHORA", "personal"], ["SMOKE SHOP", "personal"], ["DUOLINGO", "personal"], ["NETFLIX", "personal"], ["SPOTIFY", "personal"], ["HULU", "personal"], ["DISNEY PLUS", "personal"],
+  // vehicle
+  ["GM FINANCIAL", "vehicle"], ["JIFFY LUBE", "vehicle"], ["CAR WASH", "vehicle"], ["AAA MEMBERSHIP", "vehicle"], ["TOWING", "vehicle"], ["DEPARTMENT OF MOTOR", "vehicle"], ["AUTOZONE", "vehicle"], ["O'REILLY", "vehicle"], ["VALERO", "vehicle"], ["EXXON", "vehicle"], ["CIRCLE K", "vehicle"], ["SPEEDWAY", "vehicle"], ["LOVE'S", "vehicle"],
+  // shop suppliers and tools
+  ["MARCO AWARDS", "blanks"], ["STULLER", "blanks"], ["JPPLUS", "blanks"], ["LASERBITS", "blanks"], ["ANKERMAKE", "equipment"], ["CLICKLEASE", "other_opex"],
+  ["APPLE.COM", "software"], ["APPLE", "software"], ["ORACLE", "software"], ["FIREVIBE", "software"], ["VECTORIZER", "software"], ["OPENAI", "software"], ["CHATGPT", "software"], ["CANVA", "software"], ["DROPBOX", "software"], ["ZOOM.US", "software"],
   ["SDG&E", "utilities"], ["SAN DIEGO GAS", "utilities"], ["COX COMM", "utilities"], ["SPECTRUM", "utilities"], ["AT&T", "utilities"], ["T-MOBILE", "utilities"], ["VERIZON", "utilities"],
   ["ADOBE", "software"], ["GOOGLE *", "software"], ["GOOGLE WORKSPACE", "software"], ["CLOUDFLARE", "software"], ["TWILIO", "software"], ["RESEND", "software"], ["FORMSPREE", "software"], ["GODADDY", "software"], ["INTUIT", "software"], ["QUICKBOOKS", "software"], ["CANVA", "software"], ["DROPBOX", "software"], ["MICROSOFT", "software"], ["OPENAI", "software"], ["ANTHROPIC", "software"], ["LIGHTBURN", "software"],
   ["ULINE", "packaging"], ["PAPER MART", "packaging"],
@@ -1712,6 +1732,7 @@ svg text{font-size:11px;fill:var(--muted)}
 <div class="grid">
   <div class="card"><h3>Connected accounts <span class="pill" id="plaidenv"></span></h3><div id="plaid"></div><p style="margin-top:10px"><button class="act dark" id="plaidlink">Connect a bank or card</button> <button class="act" id="plaidsync">Pull now</button> <span class="small" id="plaidmsg"></span></p><p class="small">Live feed through Plaid. New transactions arrive every hour and land in the ledger with the same rules as CSV imports. Balances feed the forecast.</p>
 <p class="small" id="retention"></p></div>
+<div class="card" style="margin-top:14px"><h3>Ledger sources</h3><div id="sources"></div><p style="margin-top:10px"><button class="act" id="recat">Re-apply rules to the ledger</button> <span class="small" id="recatmsg"></span></p><p class="small">Each line is one bank account's rows in the ledger. A line marked <b>not connected</b> came from a connection that was removed or re-linked (or from the sandbox); delete it so nothing is counted twice. Re-apply rules re-files every auto-categorized row with the current merchant rules; rows you filed by hand are left alone.</p></div>
   <div class="card"><h3>Or import a statement (CSV)</h3>
     <p class="small">Download a CSV from the bank (any date range), pick it here. Columns are detected automatically: date, description, amount (or debit/credit), balance. Re-importing the same rows is safe; duplicates are skipped.</p>
     <p><input type="text" id="src" placeholder="Account name, e.g. Chase checking" style="width:60%"> <input type="file" id="csv" accept=".csv,text/csv"></p>
@@ -1800,7 +1821,11 @@ $('#imp').onclick=async()=>{ const f=$('#csv').files[0]; if(!f){ alert('Choose a
   $('#impmsg').textContent=j.ok?('Added '+j.added+', skipped '+j.duplicates+' duplicates, '+j.skipped+' unreadable.'+(j.balance_cents!=null?' Balance '+money(j.balance_cents)+' as of '+j.balance_as_of+'.':'')):(j.error||'Import failed'); load(); };
 (function(){ const n=new Date(), y=n.getFullYear(), m=n.getMonth(); const due = m<0?null : (m===0||m===6) ? 'this month' : (m<6 ? 'July '+y : 'January '+(y+1)); const soon=(m===0||m===6);
   const el=document.getElementById('retention'); if(el) el.innerHTML=(soon?'<b style="color:var(--red)">Data retention review is due '+due+'.</b> ':'Next data retention review: <b>'+due+'</b>. ')+'Delete records past their period per the <a href="https://hdlaser.net/staff/data-retention-policy/" target="_blank" rel="noopener">Data Retention Policy</a> and note it in your records.'; })();
-async function loadPlaid(){ const r=await fetch('/api/plaid/items'); const d=await r.json(); $('#plaidenv').textContent=d.configured?d.env:'not set up';
+async function loadSources(){ const r=await fetch('/api/bank/sources'); if(!r.ok) return; const d=await r.json();
+  $('#sources').innerHTML=d.sources.length?'<table>'+d.sources.map(s=>'<tr><td>'+esc(s.source||'(no source)')+(s.attached?'':' <span class="pill" style="background:#FBE9E6;color:var(--red)">not connected</span>')+'<div class="small">'+s.rows+' rows · '+(s.first||'').slice(0,10)+' to '+(s.last||'').slice(0,10)+'</div></td><td class="num">'+money(s.total_cents)+'</td><td>'+(s.attached?'':'<button class="btn" data-delsrc="'+esc(s.source)+'">Delete rows</button>')+'</td></tr>').join('')+'</table>':'<p class="empty">No bank rows yet.</p>';
+  $('#sources').querySelectorAll('button[data-delsrc]').forEach(b=>b.addEventListener('click',async()=>{ if(!confirm('Delete every ledger row from "'+b.dataset.delsrc+'"? This cannot be undone.')) return; b.disabled=true; const r=await (await fetch('/api/bank/sources?source='+encodeURIComponent(b.dataset.delsrc),{method:'DELETE'})).json(); $('#recatmsg').textContent=r.ok?('Deleted '+r.deleted+' rows.'):(r.error||'Failed'); loadSources(); load(); })); }
+$('#recat').onclick=async()=>{ const b=$('#recat'); b.disabled=true; $('#recatmsg').textContent='Working…'; const r=await (await fetch('/api/bank/recategorize',{method:'POST'})).json(); b.disabled=false; $('#recatmsg').textContent=r.ok?('Checked '+r.checked.toLocaleString()+' rows, re-filed '+r.changed.toLocaleString()+'.'):(r.error||'Failed'); load(); };
+async function loadPlaid(){ loadSources(); const r=await fetch('/api/plaid/items'); const d=await r.json(); $('#plaidenv').textContent=d.configured?d.env:'not set up';
   $('#plaid').innerHTML=d.items.length?'<table>'+d.items.map(it=>'<tr><td><b>'+esc(it.institution)+'</b><div class="small">'+it.accounts.map(a=>'<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin:2px 0"><span>'+esc(a.name)+(a.mask?' …'+a.mask:'')+'</span><button class="btn'+(a.personal?' done':'')+'" data-acct="'+it.item_id+'/accounts/'+a.id+'" data-personal="'+(a.personal?0:1)+'" title="'+(a.personal?'Counted as personal. Click to treat as business.':'Counted as business. Click to keep out of the P&L.')+'">'+(a.personal?'Personal':'Business')+'</button></div>').join('')+'</div>'+(it.status!=='ok'?'<div class="small" style="color:'+(it.status==='pending'?'var(--amber)':'var(--red)')+'">'+esc(it.status==='reconnect'?'Needs reconnecting'+(it.last_error?': '+it.last_error:''):it.last_error||it.status)+'</div>':'')+'</td><td class="num">'+it.balances.map(b=>money(b.available!=null?b.available:b.current)).join('<br>')+'</td><td class="small">'+(it.synced_at?'synced '+new Date(it.synced_at).toLocaleString():'')+'</td><td>'+(it.status==='reconnect'?'<button class="act" data-relink="'+it.item_id+'">Reconnect</button> ':'')+'<button class="act" data-unlink="'+it.item_id+'">Remove</button> <button class="act" data-details="'+it.item_id+'">Details</button></td></tr>').join('')+'</table>':(d.configured?'<p class="empty">No accounts connected yet.</p>':'<p class="small">Add PLAID_CLIENT_ID, PLAID_SECRET and PLAID_ENV to the worker settings to enable the live feed.</p>'); }
 async function linkBank(itemId){ $('#plaidmsg').textContent='Opening…'; const r=await fetch('/api/plaid/link-token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item_id:itemId||null})}); const j=await r.json(); if(!j.ok){ $('#plaidmsg').textContent=j.error||'Could not start'; return; }
   const h=Plaid.create({token:j.link_token,onSuccess:async(public_token,metadata)=>{ $('#plaidmsg').textContent='Connecting…'; if(itemId){ await fetch('/api/plaid/sync',{method:'POST'}); } else { const x=await (await fetch('/api/plaid/exchange',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_token:public_token,metadata:metadata})})).json(); $('#plaidmsg').textContent=x.ok?('Connected '+x.institution+'.'):(x.error||'Failed'); if(x.ok&&x.sync&&x.sync.more){ await pullAll(); return; } } loadPlaid(); load(); },onExit:(err)=>{ $('#plaidmsg').textContent=err?(err.display_message||err.error_message||'Closed'):''; }}); h.open(); }
@@ -1822,7 +1847,38 @@ load();
 
 // ================================================================ Plaid: live bank feed into the ledger
 // Settings: PLAID_CLIENT_ID (Text), PLAID_SECRET (Secret), PLAID_ENV = sandbox | production. One Plaid "item" per bank login.
-const PFC_MAP = { INCOME: "other_income", TRANSFER_IN: "transfer", TRANSFER_OUT: "transfer", LOAN_PAYMENTS: "credit_card_payment", BANK_FEES: "bank_fees", ENTERTAINMENT: "personal", FOOD_AND_DRINK: "meals", GENERAL_MERCHANDISE: "supplies", HOME_IMPROVEMENT: "supplies", MEDICAL: "personal", PERSONAL_CARE: "personal", GENERAL_SERVICES: "professional", GOVERNMENT_AND_NON_PROFIT: "taxes_licenses", TRANSPORTATION: "vehicle", TRAVEL: "meals", RENT_AND_UTILITIES: "utilities" };
+const PFC_MAP = { INCOME: "other_income", TRANSFER_IN: "transfer", TRANSFER_OUT: "transfer", LOAN_PAYMENTS: "credit_card_payment", BANK_FEES: "bank_fees", ENTERTAINMENT: "personal", FOOD_AND_DRINK: "meals", GENERAL_MERCHANDISE: "uncategorized", HOME_IMPROVEMENT: "supplies", MEDICAL: "personal", PERSONAL_CARE: "personal", GENERAL_SERVICES: "professional", GOVERNMENT_AND_NON_PROFIT: "taxes_licenses", TRANSPORTATION: "vehicle", TRAVEL: "travel", RENT_AND_UTILITIES: "utilities" };
+// Re-file every auto-categorized row with the current rules (hand-filed rows and personal-account rows are left alone).
+// The Plaid category is recovered from the memo we wrote at import time, so rows can fall back to it when no rule matches.
+async function recategorizeAll(env) {
+  const rules = await rulesFor(env);
+  const rows = (await env.DB.prepare(`SELECT id, description, category, memo FROM bank_txns WHERE (memo IS NULL OR memo LIKE 'Plaid: %') AND matched_payout_id IS NULL`).all()).results;
+  const stmts = []; let changed = 0; const moves = {};
+  for (const r of rows) {
+    const rule = applyRules(rules, r.description);
+    let cat, memo = r.memo;
+    if (rule) { cat = rule.category; }
+    else if (r.memo && r.memo.startsWith("Plaid: ")) { const pfc = r.memo.slice(7).toUpperCase().replace(/ /g, "_"); cat = PFC_MAP[pfc] || "uncategorized"; }
+    else cat = r.category === "square_payout" ? "square_payout" : "uncategorized";
+    if (cat !== r.category) { changed++; const k = r.category + " -> " + cat; moves[k] = (moves[k] || 0) + 1; stmts.push(env.DB.prepare(`UPDATE bank_txns SET category = ?, vendor = COALESCE(?, vendor) WHERE id = ?`).bind(cat, rule && rule.vendor || null, r.id)); }
+  }
+  for (let i = 0; i < stmts.length; i += 100) await env.DB.batch(stmts.slice(i, i + 100));
+  return { ok: true, checked: rows.length, changed, moves };
+}
+// Ledger sources (one per bank account) with whether a connected bank still feeds them. Rows left behind by a removed or
+// re-linked connection are duplicates or sandbox data and can be deleted by source.
+async function bankSources(env) {
+  const rows = (await env.DB.prepare(`SELECT source, COUNT(*) n, COALESCE(SUM(amount_cents),0) c, MIN(posted_at) first, MAX(posted_at) last FROM bank_txns GROUP BY source ORDER BY source`).all()).results;
+  const live = new Set();
+  for (const it of (await env.DB.prepare(`SELECT institution, accounts FROM plaid_items`).all()).results)
+    for (const a of JSON.parse(it.accounts || "[]")) live.add(`${it.institution} ${a.name}${a.mask ? " …" + a.mask : ""}`);
+  return rows.map((r) => ({ source: r.source, rows: r.n, total_cents: r.c, first: r.first, last: r.last, attached: live.has(r.source) || !/\S/.test(r.source || "") || !(r.source || "").match(/…\d{4}$/) }));
+}
+async function deleteSource(env, source) {
+  if (!source) return { ok: false, error: "No source given" };
+  const r = await env.DB.prepare(`DELETE FROM bank_txns WHERE source = ?`).bind(source).run();
+  return { ok: true, deleted: r.meta ? r.meta.changes : 0 };
+}
 function plaidHost(env) { return `https://${(env.PLAID_ENV || "sandbox").toLowerCase() === "production" ? "production" : "sandbox"}.plaid.com`; }
 async function plaid(env, path, body) {
   if (!env.PLAID_CLIENT_ID || !env.PLAID_SECRET) return { ok: false, error: "PLAID_CLIENT_ID / PLAID_SECRET not set" };
@@ -1962,6 +2018,9 @@ async function plaidRemove(env, itemId) {
   const it = await env.DB.prepare(`SELECT access_token FROM plaid_items WHERE item_id = ?`).bind(itemId).first();
   if (!it) return { ok: false, error: "Unknown item" };
   await plaid(env, "/item/remove", { access_token: it.access_token });
+  const full = await env.DB.prepare(`SELECT institution, accounts FROM plaid_items WHERE item_id = ?`).bind(itemId).first();
+  let deleted = 0;
+  for (const a of JSON.parse(full.accounts || "[]")) { const r = await env.DB.prepare(`DELETE FROM bank_txns WHERE source = ?`).bind(`${full.institution} ${a.name}${a.mask ? " …" + a.mask : ""}`).run(); deleted += r.meta ? r.meta.changes : 0; }
   await env.DB.prepare(`DELETE FROM plaid_items WHERE item_id = ?`).bind(itemId).run();
-  return { ok: true };
+  return { ok: true, deleted };
 }

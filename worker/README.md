@@ -131,3 +131,7 @@ The customer's return page polls `GET /coffee/status?ref=` until the order is pa
 Each connected account has a Business / Personal switch on the money page (`POST /api/plaid/items/:item/accounts/:account` with `{personal: true|false}`). A personal account's transactions are filed under `personal` (excluded from the P&L) as they arrive, existing auto-filed rows are re-filed when the switch changes, hand-categorized rows are left alone, and personal checking balances are left out of cash on hand. Move the odd business purchase on a personal card by categorizing that one row.
 
 First pulls are chunked: `plaidSync` handles a few pages per request, saves the cursor after every page, and returns `more: true`; the money page keeps calling until it is caught up.
+
+### Cleaning the ledger
+
+The money page's **Ledger sources** card lists every bank account that has rows in the ledger. A source marked *not connected* belongs to a removed or re-linked connection (or the Plaid sandbox); delete its rows so nothing is counted twice. Removing a bank now deletes its rows automatically. **Re-apply rules to the ledger** re-files every auto-categorized row with the current `DEFAULT_RULES` plus the owner's own rules; rows filed by hand (custom memo) and rows from personal accounts are left alone. Card-side payment credits, airlines and rental cars (`travel`), groceries and clothing (`personal`), and common shop suppliers are covered by the default rules.
