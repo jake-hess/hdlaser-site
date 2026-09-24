@@ -137,6 +137,8 @@ export default {
         if (path === "/api/plaid/items") return json({ items: await plaidItems(env), configured: !!(env.PLAID_CLIENT_ID && env.PLAID_SECRET), env: env.PLAID_ENV || "sandbox" }, 200, { "Cache-Control": "no-store" });
         const pm = path.match(/^\/api\/plaid\/items\/([\w-]+)$/);
         if (pm && request.method === "DELETE") return json(await plaidRemove(env, pm[1]), 200);
+        const pd = path.match(/^\/api\/plaid\/items\/([\w-]+)\/details$/);
+        if (pd) return json(await plaidItemDetails(env, pd[1]), 200, { "Cache-Control": "no-store" });
         const pa = path.match(/^\/api\/plaid\/items\/([\w-]+)\/accounts\/([\w-]+)$/);
         if (pa && request.method === "POST") { const r = await plaidAccountFlag(env, pa[1], pa[2], await request.json()); return json(r, r.ok ? 200 : 400); }
         const bm = path.match(/^\/api\/bank\/txns\/(\d+)$/);
@@ -1799,7 +1801,7 @@ $('#imp').onclick=async()=>{ const f=$('#csv').files[0]; if(!f){ alert('Choose a
 (function(){ const n=new Date(), y=n.getFullYear(), m=n.getMonth(); const due = m<0?null : (m===0||m===6) ? 'this month' : (m<6 ? 'July '+y : 'January '+(y+1)); const soon=(m===0||m===6);
   const el=document.getElementById('retention'); if(el) el.innerHTML=(soon?'<b style="color:var(--red)">Data retention review is due '+due+'.</b> ':'Next data retention review: <b>'+due+'</b>. ')+'Delete records past their period per the <a href="https://hdlaser.net/staff/data-retention-policy/" target="_blank" rel="noopener">Data Retention Policy</a> and note it in your records.'; })();
 async function loadPlaid(){ const r=await fetch('/api/plaid/items'); const d=await r.json(); $('#plaidenv').textContent=d.configured?d.env:'not set up';
-  $('#plaid').innerHTML=d.items.length?'<table>'+d.items.map(it=>'<tr><td><b>'+esc(it.institution)+'</b><div class="small">'+it.accounts.map(a=>'<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin:2px 0"><span>'+esc(a.name)+(a.mask?' …'+a.mask:'')+'</span><button class="btn'+(a.personal?' done':'')+'" data-acct="'+it.item_id+'/'+a.id+'" data-personal="'+(a.personal?0:1)+'" title="'+(a.personal?'Counted as personal. Click to treat as business.':'Counted as business. Click to keep out of the P&L.')+'">'+(a.personal?'Personal':'Business')+'</button></div>').join('')+'</div>'+(it.status!=='ok'?'<div class="small" style="color:'+(it.status==='pending'?'var(--amber)':'var(--red)')+'">'+esc(it.status==='reconnect'?'Needs reconnecting':it.last_error||it.status)+'</div>':'')+'</td><td class="num">'+it.balances.map(b=>money(b.available!=null?b.available:b.current)).join('<br>')+'</td><td class="small">'+(it.synced_at?'synced '+new Date(it.synced_at).toLocaleString():'')+'</td><td>'+(it.status==='reconnect'?'<button class="act" data-relink="'+it.item_id+'">Reconnect</button> ':'')+'<button class="act" data-unlink="'+it.item_id+'">Remove</button></td></tr>').join('')+'</table>':(d.configured?'<p class="empty">No accounts connected yet.</p>':'<p class="small">Add PLAID_CLIENT_ID, PLAID_SECRET and PLAID_ENV to the worker settings to enable the live feed.</p>'); }
+  $('#plaid').innerHTML=d.items.length?'<table>'+d.items.map(it=>'<tr><td><b>'+esc(it.institution)+'</b><div class="small">'+it.accounts.map(a=>'<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin:2px 0"><span>'+esc(a.name)+(a.mask?' …'+a.mask:'')+'</span><button class="btn'+(a.personal?' done':'')+'" data-acct="'+it.item_id+'/'+a.id+'" data-personal="'+(a.personal?0:1)+'" title="'+(a.personal?'Counted as personal. Click to treat as business.':'Counted as business. Click to keep out of the P&L.')+'">'+(a.personal?'Personal':'Business')+'</button></div>').join('')+'</div>'+(it.status!=='ok'?'<div class="small" style="color:'+(it.status==='pending'?'var(--amber)':'var(--red)')+'">'+esc(it.status==='reconnect'?'Needs reconnecting'+(it.last_error?': '+it.last_error:''):it.last_error||it.status)+'</div>':'')+'</td><td class="num">'+it.balances.map(b=>money(b.available!=null?b.available:b.current)).join('<br>')+'</td><td class="small">'+(it.synced_at?'synced '+new Date(it.synced_at).toLocaleString():'')+'</td><td>'+(it.status==='reconnect'?'<button class="act" data-relink="'+it.item_id+'">Reconnect</button> ':'')+'<button class="act" data-unlink="'+it.item_id+'">Remove</button> <button class="act" data-details="'+it.item_id+'">Details</button></td></tr>').join('')+'</table>':(d.configured?'<p class="empty">No accounts connected yet.</p>':'<p class="small">Add PLAID_CLIENT_ID, PLAID_SECRET and PLAID_ENV to the worker settings to enable the live feed.</p>'); }
 async function linkBank(itemId){ $('#plaidmsg').textContent='Opening…'; const r=await fetch('/api/plaid/link-token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item_id:itemId||null})}); const j=await r.json(); if(!j.ok){ $('#plaidmsg').textContent=j.error||'Could not start'; return; }
   const h=Plaid.create({token:j.link_token,onSuccess:async(public_token,metadata)=>{ $('#plaidmsg').textContent='Connecting…'; if(itemId){ await fetch('/api/plaid/sync',{method:'POST'}); } else { const x=await (await fetch('/api/plaid/exchange',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_token:public_token,metadata:metadata})})).json(); $('#plaidmsg').textContent=x.ok?('Connected '+x.institution+'.'):(x.error||'Failed'); if(x.ok&&x.sync&&x.sync.more){ await pullAll(); return; } } loadPlaid(); load(); },onExit:(err)=>{ $('#plaidmsg').textContent=err?(err.display_message||err.error_message||'Closed'):''; }}); h.open(); }
 $('#plaidlink').onclick=()=>linkBank(null);
@@ -1811,6 +1813,7 @@ async function pullAll(){ const b=$('#plaidsync'); b.disabled=true; let tot={add
   $('#plaidmsg').textContent='Done. Added '+tot.added.toLocaleString()+', changed '+tot.modified+', removed '+tot.removed+(errs.length?'. '+errs.join(' | '):'.'); b.disabled=false; loadPlaid(); load(); }
 $('#plaidsync').onclick=pullAll;
 document.addEventListener('click',async e=>{ const rl=e.target.closest('button[data-relink]'); if(rl) return linkBank(rl.dataset.relink);
+  const dt=e.target.closest('button[data-details]'); if(dt){ dt.disabled=true; const r=await (await fetch('/api/plaid/items/'+dt.dataset.details+'/details')).json(); dt.disabled=false; const w=window.open('','_blank'); if(w){ w.document.write('<pre style="font:13px/1.5 monospace;white-space:pre-wrap;padding:16px">'+JSON.stringify(r,null,2).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</pre>'); w.document.close(); } else alert(JSON.stringify(r,null,2)); return; }
   const ac=e.target.closest('button[data-acct]'); if(ac){ ac.disabled=true; const r=await (await fetch('/api/plaid/items/'+ac.dataset.acct,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({personal:ac.dataset.personal==='1'})})).json(); $('#plaidmsg').textContent=r.ok?((r.personal?'Marked personal. ':'Marked business. ')+r.changed+' transactions re-filed.'):(r.error||'Failed'); loadPlaid(); load(); return; } const ul=e.target.closest('button[data-unlink]'); if(ul&&confirm('Remove this bank connection? Transactions already in the ledger stay.')){ await fetch('/api/plaid/items/'+ul.dataset.unlink,{method:'DELETE'}); loadPlaid(); } });
 loadPlaid();
 load();
@@ -1938,6 +1941,22 @@ async function plaidAccountFlag(env, itemId, accountId, body) {
   }
   if (a.type === "depository") await saveFinSettings(env, { cash_balance_cents: await totalDepository(env) });
   return { ok: true, personal, changed, source };
+}
+// What Plaid itself says about a connection: institution, products, and the current error object. For troubleshooting.
+async function plaidItemDetails(env, itemId) {
+  const it = await env.DB.prepare(`SELECT access_token, institution, status, last_error FROM plaid_items WHERE item_id = ?`).bind(itemId).first();
+  if (!it) return { ok: false, error: "Unknown bank" };
+  const r = await plaid(env, "/item/get", { access_token: it.access_token });
+  if (!r.ok) return { ok: false, institution: it.institution, our_status: it.status, our_error: it.last_error, plaid_error: r.error, plaid_code: r.code };
+  const item = r.data.item || {};
+  const out = { ok: true, institution: it.institution, institution_id: item.institution_id, institution_name: item.institution_name, our_status: it.status, our_error: it.last_error,
+    products: item.products, billed: item.billed_products, consented: item.consented_products, available: item.available_products, consent_expires: item.consent_expiration_time, update_type: item.update_type,
+    error: item.error ? { code: item.error.error_code, type: item.error.error_type, message: item.error.error_message, display: item.error.display_message } : null, status: r.data.status || null };
+  const b = await plaid(env, "/accounts/get", { access_token: it.access_token });
+  out.accounts_call = b.ok ? { ok: true, accounts: (b.data.accounts || []).map((a) => ({ name: a.name, mask: a.mask, type: a.type, subtype: a.subtype })) } : { ok: false, error: b.error, code: b.code };
+  const t = await plaid(env, "/transactions/sync", { access_token: it.access_token, cursor: "", count: 1 });
+  out.transactions_call = t.ok ? { ok: true, has_more: !!t.data.has_more, sample: (t.data.added || []).length } : { ok: false, error: t.error, code: t.code };
+  return out;
 }
 async function plaidRemove(env, itemId) {
   const it = await env.DB.prepare(`SELECT access_token FROM plaid_items WHERE item_id = ?`).bind(itemId).first();
