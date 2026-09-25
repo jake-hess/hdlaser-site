@@ -46,6 +46,9 @@ input[type=range]{width:100%;accent-color:#F2B63D;height:28px}
 .toggle{display:inline-flex;background:#2A3038;border-radius:999px;padding:4px;gap:4px;margin:4px 0 16px}
 .toggle button{background:transparent;border:0;color:#D5DADF;font:inherit;font-weight:700;padding:8px 16px;border-radius:999px;cursor:pointer;min-height:40px}
 .toggle button[aria-pressed="true"]{background:#F3F4F6;color:var(--ink)}
+.toggle.stages{flex-wrap:wrap;border-radius:16px}
+.toggle.stages button{font-size:14px;padding:8px 12px}
+.toggle button:disabled{opacity:.45;cursor:default}
 .tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .tile{background:#232930;border-radius:14px;padding:14px 16px}
 .tile .l{font-size:12px;letter-spacing:1.6px;text-transform:uppercase;color:#B7BEC6;font-weight:700}
@@ -76,7 +79,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
 .col li{margin:0 0 8px}
 .dot{width:12px;height:12px;border-radius:50%;display:inline-block}
 .phase{display:grid;grid-template-columns:52px 1fr;gap:14px;align-items:start;margin-bottom:14px}
-.phase .num{width:52px;height:52px;border-radius:26px;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:22px;font-weight:800}
+.phase .num{width:52px;height:52px;border-radius:26px;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:17px;font-weight:800;letter-spacing:-.5px}
 .phase .num.blue{background:var(--hugh)} .phase .num.gold{background:#C9A227;color:var(--ink)}
 .phase p{margin:0;color:#3F454C}
 .quote{background:var(--card);border-left:4px solid var(--gold);border-radius:12px;padding:16px 20px;margin:16px 0 0}
@@ -118,7 +121,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
     <div class="cards">
       <div class="card hugh"><div class="n">$180k</div><h3>Your baseline is protected</h3><p>The first $180,000 of revenue every year is yours, entirely. Jake earns nothing on it. That number is what you are finishing this year at, so day one of the deal changes nothing about your income.</p></div>
       <div class="card jake"><div class="n">30%</div><h3>Jake is paid on growth only</h3><p>On revenue above the baseline, Jake earns 30% of the net profit. You keep the other 70%. If the growth doesn&rsquo;t come, Jake earned nothing and you lost nothing.</p></div>
-      <div class="card gold"><div class="n">15%</div><h3>It steps down as the company matures</h3><p>Once revenue holds above $1,000,000 and Jake has stepped out of daily operations, his share drops to 15%, making room for the people who run it. If revenue falls back under $1M, Jake steps back in and the 30% returns until it&rsquo;s rebuilt.</p></div>
+      <div class="card gold"><div class="n">30 &rarr; 15%</div><h3>It steps down in four stages</h3><p>Once revenue holds above $1,000,000, Jake&rsquo;s share steps down as he hands off: 25% when the $1M holds, 20% when a manager runs the floor, 15% when Jake has stepped out and a team runs it. If revenue falls back under $1M, Jake steps back in and the 30% returns until it&rsquo;s rebuilt.</p></div>
     </div>
   </section>
 
@@ -144,12 +147,14 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
             <p class="mini">Proposed at this year&rsquo;s finish. Reset each year by agreement.</p>
           </div>
           <div class="ctrl">
-            <label>Jake&rsquo;s role at this size</label>
-            <div class="toggle" role="group" aria-label="Jake's role">
-              <button type="button" id="op" aria-pressed="true">Operating &middot; 30%</button>
-              <button type="button" id="out" aria-pressed="false">Stepped out &middot; 15%</button>
+            <label>Stage of the hand-off</label>
+            <div class="toggle stages" role="group" aria-label="Stage of the hand-off">
+              <button type="button" data-stage="0" aria-pressed="true">Build &middot; 30%</button>
+              <button type="button" data-stage="1" aria-pressed="false">$1M holds &middot; 25%</button>
+              <button type="button" data-stage="2" aria-pressed="false">Manager runs floor &middot; 20%</button>
+              <button type="button" data-stage="3" aria-pressed="false">Stepped out &middot; 15%</button>
             </div>
-            <p class="mini" id="rolenote">Stepping out is only available once revenue holds above $1,000,000.</p>
+            <p class="mini" id="rolenote">The later stages unlock once revenue holds above $1,000,000.</p>
           </div>
         </div>
         <div>
@@ -172,7 +177,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
 
   <section>
     <h2>The same math at every size</h2>
-    <p class="sub">At the margin set above. The baseline profit is on top of all of this and is yours in every row.</p>
+    <p class="sub">At the margin and hand-off stage set above. Rows under $1M always use 30%. The baseline profit is on top of all of this and is yours in every row.</p>
     <div class="tablecard">
       <table id="scen">
         <thead><tr><th>Revenue</th><th>Growth</th><th>Growth profit</th><th>Jake&rsquo;s share</th><th>Hugh&rsquo;s extra</th><th>Hugh gets, per $1 to Jake</th></tr></thead>
@@ -213,10 +218,13 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
   </section>
 
   <section>
-    <h2>How the company grows up, in three phases</h2>
-    <div class="phase"><div class="num">1</div><div><h3>Build (now to $1M)</h3><p>Jake runs growth: sales, marketing, systems, the website and dashboards you already have, hiring the first people who can quote and produce without you. You keep 100% of the baseline and 70% of the growth profit. Jake earns 30% of the growth profit.</p></div></div>
-    <div class="phase"><div class="num blue">2</div><div><h3>Run (above $1M, held for two quarters)</h3><p>The shop runs on managers, checklists and the dashboards. Jake steps out of daily operations. His share drops to 15%. The difference makes room for the people who run it day to day, who will need a stake or a bonus pool to stay. You are now an owner, not the operator.</p></div></div>
-    <div class="phase"><div class="num gold">3</div><div><h3>Rebuild, if needed</h3><p>If revenue falls back under $1M after Jake has stepped out, he comes back in, the share returns to 30%, and it stays there until the shop is back above $1M for two quarters. You are never left holding a bigger company alone.</p></div></div>
+    <h2>How the company grows up, one stage at a time</h2>
+    <p class="sub">Each stage is a milestone you can see on the dashboards, not a date on a calendar. Jake&rsquo;s share only steps down when the milestone is real.</p>
+    <div class="phase"><div class="num">30%</div><div><h3>Build (now to $1M)</h3><p>Jake runs growth: sales, marketing, systems, the website and dashboards you already have, hiring the first people who can quote and produce without you. You keep 100% of the baseline and 70% of the growth profit.</p></div></div>
+    <div class="phase"><div class="num blue">25%</div><div><h3>Hold ($1M held for two quarters)</h3><p>Revenue has stayed above $1M for two quarters in a row. Jake still runs growth, but the first step-down happens here because the shop has proven it can carry the size. You keep 75% of the growth profit.</p></div></div>
+    <div class="phase"><div class="num blue">20%</div><div><h3>Hand off (a manager runs the floor)</h3><p>A floor manager owns the daily open, the queue and the close, using the checklists and the staff portal. Jake is out of daily operations and leads only sales and marketing. Part of the step-down funds the manager. You keep 80%.</p></div></div>
+    <div class="phase"><div class="num blue">15%</div><div><h3>Run (Jake stepped out)</h3><p>A small team runs it and the dashboards have stayed green for two quarters without Jake in the building. His share settles at 15%. The rest of the room he gave up goes to the people who run it, who will need a stake or a bonus pool to stay. You are an owner now, not the operator, and you keep 85%.</p></div></div>
+    <div class="phase"><div class="num gold">&#8635;</div><div><h3>Rebuild, if needed</h3><p>If revenue falls back under $1M at any stage, Jake comes back in, the share returns to 30%, and it stays there until the shop is back above $1M for two quarters. Then the ladder starts again from 25%. You are never left holding a bigger company alone.</p></div></div>
   </section>
 
   <section>
@@ -238,7 +246,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
       <div class="col"><h3><span class="dot" style="background:var(--hugh)"></span>What protects Hugh</h3><ul>
         <li>The baseline. Your current income is never in the split.</li>
         <li>No fixed cost. Jake is not a salary. No growth, no check.</li>
-        <li>You keep 70 cents of every new profit dollar, then 85 cents once he steps out.</li>
+        <li>You keep 70 cents of every new profit dollar, rising to 75, 80 and 85 cents as Jake steps down.</li>
         <li>One set of books. Both of you read the same money page, the same P&amp;L, the same ledger. Nothing is calculated in someone&rsquo;s head.</li>
         <li>The shop stays yours. This is a share of profit, not a share of the company.</li>
         <li>Either of you can end it with 60 days&rsquo; notice. Jake&rsquo;s share applies only to revenue booked before the end date.</li>
@@ -246,8 +254,8 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
       <div class="col"><h3><span class="dot" style="background:var(--jake)"></span>What protects Jake</h3><ul>
         <li>The definition of net profit is written down: revenue, minus cost of goods, minus operating costs, before owner draws and before Jake&rsquo;s share. Agreed once, checked by a CPA.</li>
         <li>Monthly statement, quarterly settlement, from the money page.</li>
-        <li>The 30% holds until Phase 2 is real: above $1M for two quarters, with managers in place.</li>
-        <li>If Phase 2 slips, Phase 1 comes back. Jake&rsquo;s time is protected the same way your baseline is.</li>
+        <li>Each step-down happens only when its milestone is real and visible on the dashboards: $1M held two quarters, a manager running the floor, a team running it without him.</li>
+        <li>If revenue slips under $1M, the 30% comes back. Jake&rsquo;s time is protected the same way your baseline is.</li>
         <li>Growth spend (ads, hires, tools) is agreed before it&rsquo;s spent and comes out before profit is split, so nobody is paid on money that was reinvested.</li>
       </ul></div>
     </div>
@@ -261,8 +269,8 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
         <li><b>What happens to the baseline next year?</b> Proposal: reset it each January to the prior year&rsquo;s revenue, so Jake is always paid on new growth, never twice on the same growth.</li>
         <li><b>What if a big customer leaves?</b> The split is on actual profit, so a bad year pays Jake less automatically. Nothing is owed on a forecast.</li>
         <li><b>Who decides on spending?</b> Anything over an agreed amount needs both of you. It comes off the top before the split.</li>
-        <li><b>What does &ldquo;stepped out&rdquo; mean in writing?</b> Jake no longer in day-to-day operations, a manager running the floor, dashboards green for two quarters.</li>
-        <li><b>What about the people who run it later?</b> Phase 2 sets aside part of the profit for managers. That comes from Jake&rsquo;s step-down first, not from your baseline.</li>
+        <li><b>What does each milestone mean in writing?</b> $1M held: two consecutive quarters above $250,000. Manager runs the floor: a named person owns open, queue and close for a full quarter. Stepped out: Jake not in daily operations and dashboards green for two quarters.</li>
+        <li><b>What about the people who run it later?</b> The 20% and 15% stages set aside part of the profit for the manager and the team. That comes from Jake&rsquo;s step-down first, not from your baseline.</li>
       </ul>
     </div>
   </section>
@@ -286,16 +294,20 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
   var $=function(id){return document.getElementById(id);};
   var money=function(n){return '$'+Math.round(n).toLocaleString('en-US');};
   var short=function(n){return n>=1e6?'$'+(n/1e6).toFixed(2).replace(/\.?0+$/,'')+'M':money(n);};
-  var out=false;
+  var STAGES=[0.30,0.25,0.20,0.15];
+  var NOTES=['Build: Jake runs growth and operations alongside you. 30% of the growth profit.',
+    'Revenue has held above $1M for two quarters. Jake still runs growth. 25%.',
+    'A manager runs the floor; Jake is out of daily operations but still leads sales and marketing. 20%.',
+    'Jake has stepped out; a team runs it and the dashboards have stayed green for two quarters. 15%.'];
+  var stage=0;
+  var stageBtns=Array.prototype.slice.call(document.querySelectorAll('.stages button'));
   function calc(){
     var rev=+$('rev').value, m=+$('margin').value/100, base=+$('base').value;
     var canOut=rev>=1000000;
-    if(!canOut) out=false;
-    $('out').disabled=!canOut;
-    $('out').style.opacity=canOut?'1':'.45';
-    $('op').setAttribute('aria-pressed',String(!out)); $('out').setAttribute('aria-pressed',String(out));
-    $('rolenote').textContent=canOut?(out?'Jake stepped out: managers run the floor, his share is 15%.':'Above $1M. Jake can step out and drop to 15% once it holds for two quarters.'):'Stepping out is only available once revenue holds above $1,000,000.';
-    var share=out?0.15:0.30;
+    if(!canOut) stage=0;
+    stageBtns.forEach(function(b){ var i=+b.dataset.stage; b.disabled=(i>0&&!canOut); b.setAttribute('aria-pressed',String(i===stage)); });
+    $('rolenote').textContent=canOut?NOTES[stage]:'The later stages unlock once revenue holds above $1,000,000. Under $1M the share is always 30%.';
+    var share=STAGES[stage];
     var growth=Math.max(0,rev-base), np=growth*m, jake=np*share, hugh=np-jake;
     $('v-rev').textContent=money(rev); $('v-margin').textContent=Math.round(m*100)+'%'; $('v-base').textContent=money(base);
     $('o-growth').textContent=money(growth);
@@ -313,8 +325,8 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
     // scenario table
     var rows=[180000,300000,500000,750000,1000000,1500000,2000000], tb=$('scen').querySelector('tbody'), html='';
     rows.forEach(function(r){
-      var s=r>=1000000&&out?0.15:0.30; var g=Math.max(0,r-base), p=g*m, j=p*s, h=p-j;
-      html+='<tr><td>'+short(r)+'</td><td>'+money(g)+'</td><td>'+money(p)+'</td><td class="j">'+money(j)+(r>=1000000?' <span style="font-weight:400;color:var(--muted)">('+Math.round(s*100)+'%)</span>':'')+'</td><td class="h">'+money(h)+'</td><td>$'+((1-s)/s).toFixed(2)+'</td></tr>';
+      var s=r>=1000000?STAGES[stage]:0.30; var g=Math.max(0,r-base), p=g*m, j=p*s, h=p-j;
+      html+='<tr><td>'+short(r)+'</td><td>'+money(g)+'</td><td>'+money(p)+'</td><td class="j">'+money(j)+' <span style="font-weight:400;color:var(--muted)">('+Math.round(s*100)+'%)</span></td><td class="h">'+money(h)+'</td><td>$'+((1-s)/s).toFixed(2)+'</td></tr>';
     });
     tb.innerHTML=html;
     // $100k target
@@ -330,8 +342,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
   }
   ['rev','margin','base'].forEach(function(i){ $(i).addEventListener('input',calc); });
   $('fixed').addEventListener('input',ga);
-  $('op').addEventListener('click',function(){ out=false; calc(); });
-  $('out').addEventListener('click',function(){ if(+$('rev').value>=1000000){ out=true; calc(); } });
+  stageBtns.forEach(function(b){ b.addEventListener('click',function(){ var i=+b.dataset.stage; if(i===0||+$('rev').value>=1000000){ stage=i; calc(); } }); });
   // tooltips on the bars
   var tip=$('tip'), chart=document.querySelector('.chart');
   chart.addEventListener('mousemove',function(e){ var s=e.target.closest('.seg'); if(!s||!s.dataset.tip){ tip.style.display='none'; return; } var r=chart.getBoundingClientRect(); tip.textContent=s.dataset.tip; tip.style.display='block'; tip.style.left=(e.clientX-r.left+12)+'px'; tip.style.top=(e.clientY-r.top-34)+'px'; });
