@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>The growth deal, in plain numbers &middot; For Hugh</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Figtree:wght@400;500;700;800&display=swap">
+<style>
+:root{--cream:#F6F4EF;--ink:#15191E;--muted:#545B63;--copper:#A32C21;--red:#C8372A;--gold:#F2B63D;--ocean:#2B5F8A;--line:#E4E0D8;--card:#FFFFFF;--green:#2F6B4F;--hugh:#1F6FB2;--jake:#C8372A;--sand:#EDE8DF}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--cream);color:var(--ink);font-family:Figtree,"Helvetica Neue",Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%;line-height:1.5}
+a{color:var(--copper)}
+:focus-visible{outline:3px solid var(--copper);outline-offset:3px}
+.wrap{max-width:860px;margin:0 auto;padding:20px 20px 56px}
+.serif,h1,h2,h3{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--ink);padding-bottom:12px;margin-bottom:26px}
+header .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-weight:800;letter-spacing:2px;font-size:16px}
+header .tag{font-size:14px;color:var(--muted)}
+.kicker{font-weight:800;color:var(--ocean);font-size:17px;margin:0;font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif}
+h1{font-size:clamp(34px,6.5vw,54px);line-height:1.03;margin:6px 0 14px;font-weight:800;letter-spacing:-.5px}
+h1 em{font-style:normal;color:var(--red)}
+.lede{font-size:18px;line-height:1.55;color:#3F454C;margin:0 0 12px;max-width:44em}
+section{margin-top:40px}
+h2{font-size:clamp(24px,4.4vw,34px);line-height:1.15;margin:0 0 8px;font-weight:800}
+h3{font-size:19px;margin:0 0 6px;font-weight:800}
+.sub{color:var(--muted);margin:0 0 20px;font-size:16px;max-width:46em}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+.card .n{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:34px;font-weight:800;line-height:1;margin-bottom:6px}
+.card p{margin:0;color:#3F454C;font-size:15px}
+.card.hugh .n{color:var(--hugh)} .card.jake .n{color:var(--jake)} .card.gold .n{color:#9A7A2C}
+
+/* calculator */
+.calc{background:var(--ink);color:#F3F4F6;border-radius:20px;padding:26px}
+.calc h2{color:#fff}
+.calc .sub{color:#C9CFD6}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:start}
+.ctrl{margin-bottom:16px}
+.ctrl label{display:flex;justify-content:space-between;align-items:baseline;font-size:15px;font-weight:700;gap:10px;margin-bottom:6px}
+.ctrl .val{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:20px;color:var(--gold);white-space:nowrap}
+input[type=range]{width:100%;accent-color:#F2B63D;height:28px}
+.mini{font-size:13px;color:#B7BEC6;margin:-2px 0 0;line-height:1.4}
+.toggle{display:inline-flex;background:#2A3038;border-radius:999px;padding:4px;gap:4px;margin:4px 0 16px}
+.toggle button{background:transparent;border:0;color:#D5DADF;font:inherit;font-weight:700;padding:8px 16px;border-radius:999px;cursor:pointer;min-height:40px}
+.toggle button[aria-pressed="true"]{background:#F3F4F6;color:var(--ink)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tile{background:#232930;border-radius:14px;padding:14px 16px}
+.tile .l{font-size:12px;letter-spacing:1.6px;text-transform:uppercase;color:#B7BEC6;font-weight:700}
+.tile .v{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:30px;font-weight:800;line-height:1.1;margin-top:4px;font-variant-numeric:tabular-nums}
+.tile.hugh .v{color:#8FC1F0} .tile.jake .v{color:#F29B90} .tile.gold .v{color:var(--gold)}
+.tile .s{font-size:13px;color:#B7BEC6;margin-top:4px}
+.chart{margin-top:16px}
+.chart .row{display:grid;grid-template-columns:118px 1fr;gap:10px;align-items:center;margin:10px 0}
+.chart .lab{font-size:14px;font-weight:700;color:#E7EAEE}
+.bar{position:relative;height:30px;background:#2A3038;border-radius:6px;overflow:hidden;display:flex;gap:2px}
+.seg{height:100%;transition:width .25s ease}
+.seg.h{background:var(--hugh)} .seg.j{background:var(--jake)} .seg.b{background:#6B7480}
+.seg span{position:absolute;top:0;line-height:30px;font-size:13px;font-weight:700;color:#fff;padding:0 8px;white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:8px;font-size:13px;color:#C9CFD6}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.tip{position:absolute;z-index:5;background:#fff;color:var(--ink);font-size:13px;padding:6px 10px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.25);pointer-events:none;display:none;white-space:nowrap}
+
+table{width:100%;border-collapse:collapse;font-size:15px;background:var(--card)}
+th,td{text-align:right;padding:10px 12px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left}
+thead th{background:var(--sand);font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted)}
+td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
+.tablecard{border:1px solid var(--line);border-radius:14px;overflow:auto}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.col{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 22px}
+.col h3{display:flex;align-items:center;gap:8px}
+.col ul{margin:8px 0 0 18px;padding:0;color:#3F454C}
+.col li{margin:0 0 8px}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+.phase{display:grid;grid-template-columns:52px 1fr;gap:14px;align-items:start;margin-bottom:14px}
+.phase .num{width:52px;height:52px;border-radius:26px;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:22px;font-weight:800}
+.phase .num.blue{background:var(--hugh)} .phase .num.gold{background:#C9A227;color:var(--ink)}
+.phase p{margin:0;color:#3F454C}
+.quote{background:var(--card);border-left:4px solid var(--gold);border-radius:12px;padding:16px 20px;margin:16px 0 0}
+.quote p{margin:0;font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:19px;font-weight:600;line-height:1.4}
+.cta{background:var(--sand);border-radius:20px;padding:28px;text-align:center}
+.btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:12px 22px;border-radius:999px;font-weight:700;text-decoration:none;font-size:16px;border:0;cursor:pointer;font-family:inherit}
+.btn.primary{background:var(--red);color:#fff}
+.btn.ghost{border:2px solid var(--ink);color:var(--ink);background:transparent}
+.foot{font-size:12px;color:var(--muted);margin-top:28px;line-height:1.5;text-align:center}
+@media (max-width:760px){
+  .cards,.grid,.tiles,.two{grid-template-columns:1fr}
+  .calc{padding:20px}
+  .toggle button{padding:8px 12px;font-size:14px;white-space:nowrap}
+  .chart .row{grid-template-columns:1fr;gap:4px}
+}
+@media print{
+  body{background:#fff}
+  .calc{background:#fff;color:#000;border:1px solid #999}
+  .calc .sub,.mini,.tile .l,.tile .s,.legend{color:#333}
+  .tile{background:#f4f4f4} .tile .v{color:#000!important}
+  .btns,.toggle{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="https://hdlaser.net" aria-label="HD Laser Studio home"><svg width="78" height="26" viewBox="220 115 1930 640" aria-hidden="true"><path fill="#C8372A" d="M510 125 L730 125 L636 371 L963 371 L1072 125 L2000 125 C2100 125 2160 210 2130 300 L2010 610 C1970 700 1880 742 1790 742 L1115 742 L1283 341 L1525 341 L1425 595 L1800 595 L1938 272 L1222 272 L1030 742 L808 742 L907 523 L572 523 L483 742 L232 742 Z"></path></svg><span>LASER STUDIO</span></a>
+    <div class="tag">A proposal from Jake &middot; private</div>
+  </header>
+
+  <p class="kicker">Hugh, in plain numbers</p>
+  <h1>Your best year in a decade stays yours. <em>The deal is about the dollars that don&rsquo;t exist yet.</em></h1>
+  <p class="lede">You built HD Laser to about $180,000 this year, the strongest it has been in ten years. Nothing about that is on the table. This page shows what Jake is proposing, what it would pay each of you at different sizes, and what changes as the company grows up. Move the sliders. Every number updates.</p>
+
+  <section>
+    <h2>Three rules, and that&rsquo;s the whole deal</h2>
+    <div class="cards">
+      <div class="card hugh"><div class="n">$180k</div><h3>Your baseline is protected</h3><p>The first $180,000 of revenue every year is yours, entirely. Jake earns nothing on it. That number is what you are finishing this year at, so day one of the deal changes nothing about your income.</p></div>
+      <div class="card jake"><div class="n">30%</div><h3>Jake is paid on growth only</h3><p>On revenue above the baseline, Jake earns 30% of the net profit. You keep the other 70%. If the growth doesn&rsquo;t come, Jake earned nothing and you lost nothing.</p></div>
+      <div class="card gold"><div class="n">15%</div><h3>It steps down as the company matures</h3><p>Once revenue holds above $1,000,000 and Jake has stepped out of daily operations, his share drops to 15%, making room for the people who run it. If revenue falls back under $1M, Jake steps back in and the 30% returns until it&rsquo;s rebuilt.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="calc" id="calc">
+      <h2>What it pays each of you</h2>
+      <p class="sub">Set the size you think HD Laser can reach and the margin on the growth. Your baseline profit is untouched and not shown here; this is only the split of what&rsquo;s new.</p>
+      <div class="grid">
+        <div>
+          <div class="ctrl">
+            <label for="rev">Annual revenue <span class="val" id="v-rev">$500,000</span></label>
+            <input type="range" id="rev" min="180000" max="2000000" step="10000" value="500000">
+            <p class="mini">This year: about $180,000.</p>
+          </div>
+          <div class="ctrl">
+            <label for="margin">Net margin on the growth <span class="val" id="v-margin">30%</span></label>
+            <input type="range" id="margin" min="10" max="50" step="1" value="30">
+            <p class="mini">Growth dollars carry a higher margin than today&rsquo;s blended margin, because rent, insurance and software are already paid for by the baseline. See &ldquo;How overhead thins out&rdquo; below.</p>
+          </div>
+          <div class="ctrl">
+            <label for="base">Protected baseline <span class="val" id="v-base">$180,000</span></label>
+            <input type="range" id="base" min="120000" max="300000" step="5000" value="180000">
+            <p class="mini">Proposed at this year&rsquo;s finish. Reset each year by agreement.</p>
+          </div>
+          <div class="ctrl">
+            <label>Jake&rsquo;s role at this size</label>
+            <div class="toggle" role="group" aria-label="Jake's role">
+              <button type="button" id="op" aria-pressed="true">Operating &middot; 30%</button>
+              <button type="button" id="out" aria-pressed="false">Stepped out &middot; 15%</button>
+            </div>
+            <p class="mini" id="rolenote">Stepping out is only available once revenue holds above $1,000,000.</p>
+          </div>
+        </div>
+        <div>
+          <div class="tiles">
+            <div class="tile"><div class="l">Growth revenue</div><div class="v" id="o-growth">$320,000</div><div class="s">above the baseline</div></div>
+            <div class="tile"><div class="l">Net profit on growth</div><div class="v" id="o-np">$96,000</div><div class="s" id="o-npnote">at 30% margin</div></div>
+            <div class="tile hugh"><div class="l">Hugh keeps</div><div class="v" id="o-hugh">$67,200</div><div class="s" id="o-hughnote">70% of the growth profit, plus all of the baseline</div></div>
+            <div class="tile jake"><div class="l">Jake earns</div><div class="v" id="o-jake">$28,800</div><div class="s" id="o-jakenote">30% of the growth profit, nothing on the baseline</div></div>
+          </div>
+          <div class="chart" aria-label="How the growth profit splits">
+            <div class="row"><div class="lab">Growth profit</div><div class="bar" id="bar1"><div class="seg h" id="seg-h"><span id="seg-h-l"></span></div><div class="seg j" id="seg-j"><span id="seg-j-l"></span></div></div></div>
+            <div class="row"><div class="lab">Every $1 to Jake</div><div class="bar" id="bar2"><div class="seg h" id="seg-r"><span id="seg-r-l"></span></div><div class="seg j" id="seg-r2"><span>$1.00</span></div></div></div>
+            <div class="legend"><span><i style="background:var(--hugh)"></i>Hugh</span><span><i style="background:var(--jake)"></i>Jake</span></div>
+            <div class="tip" id="tip"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The same math at every size</h2>
+    <p class="sub">At the margin set above. The baseline profit is on top of all of this and is yours in every row.</p>
+    <div class="tablecard">
+      <table id="scen">
+        <thead><tr><th>Revenue</th><th>Growth</th><th>Growth profit</th><th>Jake&rsquo;s share</th><th>Hugh&rsquo;s extra</th><th>Hugh gets, per $1 to Jake</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>What it would take for Jake to earn $100,000</h2>
+    <p class="sub">Jake&rsquo;s own target for the rest of 2026. It is worth seeing what has to be true for it, because the same numbers say what you would take home.</p>
+    <div class="cards">
+      <div class="card jake"><div class="n" id="t-jake">$100,000</div><h3>Jake&rsquo;s cut</h3><p>at 30% of the growth profit</p></div>
+      <div class="card hugh"><div class="n" id="t-hugh">$233,333</div><h3>Your extra profit</h3><p>the 70% that comes with it, on top of your baseline</p></div>
+      <div class="card gold"><div class="n" id="t-rev">$1.29M</div><h3>Revenue it needs</h3><p id="t-revnote">baseline plus $1.11M of growth at a 30% margin</p></div>
+    </div>
+    <p class="sub" style="margin-top:14px">If that sounds far from a $180,000 shop, it is. That gap is the point: Jake gets paid only if he closes it, and you are ahead by more than twice his check if he does.</p>
+  </section>
+
+  <section>
+    <h2>Owner and operator are two different jobs</h2>
+    <p class="sub">Right now you are both. The plan is to make HD Laser run without either of us standing at the machine.</p>
+    <div class="two">
+      <div class="col"><h3><span class="dot" style="background:var(--hugh)"></span>The operator</h3><ul>
+        <li>Works <b>in</b> the business: quotes, cuts, engraves, opens the door, answers the phone.</li>
+        <li>Income stops the day they stop. A vacation costs a week of revenue.</li>
+        <li>Judged by how hard they worked this week.</li>
+        <li>This is what you have been for ten years, and it is why the shop survived.</li>
+      </ul></div>
+      <div class="col"><h3><span class="dot" style="background:#C9A227"></span>The owner</h3><ul>
+        <li>Works <b>on</b> the business: systems, people, brand, pricing, where the next thousand customers come from.</li>
+        <li>Income continues whether or not they are in the room, because other people and systems do the operating.</li>
+        <li>Judged by what the business is worth and what it earns without them.</li>
+        <li>This is where the deal is trying to put you, with the shop still yours.</li>
+      </ul></div>
+    </div>
+    <div class="quote"><p>Letting go of operating is not letting go of owning. It is the only way ownership starts to pay.</p></div>
+  </section>
+
+  <section>
+    <h2>How the company grows up, in three phases</h2>
+    <div class="phase"><div class="num">1</div><div><h3>Build (now to $1M)</h3><p>Jake runs growth: sales, marketing, systems, the website and dashboards you already have, hiring the first people who can quote and produce without you. You keep 100% of the baseline and 70% of the growth profit. Jake earns 30% of the growth profit.</p></div></div>
+    <div class="phase"><div class="num blue">2</div><div><h3>Run (above $1M, held for two quarters)</h3><p>The shop runs on managers, checklists and the dashboards. Jake steps out of daily operations. His share drops to 15%. The difference makes room for the people who run it day to day, who will need a stake or a bonus pool to stay. You are now an owner, not the operator.</p></div></div>
+    <div class="phase"><div class="num gold">3</div><div><h3>Rebuild, if needed</h3><p>If revenue falls back under $1M after Jake has stepped out, he comes back in, the share returns to 30%, and it stays there until the shop is back above $1M for two quarters. You are never left holding a bigger company alone.</p></div></div>
+  </section>
+
+  <section>
+    <h2>How overhead thins out as revenue grows</h2>
+    <p class="sub">The fixed costs of running the shop are roughly the same at $180,000 as at $500,000. They just become a smaller slice. This is why growth dollars are worth more than today&rsquo;s dollars, and why the margin slider above sits higher than your current blended margin.</p>
+    <div class="ctrl" style="max-width:420px">
+      <label for="fixed" style="display:flex;justify-content:space-between;font-weight:700">Fixed overhead per year <span class="val" id="v-fixed" style="font-family:'Bricolage Grotesque',sans-serif;font-size:20px;color:#9A7A2C">$90,000</span></label>
+      <input type="range" id="fixed" min="40000" max="200000" step="5000" value="90000" style="accent-color:#C9A227">
+      <p class="mini" style="color:var(--muted)">Rent, insurance, software, utilities, the things that don&rsquo;t change when you sell one more cup. Set it to your real number.</p>
+    </div>
+    <div class="tablecard" style="margin-top:12px">
+      <table id="ga"><thead><tr><th>Revenue</th><th>Fixed overhead</th><th>Overhead as a share of revenue</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <section>
+    <h2>What protects each of you</h2>
+    <div class="two">
+      <div class="col"><h3><span class="dot" style="background:var(--hugh)"></span>What protects Hugh</h3><ul>
+        <li>The baseline. Your current income is never in the split.</li>
+        <li>No fixed cost. Jake is not a salary. No growth, no check.</li>
+        <li>You keep 70 cents of every new profit dollar, then 85 cents once he steps out.</li>
+        <li>One set of books. Both of you read the same money page, the same P&amp;L, the same ledger. Nothing is calculated in someone&rsquo;s head.</li>
+        <li>The shop stays yours. This is a share of profit, not a share of the company.</li>
+        <li>Either of you can end it with 60 days&rsquo; notice. Jake&rsquo;s share applies only to revenue booked before the end date.</li>
+      </ul></div>
+      <div class="col"><h3><span class="dot" style="background:var(--jake)"></span>What protects Jake</h3><ul>
+        <li>The definition of net profit is written down: revenue, minus cost of goods, minus operating costs, before owner draws and before Jake&rsquo;s share. Agreed once, checked by a CPA.</li>
+        <li>Monthly statement, quarterly settlement, from the money page.</li>
+        <li>The 30% holds until Phase 2 is real: above $1M for two quarters, with managers in place.</li>
+        <li>If Phase 2 slips, Phase 1 comes back. Jake&rsquo;s time is protected the same way your baseline is.</li>
+        <li>Growth spend (ads, hires, tools) is agreed before it&rsquo;s spent and comes out before profit is split, so nobody is paid on money that was reinvested.</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Questions worth asking before you say yes</h2>
+    <div class="col">
+      <ul>
+        <li><b>What exactly counts as net profit?</b> Write the formula on one line and have your CPA initial it.</li>
+        <li><b>What happens to the baseline next year?</b> Proposal: reset it each January to the prior year&rsquo;s revenue, so Jake is always paid on new growth, never twice on the same growth.</li>
+        <li><b>What if a big customer leaves?</b> The split is on actual profit, so a bad year pays Jake less automatically. Nothing is owed on a forecast.</li>
+        <li><b>Who decides on spending?</b> Anything over an agreed amount needs both of you. It comes off the top before the split.</li>
+        <li><b>What does &ldquo;stepped out&rdquo; mean in writing?</b> Jake no longer in day-to-day operations, a manager running the floor, dashboards green for two quarters.</li>
+        <li><b>What about the people who run it later?</b> Phase 2 sets aside part of the profit for managers. That comes from Jake&rsquo;s step-down first, not from your baseline.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="cta">
+      <h2>Next step: one page, one CPA, one signature.</h2>
+      <p class="sub" style="margin:8px auto 0;max-width:36em">Take your time with this. When the numbers feel right, we write them on a single page, your CPA reads it, and we start on Monday.</p>
+      <div class="btns">
+        <button class="btn primary" type="button" onclick="window.print()">Save as PDF</button>
+        <a class="btn ghost" href="https://hdlaser-checkout.yellow-smoke-9c0e.workers.dev/admin/money" rel="nofollow">Open the money page</a>
+      </div>
+    </div>
+  </section>
+
+  <p class="foot">Private page for Hugh Demiral. Not linked anywhere or listed in search. Figures are illustrations of how the split works, not a forecast or a promise of income. Nothing here is legal or tax advice; have a CPA read the final page.</p>
+</div>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  var money=function(n){return '$'+Math.round(n).toLocaleString('en-US');};
+  var short=function(n){return n>=1e6?'$'+(n/1e6).toFixed(2).replace(/\.?0+$/,'')+'M':money(n);};
+  var out=false;
+  function calc(){
+    var rev=+$('rev').value, m=+$('margin').value/100, base=+$('base').value;
+    var canOut=rev>=1000000;
+    if(!canOut) out=false;
+    $('out').disabled=!canOut;
+    $('out').style.opacity=canOut?'1':'.45';
+    $('op').setAttribute('aria-pressed',String(!out)); $('out').setAttribute('aria-pressed',String(out));
+    $('rolenote').textContent=canOut?(out?'Jake stepped out: managers run the floor, his share is 15%.':'Above $1M. Jake can step out and drop to 15% once it holds for two quarters.'):'Stepping out is only available once revenue holds above $1,000,000.';
+    var share=out?0.15:0.30;
+    var growth=Math.max(0,rev-base), np=growth*m, jake=np*share, hugh=np-jake;
+    $('v-rev').textContent=money(rev); $('v-margin').textContent=Math.round(m*100)+'%'; $('v-base').textContent=money(base);
+    $('o-growth').textContent=money(growth);
+    $('o-np').textContent=money(np); $('o-npnote').textContent='at '+Math.round(m*100)+'% margin';
+    $('o-hugh').textContent=money(hugh); $('o-hughnote').textContent=Math.round((1-share)*100)+'% of the growth profit, plus all of the baseline';
+    $('o-jake').textContent=money(jake); $('o-jakenote').textContent=Math.round(share*100)+'% of the growth profit, nothing on the baseline';
+    var hp=np>0?(hugh/np*100):100, jp=np>0?(jake/np*100):0;
+    $('seg-h').style.width='calc('+hp+'% - 1px)'; $('seg-j').style.width='calc('+jp+'% - 1px)';
+    $('seg-h-l').textContent=np>0?money(hugh):'no growth yet'; $('seg-j-l').textContent=np>0?money(jake):'';
+    var ratio=(1-share)/share; var tot=ratio+1;
+    $('seg-r').style.width='calc('+(ratio/tot*100)+'% - 1px)'; $('seg-r2').style.width='calc('+(1/tot*100)+'% - 1px)';
+    $('seg-r-l').textContent='$'+ratio.toFixed(2)+' to Hugh';
+    $('seg-h').dataset.tip='Hugh: '+money(hugh)+' ('+Math.round(hp)+'%)'; $('seg-j').dataset.tip='Jake: '+money(jake)+' ('+Math.round(jp)+'%)';
+    $('seg-r').dataset.tip='Hugh gets $'+ratio.toFixed(2)+' for every $1 Jake earns'; $('seg-r2').dataset.tip='Jake: $1.00';
+    // scenario table
+    var rows=[180000,300000,500000,750000,1000000,1500000,2000000], tb=$('scen').querySelector('tbody'), html='';
+    rows.forEach(function(r){
+      var s=r>=1000000&&out?0.15:0.30; var g=Math.max(0,r-base), p=g*m, j=p*s, h=p-j;
+      html+='<tr><td>'+short(r)+'</td><td>'+money(g)+'</td><td>'+money(p)+'</td><td class="j">'+money(j)+(r>=1000000?' <span style="font-weight:400;color:var(--muted)">('+Math.round(s*100)+'%)</span>':'')+'</td><td class="h">'+money(h)+'</td><td>$'+((1-s)/s).toFixed(2)+'</td></tr>';
+    });
+    tb.innerHTML=html;
+    // $100k target
+    var target=100000, npNeeded=target/0.30, gNeeded=npNeeded/m, rNeeded=base+gNeeded;
+    $('t-hugh').textContent=money(npNeeded-target); $('t-rev').textContent=short(rNeeded);
+    $('t-revnote').textContent='baseline plus '+short(gNeeded)+' of growth at a '+Math.round(m*100)+'% margin';
+  }
+  function ga(){
+    var f=+$('fixed').value; $('v-fixed').textContent=money(f);
+    var rows=[180000,300000,500000,750000,1000000,1500000], html='';
+    rows.forEach(function(r){ html+='<tr><td>'+short(r)+'</td><td>'+money(f)+'</td><td><b>'+Math.round(f/r*100)+'%</b></td></tr>'; });
+    $('ga').querySelector('tbody').innerHTML=html;
+  }
+  ['rev','margin','base'].forEach(function(i){ $(i).addEventListener('input',calc); });
+  $('fixed').addEventListener('input',ga);
+  $('op').addEventListener('click',function(){ out=false; calc(); });
+  $('out').addEventListener('click',function(){ if(+$('rev').value>=1000000){ out=true; calc(); } });
+  // tooltips on the bars
+  var tip=$('tip'), chart=document.querySelector('.chart');
+  chart.addEventListener('mousemove',function(e){ var s=e.target.closest('.seg'); if(!s||!s.dataset.tip){ tip.style.display='none'; return; } var r=chart.getBoundingClientRect(); tip.textContent=s.dataset.tip; tip.style.display='block'; tip.style.left=(e.clientX-r.left+12)+'px'; tip.style.top=(e.clientY-r.top-34)+'px'; });
+  chart.addEventListener('mouseleave',function(){ tip.style.display='none'; });
+  chart.addEventListener('click',function(e){ var s=e.target.closest('.seg'); if(s&&s.dataset.tip){ var r=chart.getBoundingClientRect(); tip.textContent=s.dataset.tip; tip.style.display='block'; tip.style.left=(e.clientX-r.left+12)+'px'; tip.style.top=(e.clientY-r.top-34)+'px'; setTimeout(function(){tip.style.display='none';},2500); } });
+  calc(); ga();
+})();
+</script>
+</body>
+</html>

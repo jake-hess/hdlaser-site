@@ -3,5 +3,6 @@ Allow: /
 Disallow: /thanks/
 Disallow: /staff/
 Disallow: /marisa/
+Disallow: /partnership/
 
 Sitemap: https://hdlaser.net/sitemap.xml
