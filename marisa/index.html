@@ -16,7 +16,7 @@ a{color:var(--rose)}
 :focus-visible{outline:3px solid var(--rose);outline-offset:3px}
 
 /* hero */
-.hero{padding:56px 0 8px}
+.hero{padding:56px 22px 8px}
 .eyebrow{font-size:13px;letter-spacing:2.6px;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
 h1{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:clamp(38px,7vw,64px);line-height:1.04;margin:0 0 18px;letter-spacing:-0.5px}
 h1 em{font-style:italic;color:var(--rose)}
@@ -81,6 +81,39 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 .btn.primary{background:var(--rose);color:#fff}
 .btn.ghost{border:2px solid var(--ink);color:var(--ink);background:transparent}
 footer.page{padding:30px 0 60px;color:var(--muted);font-size:13px;text-align:center}
+
+/* tattoo motifs, borrowed from her sleeve */
+.inked{position:relative;overflow:hidden}
+.inked::before{content:"";position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 340 340' fill='none' stroke='%2322201D' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E %3Cg transform='translate%2848 44%29'%3E %3Cpath d='M12 26 C12 8 20 0 34 0 C48 0 56 8 56 26 L56 54 C56 68 46 74 34 74 C22 74 12 68 12 54 Z'/%3E %3Cpath d='M16 8 L8 -4 L24 4 M52 8 L60 -4 L44 4'/%3E %3Ccircle cx='24' cy='26' r='7'/%3E%3Ccircle cx='44' cy='26' r='7'/%3E %3Ccircle cx='24' cy='26' r='2.2' fill='%2322201D' stroke='none'/%3E%3Ccircle cx='44' cy='26' r='2.2' fill='%2322201D' stroke='none'/%3E %3Cpath d='M30 34 L34 42 L38 34 Z'/%3E %3Cpath d='M14 40 C10 52 12 62 18 70 M54 40 C58 52 56 62 50 70'/%3E %3Cpath d='M26 48 C30 52 38 52 42 48 M24 56 C30 60 38 60 44 56'/%3E %3Cpath d='M26 74 L24 82 M30 74 L30 82 M38 74 L38 82 M42 74 L44 82'/%3E %3C/g%3E %3Cg transform='translate%28236 84%29'%3E %3Ccircle r='26'/%3E %3Cpath d='M0 -36 L0 -46 M25 -25 L32 -32 M36 0 L46 0 M25 25 L32 32 M0 36 L0 46 M-25 25 L-32 32 M-36 0 L-46 0 M-25 -25 L-32 -32'/%3E %3Cpath d='M14 -34 L18 -42 M34 -14 L42 -18 M34 14 L42 18 M14 34 L18 42 M-14 34 L-18 42 M-34 14 L-42 18 M-34 -14 L-42 -18 M-14 -34 L-18 -42'/%3E %3Cpath d='M-12 -4 C-10 -8 -6 -8 -4 -4 M4 -4 C6 -8 10 -8 12 -4 M-9 8 C-4 14 4 14 9 8'/%3E %3Cpath d='M-2 -2 L-4 4 L0 4'/%3E %3C/g%3E %3Cg transform='translate%28276 262%29'%3E %3Cpath d='M0 -28 C-16 -24 -24 -12 -22 4 C-20 20 -8 30 8 28 C-6 22 -14 8 -12 -6 C-10 -18 -6 -24 0 -28 Z'/%3E %3Cpath d='M22 -20 L22 -12 M18 -16 L26 -16 M30 6 L30 10 M28 8 L32 8'/%3E %3C/g%3E %3Cg transform='translate%2860 232%29'%3E %3Cpath d='M30 84 C28 60 34 40 46 20'/%3E %3Cpath d='M36 62 C24 62 16 54 14 44 C26 44 34 50 36 62 Z M36 62 C36 50 42 42 52 40 C52 50 46 60 36 62 Z'/%3E %3Cpath d='M46 20 C40 14 40 6 46 2 C52 6 52 14 46 20 Z M46 20 C52 14 60 14 64 20 C60 26 52 26 46 20 Z M46 20 C40 26 40 34 46 38 C52 34 52 26 46 20 Z M46 20 C40 14 32 14 28 20 C32 26 40 26 46 20 Z'/%3E %3Ccircle cx='46' cy='20' r='3'/%3E %3Cpath d='M22 84 C18 72 10 66 0 66 C2 78 10 84 22 84 Z'/%3E %3Cpath d='M84 78 C80 66 84 54 94 48 M94 48 C90 44 92 38 96 36 C100 38 100 44 94 48 Z M94 48 C100 46 104 50 104 54 C100 56 96 54 94 48 Z M94 48 C88 46 84 50 84 54 C88 56 92 54 94 48 Z'/%3E %3C/g%3E %3Cg transform='translate%28176 176%29'%3E %3Cpath d='M0 -12 L10 -6 L10 6 L0 12 L-10 6 L-10 -6 Z'/%3E %3Cpath d='M20 -24 L30 -18 L30 -6 L20 0 L10 -6 L10 -18 Z'/%3E %3Cpath d='M20 0 L30 6 L30 18 L20 24 L10 18 L10 6 Z'/%3E %3Cpath d='M-20 0 L-10 6 L-10 18 L-20 24 L-30 18 L-30 6 Z'/%3E %3C/g%3E %3Cpath d='M150 40 L150 48 M146 44 L154 44 M300 170 L300 176 M297 173 L303 173 M120 300 L120 308 M116 304 L124 304 M210 300 L210 306 M207 303 L213 303'/%3E %3C/svg%3E");background-size:340px 340px;background-position:20px 10px;opacity:.11;pointer-events:none}
+.inked>*{position:relative}
+.inknote{font-size:13px;color:var(--muted);margin:18px 0 0;font-style:italic}
+.heart{background:none;border:0;color:var(--rose);font:inherit;font-size:20px;line-height:1;cursor:pointer;padding:2px 6px;vertical-align:-1px}
+.heart:hover{transform:scale(1.2)}
+
+/* the parade */
+#parade{position:fixed;left:0;bottom:0;display:flex;align-items:flex-end;gap:8px;padding:0 260px 4px 0;pointer-events:none;z-index:60;visibility:hidden;transform:translateX(-110%);will-change:transform}
+#parade.go{visibility:visible;animation:march 17s linear forwards}
+@keyframes march{from{transform:translateX(-110%)}to{transform:translateX(100vw)}}
+#parade .mr{width:46px;height:74px;animation:bob .48s ease-in-out infinite alternate}
+#parade .mr:nth-child(2){animation-delay:-.12s}
+#parade .mr:nth-child(3){animation-delay:-.24s}
+#parade .mr:nth-child(4){animation-delay:-.36s}
+#parade .mr:nth-child(5){animation-delay:-.18s}
+@keyframes bob{from{transform:translateY(0)}to{transform:translateY(-3px)}}
+#parade .lg{transform-origin:23px 47px;animation:stepA .48s ease-in-out infinite alternate}
+#parade .lg.b{animation-name:stepB}
+@keyframes stepA{from{transform:rotate(-16deg)}to{transform:rotate(16deg)}}
+@keyframes stepB{from{transform:rotate(16deg)}to{transform:rotate(-16deg)}}
+#parade .arm{transform-origin:9px 27px;animation:stepB .48s ease-in-out infinite alternate}
+#parade .arm.r{transform-origin:37px 27px;animation-name:stepA}
+#parade .flag{position:absolute;left:30px;bottom:60px;width:240px;height:124px}
+#parade .stick{transform-origin:23px 44px;animation:drum .24s ease-in-out infinite alternate}
+@keyframes drum{from{transform:rotate(-10deg)}to{transform:rotate(14deg)}}
+@media (prefers-reduced-motion:reduce){
+  #parade .mr,#parade .lg,#parade .arm,#parade .stick{animation:none}
+  #parade.go{animation-duration:26s}
+}
+@media print{#parade{display:none}}
 @media (max-width:760px){
   .hero-grid,.calc-grid,.cards,.work{grid-template-columns:1fr}
   .hero-grid img{border-radius:24px;max-width:340px;margin:0 auto}
@@ -98,33 +131,34 @@ footer.page{padding:30px 0 60px;color:var(--muted);font-size:13px;text-align:cen
 <body>
 
 <div class="wrap hero">
-  <p class="eyebrow">A private invitation &middot; Pacific Beach</p>
+  <p class="eyebrow">A thank-you, and an invitation &middot; Pacific Beach</p>
   <div class="hero-grid">
     <div>
       <h1>Marisa, this room <em>should be yours.</em></h1>
-      <p class="lede">You have spent years making other people's ideas work. Boards n' Beans runs the way it does partly because you run it. Meanwhile you have built something of your own: a following, a craft, and clients who drive across the county to sit in your chair.</p>
-      <p class="lede">The back room behind the shop is open. We would like you to have it, on terms built so that you keep the upside.</p>
-      <p class="sig">&mdash; With respect from your neighbors at HD Laser</p>
+      <p class="lede">First, thank you. What you and Alex have built at Boards n' Beans is more than a coffee shop: it's the corner where this block says good morning to itself. We're lucky to be your neighbors, and we don't say that enough.</p>
+      <p class="lede">You've also built something entirely your own: a craft, a following, and clients who drive across the county to sit in your chair. The back room behind the shop is open, and we can't think of anyone we'd rather see in it. The terms are built so you keep the upside.</p>
+      <p class="sig">&mdash; With love from your neighbors at HD Laser <button class="heart" type="button" id="encore" aria-label="Play the parade again">&hearts;</button></p>
     </div>
     <img src="/assets/marisa-portrait.jpg" alt="Marisa Lee, hair stylist">
   </div>
 </div>
 
 <div class="wrap">
-  <section>
+  <section class="inked">
     <h2>Your own room, in your own community</h2>
-    <p class="sub">Three shops sharing three walls. Your husband's coffee shop on one side, Hugh's laser studio on the other, Palm &amp; Sage down the wall, and your home across the street.</p>
+    <p class="sub">Three shops sharing three walls. The coffee shop you and Alex built on one side, Hugh's laser studio on the other, Palm &amp; Sage down the wall, and your home across the street.</p>
     <div class="cards">
       <div class="card"><div class="tag">The space</div><h3>A private salon room</h3><p>The back room, yours alone. Your own keys, your own hours, your own door to walk through on a Sunday if you feel like it.</p></div>
       <div class="card"><div class="tag">The clients</div><h3>Foot traffic that already loves you</h3><p>Every person who walks into Boards n' Beans is twenty feet from your chair. Coffee first, color second, no parking, no freeway.</p></div>
-      <div class="card"><div class="tag">The family</div><h3>Ninety seconds from home</h3><p>Between appointments you are still here: with Alex, with your daughter, in the place you helped build.</p></div>
+      <div class="card"><div class="tag">The family</div><h3>Ninety seconds from home</h3><p>Between appointments you are still here: with Alex, with your daughter, in the community you helped build.</p></div>
       <div class="card"><div class="tag">The look</div><h3>Built with your taste, not ours</h3><p>We would love you to use your network and resources to bring the room up to your standard. You know what a salon should feel like. We don't.</p></div>
     </div>
+    <p class="inknote">The pattern behind this section is borrowed from your sleeve: the owl, the sun, the moon, the flowers, and the honeycomb.</p>
   </section>
 
-  <section>
+  <section id="work">
     <h2>Your work already speaks</h2>
-    <p class="sub">This is not a favor. It's an invitation to a professional whose work fills a feed and a books page.</p>
+    <p class="sub">This is not a favor. It's an invitation to a professional whose work fills a feed, a books page, and a good share of the best hair on Garnet.</p>
     <figure class="work" style="margin:0">
       <img src="/assets/marisa-work-grid.jpg" alt="A grid of Marisa's balayage, blonding, and bridal styling work">
       <figcaption>Balayage, color, extensions, bridal, cuts &mdash; @hairby_risss</figcaption>
@@ -242,7 +276,7 @@ footer.page{padding:30px 0 60px;color:var(--muted);font-size:13px;text-align:cen
   <section style="border:0">
     <div class="cta">
       <h2>You&rsquo;ve earned a space with your name on it.</h2>
-      <p class="sub" style="margin:10px auto 0;max-width:34em">Take your time with this page. When you&rsquo;re ready, say the word and we&rsquo;ll walk the room together.</p>
+      <p class="sub" style="margin:10px auto 0;max-width:34em">Take your time with this page. When you&rsquo;re ready, say the word and we&rsquo;ll walk the room together. Either way: thank you for making this block what it is.</p>
       <div class="btns">
         <a class="btn primary" href="sms:+18583739866?&body=I%20read%20the%20page.%20Let%27s%20talk%20about%20the%20room.">Text us</a>
         <a class="btn ghost" href="tel:+18583739866">Call (858) 373-9866</a>
@@ -250,6 +284,24 @@ footer.page{padding:30px 0 60px;color:var(--muted);font-size:13px;text-align:cen
       </div>
     </div>
   </section>
+</div>
+
+
+<div id="parade" aria-hidden="true">
+  <svg class="flag" viewBox="0 0 240 124" aria-hidden="true">
+    <rect x="6" y="0" width="3" height="124" fill="#5A4A3A"/>
+    <circle cx="7.5" cy="3" r="3.2" fill="#C9A227"/>
+    <path fill="#141414">
+      <animate attributeName="d" dur="1.5s" repeatCount="indefinite" values="M9,8 C60,0 110,16 160,8 S212,16 232,8 L232,70 C182,78 132,62 82,70 S30,78 9,70 Z;M9,8 C60,16 110,0 160,8 S212,0 232,8 L232,70 C182,62 132,78 82,70 S30,62 9,70 Z;M9,8 C60,0 110,16 160,8 S212,16 232,8 L232,70 C182,78 132,62 82,70 S30,78 9,70 Z"/>
+    </path>
+    <path fill="none" stroke="#B8766B" stroke-width="1.5">
+      <animate attributeName="d" dur="1.5s" repeatCount="indefinite" values="M14,14 C62,6 112,22 162,14 S212,22 228,14;M14,14 C62,22 112,6 162,14 S212,6 228,14;M14,14 C62,6 112,22 162,14 S212,22 228,14"/>
+    </path>
+    <path id="flagtext" fill="none">
+      <animate attributeName="d" dur="1.5s" repeatCount="indefinite" values="M18,46 C62,38 112,54 162,46 S212,54 228,46;M18,46 C62,54 112,38 162,46 S212,38 228,46;M18,46 C62,38 112,54 162,46 S212,54 228,46"/>
+    </path>
+    <text font-family="Fraunces,Georgia,serif" font-style="italic" font-weight="600" font-size="16" fill="#F5F0E9"><textPath href="#flagtext" startOffset="0" textLength="204" lengthAdjust="spacingAndGlyphs">Momma, we&rsquo;re all gonna die</textPath></text>
+  </svg>
 </div>
 
 <footer class="page">This page is private. It isn&rsquo;t linked anywhere or listed in search. Figures are estimates to show how the split works, not a promise of income.</footer>
@@ -291,6 +343,52 @@ footer.page{padding:30px 0 60px;color:var(--muted);font-size:13px;text-align:cen
   el('btn-month').addEventListener('click',function(){yearly=false;this.setAttribute('aria-pressed','true');el('btn-year').setAttribute('aria-pressed','false');calc();});
   el('btn-year').addEventListener('click',function(){yearly=true;this.setAttribute('aria-pressed','true');el('btn-month').setAttribute('aria-pressed','false');calc();});
   calc();
+})();
+</script>
+
+<script>
+(function(){
+  var p=document.getElementById('parade'); if(!p) return;
+  var skin='#F3DCC8', ink='#22201D', coat='#151515', pipe='#E8E2D8';
+  function head(hair){
+    var h='';
+    if(hair==='curls'){ h='<circle cx="23" cy="10" r="12" fill="#2B1B12"/><circle cx="12" cy="14" r="4" fill="#2B1B12"/><circle cx="34" cy="14" r="4" fill="#2B1B12"/>'; }
+    var face='<circle cx="23" cy="13" r="9" fill="'+skin+'"/>';
+    var fringe={white:'#F2EEE6',black:'#111',brown:'#3B2A20',curls:'#2B1B12'}[hair];
+    var top=hair==='curls'?'':'<path d="M13 13 C13 3 33 3 33 13 L31 9 C27 5 19 5 15 9 Z" fill="'+fringe+'"/>';
+    var eyes='<circle cx="20" cy="13.5" r="1.2" fill="'+ink+'"/><circle cx="26" cy="13.5" r="1.2" fill="'+ink+'"/><path d="M20.5 17 Q23 19 25.5 17" stroke="'+ink+'" stroke-width="1" fill="none"/>';
+    var glasses=hair==='brown'?'<rect x="16.5" y="11" width="6" height="4.5" rx="1" fill="none" stroke="'+ink+'" stroke-width="1"/><rect x="23.5" y="11" width="6" height="4.5" rx="1" fill="none" stroke="'+ink+'" stroke-width="1"/><path d="M22.5 13 h1" stroke="'+ink+'" stroke-width="1"/>':'';
+    return h+face+top+eyes+glasses;
+  }
+  function marcher(hair, role){
+    var legs='<g class="lg a"><rect x="15" y="46" width="7" height="20" rx="3" fill="'+coat+'"/><rect x="13" y="63" width="11" height="6" rx="2" fill="#000"/></g>'
+            +'<g class="lg b"><rect x="24" y="46" width="7" height="20" rx="3" fill="'+coat+'"/><rect x="22" y="63" width="11" height="6" rx="2" fill="#000"/></g>';
+    var body='<rect x="12" y="24" width="22" height="26" rx="6" fill="'+coat+'"/>'
+            +'<path d="M23 26v22" stroke="'+pipe+'" stroke-width="1.4"/>'
+            +'<circle cx="19" cy="32" r="1.3" fill="'+pipe+'"/><circle cx="27" cy="32" r="1.3" fill="'+pipe+'"/><circle cx="19" cy="38" r="1.3" fill="'+pipe+'"/><circle cx="27" cy="38" r="1.3" fill="'+pipe+'"/><circle cx="19" cy="44" r="1.3" fill="'+pipe+'"/><circle cx="27" cy="44" r="1.3" fill="'+pipe+'"/>'
+            +'<rect x="9" y="24" width="7" height="4" rx="1" fill="'+pipe+'"/><rect x="30" y="24" width="7" height="4" rx="1" fill="'+pipe+'"/>'
+            +'<rect x="20" y="22" width="6" height="4" fill="#B8766B"/>';
+    var arms;
+    if(role==='flag'){ arms='<rect class="arm" x="6" y="26" width="6" height="18" rx="3" fill="'+coat+'"/><rect x="33" y="8" width="6" height="22" rx="3" fill="'+coat+'"/><circle cx="36" cy="9" r="3" fill="'+skin+'"/>'; }
+    else if(role==='drum'){ arms='<rect x="12" y="40" width="22" height="12" rx="3" fill="#B8766B" stroke="'+pipe+'" stroke-width="1.2"/><path d="M12 46h22" stroke="'+pipe+'" stroke-width="1"/><g class="stick"><rect x="8" y="30" width="16" height="4" rx="2" fill="'+coat+'" transform="rotate(20 9 32)"/><circle cx="8" cy="31" r="1.8" fill="'+skin+'"/></g><rect x="30" y="30" width="7" height="12" rx="3" fill="'+coat+'"/>'; }
+    else { arms='<rect class="arm" x="6" y="26" width="6" height="18" rx="3" fill="'+coat+'"/><rect class="arm r" x="34" y="26" width="6" height="18" rx="3" fill="'+coat+'"/>'; }
+    return '<svg class="mr" viewBox="0 0 46 74" aria-hidden="true">'+legs+body+arms+head(hair)+'</svg>';
+  }
+  var flag=p.innerHTML;
+  p.innerHTML=marcher('white','flag')+marcher('black','drum')+marcher('curls','march')+marcher('brown','march')+flag;
+
+  var playing=false;
+  function go(){ if(playing) return; playing=true; p.classList.remove('go'); void p.offsetWidth; p.classList.add('go'); }
+  p.addEventListener('animationend',function(e){ if(e.target===p){ p.classList.remove('go'); playing=false; } });
+  document.getElementById('encore').addEventListener('click',go);
+
+  var fired=false, once=function(){ if(!fired){ fired=true; go(); } };
+  var target=document.getElementById('work');
+  if('IntersectionObserver' in window && target){
+    var io=new IntersectionObserver(function(en){ if(en[0].isIntersecting){ once(); io.disconnect(); } },{threshold:.3});
+    io.observe(target);
+  }
+  setTimeout(once, /[?&]parade/.test(location.search)?0:12000);
 })();
 </script>
 </body>
