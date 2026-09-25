@@ -141,7 +141,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
         <li>Say yes or no to spend above the agreed amount.</li>
       </ul></div>
       <div class="col"><h3><span class="dot" style="background:var(--jake)"></span>Jake: demand, brand and systems</h3><ul>
-        <li>Marketing: organic content, campaigns, the budget below, measured monthly on the dashboards.</li>
+        <li>Marketing: organic content first, paid campaigns as the budget below earns itself, measured monthly on the dashboards.</li>
         <li>Sales: corporate and repeat accounts, pricing, the pipeline. Closed from a phone, not a workbench.</li>
         <li>Systems: the website, checkout, staff portal, money page, and the automation that lets the shop run without either of us.</li>
         <li>Hiring and training the first people who quote and produce without you.</li>
@@ -172,7 +172,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
   <section>
     <div class="calc" id="calc">
       <h2>What it pays each of you</h2>
-      <p class="sub">Set the size you think HD Laser can reach, the margin on the growth, and the marketing it takes. The order never changes: growth profit pays the marketing, fills the hole, and only then is split. Your baseline is untouched and not shown here.</p>
+      <p class="sub">Set the size you think HD Laser can reach, the margin on the growth, and the marketing rate that gets it there. The order never changes: growth profit pays the marketing, fills the hole, and only then is split. Your baseline is untouched and not shown here.</p>
       <div class="grid">
         <div>
           <div class="ctrl">
@@ -186,9 +186,14 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
             <p class="mini">Growth dollars carry a higher margin than today&rsquo;s blended margin, because rent, insurance and software are already paid for by the baseline. See &ldquo;How overhead thins out&rdquo; below.</p>
           </div>
           <div class="ctrl">
-            <label for="mkt">Marketing budget per month <span class="val" id="v-mkt">$12,000</span></label>
-            <input type="range" id="mkt" min="0" max="20000" step="500" value="12000">
-            <p class="mini">Paid out of growth profit before anything is split. This is what buys the growth: content, ads, outreach, tools. It is agreed monthly and shown on the money page.</p>
+            <label for="mrate">Marketing, as a share of growth revenue <span class="val" id="v-mrate">15%</span></label>
+            <input type="range" id="mrate" min="5" max="40" step="1" value="15">
+            <p class="mini">You don&rsquo;t have $12,000 a month today, and the deal doesn&rsquo;t ask for it. Marketing is a share of the growth revenue it creates, so it starts near zero (organic content and Jake&rsquo;s time) and scales up as the money arrives. Paid out of growth profit before anything is split.</p>
+          </div>
+          <div class="ctrl">
+            <label for="mkt">Marketing ceiling per month <span class="val" id="v-mkt">$12,000</span></label>
+            <input type="range" id="mkt" min="2000" max="20000" step="500" value="12000">
+            <p class="mini" id="mktnote">The healthy rate to reach and hold. At the settings above it is reached at about $1.14M of revenue.</p>
           </div>
           <div class="ctrl">
             <label for="def">Hole to fill first, year one <span class="val" id="v-def">$30,000</span></label>
@@ -316,7 +321,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
         <tbody>
           <tr><td><b>Materials &amp; product</b><br><span class="small">Blanks, tumblers, wood, acrylic, packaging</span></td><td><input class="pct" data-k="materials" type="number" min="0" max="60" step="1" value="28">%</td><td class="amt" data-k="materials"></td><td style="text-align:left">Stop buying. Quote longer lead times and take a 50% deposit on custom orders so the deposit funds the material. Never push a job by buying on a personal card.</td></tr>
           <tr><td><b>Production labor</b><br><span class="small">Staff on the floor, excluding Hugh</span></td><td><input class="pct" data-k="labor" type="number" min="0" max="50" step="1" value="18">%</td><td class="amt" data-k="labor"></td><td style="text-align:left">No overtime. Non-rush jobs move to next week; lead times go out before hours go up.</td></tr>
-          <tr><td><b>Marketing</b><br><span class="small">Content, ads, outreach, tools; Jake&rsquo;s envelope</span></td><td>fixed</td><td class="amt" data-k="marketing"></td><td style="text-align:left">Paid spend pauses for the month, organic continues. Never topped up from materials or labor.</td></tr>
+          <tr><td><b>Marketing</b><br><span class="small">Content, ads, outreach, tools; Jake&rsquo;s envelope</span></td><td>scales</td><td class="amt" data-k="marketing"></td><td style="text-align:left">A share of growth revenue, rising to the $12,000-a-month ceiling as revenue arrives. Paid spend pauses for the month if the envelope is empty; organic continues. Never topped up from materials or labor.</td></tr>
           <tr><td><b>Rent, utilities, insurance</b><br><span class="small">Fixed overhead from the slider above</span></td><td>fixed</td><td class="amt" data-k="fixed"></td><td style="text-align:left">Paid first, from the baseline. Not a decision.</td></tr>
           <tr><td><b>Software &amp; tools</b></td><td><input class="pct" data-k="software" type="number" min="0" max="10" step="1" value="2">%</td><td class="amt" data-k="software"></td><td style="text-align:left">No new subscriptions until next month. Cancel one to add one.</td></tr>
           <tr><td><b>Equipment reserve</b><br><span class="small">Maintenance, lenses, tubes, replacement</span></td><td><input class="pct" data-k="equipment" type="number" min="0" max="15" step="1" value="3">%</td><td class="amt" data-k="equipment"></td><td style="text-align:left">Repairs come from here. A repair bigger than the reserve needs both signatures and a plan to refill it.</td></tr>
@@ -351,7 +356,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
       <div class="col"><h3><span class="dot" style="background:var(--hugh)"></span>What protects Hugh</h3><ul>
         <li>The baseline. Your current income is never in the split.</li>
         <li>No fixed cost. Jake is not a salary. No growth, no check.</li>
-        <li>The marketing budget is agreed monthly, capped, visible on the money page, and comes off the top so it is never paid twice.</li>
+        <li>Marketing is a share of growth revenue, not a bill. It starts near zero, scales only as revenue arrives, is capped at $12,000 a month, and comes off the top so it is never paid twice.</li>
         <li>The hole is filled before the first split. You start from zero, not from behind.</li>
         <li>You keep 70 cents of every new profit dollar, rising to 75, 80 and 85 cents as Jake steps down.</li>
         <li>One set of books. Both of you read the same money page, the same P&amp;L, the same ledger. Nothing is calculated in someone&rsquo;s head.</li>
@@ -364,7 +369,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
         <li>Each step-down happens only when its milestone is real and visible on the dashboards: $1M held two quarters, a manager running the floor, a team running it without him.</li>
         <li>If revenue slips under $1M, the 30% comes back. Jake&rsquo;s time is protected the same way your baseline is.</li>
         <li>Growth spend (ads, hires, tools) is agreed before it&rsquo;s spent and comes out before profit is split, so nobody is paid on money that was reinvested.</li>
-        <li>The marketing budget is committed for at least six months. Growth can&rsquo;t be judged on a budget that was cut halfway.</li>
+        <li>The marketing rate is committed for at least six months. Growth can&rsquo;t be judged on a budget that was cut halfway.</li>
         <li>Jake is not required to be in the shop. His work is measured on the dashboards: revenue, pipeline, margin. Not hours on the floor.</li>
       </ul></div>
     </div>
@@ -400,7 +405,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
         <li><b>What exactly counts as net profit?</b> Write the formula on one line and have your CPA initial it.</li>
         <li><b>What happens to the baseline next year?</b> Proposal: reset it each January to the prior year&rsquo;s revenue, so Jake is always paid on new growth, never twice on the same growth.</li>
         <li><b>What if a big customer leaves?</b> The split is on actual profit, so a bad year pays Jake less automatically. Nothing is owed on a forecast.</li>
-        <li><b>Who decides on spending?</b> The marketing budget is agreed up front and Jake runs it. Anything else over an agreed amount needs both of you. All of it comes off the top before the split.</li>
+        <li><b>Who decides on spending?</b> The marketing rate and ceiling are agreed up front and Jake runs the envelope. Anything else over an agreed amount needs both of you. All of it comes off the top before the split.</li>
         <li><b>Where does the $30,000 figure come from?</b> The money page. Confirm it together with the CPA before signing, and write the exact number on the page.</li>
         <li><b>What does each milestone mean in writing?</b> $1M held: two consecutive quarters above $250,000. Manager runs the floor: a named person owns open, queue and close for a full quarter. Stepped out: Jake not in daily operations and dashboards green for two quarters.</li>
         <li><b>What about the people who run it later?</b> The 20% and 15% stages set aside part of the profit for the manager and the team. That comes from Jake&rsquo;s step-down first, not from your baseline.</li>
@@ -441,16 +446,20 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
     stageBtns.forEach(function(b){ var i=+b.dataset.stage; b.disabled=(i>0&&!canOut); b.setAttribute('aria-pressed',String(i===stage)); });
     $('rolenote').textContent=canOut?NOTES[stage]:'The later stages unlock once revenue holds above $1,000,000. Under $1M the share is always 30%.';
     var share=STAGES[stage];
-    var mk=+$('mkt').value*12, def=+$('def').value;
+    var rate=+$('mrate').value/100, cap=+$('mkt').value*12, def=+$('def').value;
     var growth=Math.max(0,rev-base), np=growth*m;
+    var mk=Math.min(rate*growth,cap);
+    $('v-mrate').textContent=Math.round(rate*100)+'%';
+    var capRev=base+cap/rate;
+    $('mktnote').textContent='The healthy rate to reach and hold. At '+Math.round(rate*100)+'% it is reached at about '+short(capRev)+' of revenue. Right now (at '+money(rev)+') marketing is '+money(mk/12)+' a month.';
     var mkUsed=Math.min(np,mk), afterMk=np-mkUsed, defUsed=Math.min(afterMk,def), pool=afterMk-defUsed;
     var jake=pool*share, hugh=pool-jake;
-    var firstRev=base+(mk+def)/m;
+    var firstGrowth=(m>rate && (def/(m-rate))*rate<=cap)?def/(m-rate):(cap+def)/m; var firstRev=base+firstGrowth;
     $('v-rev').textContent=money(rev); $('v-margin').textContent=Math.round(m*100)+'%'; $('v-base').textContent=money(base);
     $('v-mkt').textContent=money(+$('mkt').value); $('v-def').textContent=money(def);
     $('o-growth').textContent=money(growth);
     $('o-np').textContent=money(np); $('o-npnote').textContent='at '+Math.round(m*100)+'% margin';
-    $('o-top').textContent=money(mkUsed+defUsed); $('o-topnote').textContent='marketing '+money(mkUsed)+(mkUsed<mk?' of '+money(mk):'')+', then '+money(defUsed)+(defUsed<def?' of the '+money(def)+' hole':' hole filled');
+    $('o-top').textContent=money(mkUsed+defUsed); $('o-topnote').textContent='marketing '+money(mkUsed)+' ('+money(mk/12)+' a month), then '+money(defUsed)+(defUsed<def?' of the '+money(def)+' hole':' hole filled');
     $('o-pool').textContent=money(pool); $('o-poolnote').textContent=pool>0?'split '+Math.round((1-share)*100)+' / '+Math.round(share*100):'nothing to split yet at this size';
     $('o-hugh').textContent=money(hugh+defUsed); $('o-hughnote').textContent=Math.round((1-share)*100)+'% of the split ('+money(hugh)+') plus the '+money(defUsed)+' hole filled, plus all of the baseline';
     $('o-jake').textContent=money(jake); $('o-jakenote').textContent=Math.round(share*100)+'% of the split, nothing on the baseline, nothing on the hole';
@@ -458,7 +467,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
     function seg(id,lid,val,label){ var pct=np>0?val/np*100:0; $(id).style.width=pct>0?'calc('+pct+'% - 1px)':'0'; $(lid).textContent=pct>=22?label:''; $(id).dataset.tip=label; }
     if(np>0){ seg('seg-m','seg-m-l',mkUsed,'Marketing '+money(mkUsed)); seg('seg-d','seg-d-l',defUsed,'Hole '+money(defUsed)); seg('seg-h','seg-h-l',hugh,'Hugh '+money(hugh)); seg('seg-j','seg-j-l',jake,'Jake '+money(jake)); }
     else { ['seg-m','seg-d','seg-j'].forEach(function(i){$(i).style.width='0';}); $('seg-h').style.width='100%'; $('seg-h-l').textContent='no growth yet'; }
-    $('r-first').textContent=short(firstRev); $('r-firstnote').textContent='baseline, plus '+short(firstRev-base)+' of growth to pay '+money(mk)+' of marketing and fill the '+money(def)+' hole at a '+Math.round(m*100)+'% margin';
+    $('r-first').textContent=short(firstRev); $('r-firstnote').textContent='baseline, plus '+short(firstRev-base)+' of growth to pay marketing at '+Math.round(rate*100)+'% and fill the '+money(def)+' hole, at a '+Math.round(m*100)+'% margin';
     var ratio=(1-share)/share; var tot=ratio+1;
     $('seg-r').style.width='calc('+(ratio/tot*100)+'% - 1px)'; $('seg-r2').style.width='calc('+(1/tot*100)+'% - 1px)';
     $('seg-r-l').textContent='$'+ratio.toFixed(2)+' to Hugh';
@@ -467,18 +476,21 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
     var rows=[180000,300000,500000,750000,1000000,1500000,2000000], tb=$('scen').querySelector('tbody'), html='';
     rows.forEach(function(r){
       var s=r>=1000000?STAGES[stage]:0.30; var g=Math.max(0,r-base), p=g*m;
-      var mu=Math.min(p,mk), am=p-mu, du=Math.min(am,def), pl=am-du, j=pl*s, h=pl-j;
+      var mr=Math.min(rate*g,cap), mu=Math.min(p,mr), am=p-mu, du=Math.min(am,def), pl=am-du, j=pl*s, h=pl-j;
       html+='<tr><td>'+short(r)+'</td><td>'+money(p)+'</td><td>'+money(mu)+'</td><td>'+money(du)+'</td><td>'+money(pl)+'</td><td class="j">'+money(j)+' <span style="font-weight:400;color:var(--muted)">('+Math.round(s*100)+'%)</span></td><td class="h">'+money(h+du)+'</td></tr>';
     });
     tb.innerHTML=html;
     // $100k target
-    var target=100000, poolNeeded=target/0.30, gNeeded=(poolNeeded+mk+def)/m, rNeeded=base+gNeeded;
+    var target=100000, poolNeeded=target/0.30, gNeeded;
+    if(m>rate && ((poolNeeded+def)/(m-rate))*rate<=cap) gNeeded=(poolNeeded+def)/(m-rate); else gNeeded=(poolNeeded+def+cap)/m;
+    var rNeeded=base+gNeeded, mkNeeded=Math.min(rate*gNeeded,cap);
     $('t-hugh').textContent=money(poolNeeded-target+def); $('t-rev').textContent=short(rNeeded);
-    $('t-revnote').textContent='baseline plus '+short(gNeeded)+' of growth: '+money(mk)+' marketing and the '+money(def)+' hole first, then a '+money(poolNeeded)+' split, at a '+Math.round(m*100)+'% margin';
+    $('t-revnote').textContent='baseline plus '+short(gNeeded)+' of growth: '+money(mkNeeded)+' of marketing and the '+money(def)+' hole first, then a '+money(poolNeeded)+' split, at a '+Math.round(m*100)+'% margin';
   }
   var PCT_KEYS=['materials','labor','software','equipment','fees','reserve'];
   function budgets(){
-    var rev=+$('rev').value, mrev=rev/12, fixed=+$('fixed').value/12, mkt=+$('mkt').value, sum=0;
+    var rev=+$('rev').value, mrev=rev/12, fixed=+$('fixed').value/12, sum=0;
+    var mkt=Math.min((+$('mrate').value/100)*Math.max(0,rev-(+$('base').value)),(+$('mkt').value)*12)/12;
     PCT_KEYS.forEach(function(k){ var pct=+document.querySelector('#bud input[data-k="'+k+'"]').value||0; sum+=pct; document.querySelector('#bud .amt[data-k="'+k+'"]').textContent=money(mrev*pct/100); });
     document.querySelector('#bud .amt[data-k="marketing"]').textContent=money(mkt);
     document.querySelector('#bud .amt[data-k="fixed"]').textContent=money(fixed);
@@ -493,7 +505,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
     rows.forEach(function(r){ html+='<tr><td>'+short(r)+'</td><td>'+money(f)+'</td><td><b>'+Math.round(f/r*100)+'%</b></td></tr>'; });
     $('ga').querySelector('tbody').innerHTML=html;
   }
-  ['rev','margin','base','mkt','def'].forEach(function(i){ $(i).addEventListener('input',function(){ calc(); budgets(); }); });
+  ['rev','margin','base','mrate','mkt','def'].forEach(function(i){ $(i).addEventListener('input',function(){ calc(); budgets(); }); });
   $('fixed').addEventListener('input',function(){ ga(); budgets(); });
   stageBtns.forEach(function(b){ b.addEventListener('click',function(){ var i=+b.dataset.stage; if(i===0||+$('rev').value>=1000000){ stage=i; calc(); } }); });
   // tooltips on the bars
