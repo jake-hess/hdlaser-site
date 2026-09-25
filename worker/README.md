@@ -135,3 +135,9 @@ First pulls are chunked: `plaidSync` handles a few pages per request, saves the 
 ### Cleaning the ledger
 
 The money page's **Ledger sources** card lists every bank account that has rows in the ledger. A source marked *not connected* belongs to a removed or re-linked connection (or the Plaid sandbox); delete its rows so nothing is counted twice. Removing a bank now deletes its rows automatically. **Re-apply rules to the ledger** re-files every auto-categorized row with the current `DEFAULT_RULES` plus the owner's own rules; rows filed by hand (custom memo) and rows from personal accounts are left alone. Card-side payment credits, airlines and rental cars (`travel`), groceries and clothing (`personal`), and common shop suppliers are covered by the default rules.
+
+### Assessment views on the money page
+
+- **This year vs last year** (`GET /api/money/yoy`): month-by-month Square net sales and bank deposits for the current and previous year, year-to-date growth, and a full-year projection that scales this year's year-to-date by the share of last year that had arrived by the same point (falls back to a straight run-rate when less than a fifth of last year is on file).
+- **Two-year trend** (`GET /api/money/trends`, CSV at `/api/money/trends.csv`): for each of the last 24 months, sales, ticket count, average ticket, bank deposits, Zelle/check income, COGS, opex, profit, margin, and what was kept out (personal, owner draws, unfiled).
+- **Where the money goes**: spend by category for the last 12 months against the 12 before, with share of sales against the category target; biggest vendors; best-selling Square items; biggest web customers.
