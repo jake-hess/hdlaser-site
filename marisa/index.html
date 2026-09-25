@@ -90,6 +90,16 @@ footer.page{padding:30px 0 60px;color:var(--muted);font-size:13px;text-align:cen
 .heart{background:none;border:0;color:var(--rose);font:inherit;font-size:20px;line-height:1;cursor:pointer;padding:2px 6px;vertical-align:-1px}
 .heart:hover{transform:scale(1.2)}
 
+/* the corner */
+.day{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:0 0 22px}
+.moment{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px 22px}
+.moment .t{font-family:Fraunces,Georgia,serif;color:var(--gold);font-weight:700;font-size:22px;margin-bottom:6px}
+.moment p{margin:0;color:#4A443D}
+.family{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:0 0 22px}
+.family figure{margin:0}
+.family video,.family img{width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:20px;display:block;background:#1a1613}
+.family figcaption{font-size:14px;color:var(--muted);margin-top:8px}
+
 /* the parade */
 #parade{position:fixed;left:0;bottom:0;display:flex;align-items:flex-end;gap:8px;padding:0 260px 4px 0;pointer-events:none;z-index:60;visibility:hidden;transform:translateX(-110%);will-change:transform}
 #parade.go{visibility:visible;animation:march 17s linear forwards}
@@ -115,7 +125,8 @@ footer.page{padding:30px 0 60px;color:var(--muted);font-size:13px;text-align:cen
 }
 @media print{#parade{display:none}}
 @media (max-width:760px){
-  .hero-grid,.calc-grid,.cards,.work{grid-template-columns:1fr}
+  .hero-grid,.calc-grid,.cards,.work,.day,.family{grid-template-columns:1fr}
+  .family figure{max-width:360px;margin:0 auto}
   .hero-grid img{border-radius:24px;max-width:340px;margin:0 auto}
   .calc{padding:22px}
 }
@@ -124,7 +135,7 @@ footer.page{padding:30px 0 60px;color:var(--muted);font-size:13px;text-align:cen
   .calc{background:#fff;color:#000;border:1px solid #999}
   .calc .sub,.mini{color:#333}
   .lines{background:#f5f5f5}
-  .btns,.toggle{display:none}
+  .btns,.toggle,.family video{display:none}
 }
 </style>
 </head>
@@ -166,6 +177,32 @@ footer.page{padding:30px 0 60px;color:var(--muted);font-size:13px;text-align:cen
     <blockquote class="quote" style="margin-top:20px">
       <p>&ldquo;My hair was styled to perfection.&rdquo;</p>
       <footer>A client, on her engagement photos</footer>
+    </blockquote>
+  </section>
+
+  <section>
+    <h2>What that corner could feel like</h2>
+    <p class="sub">People already come to this block for what you and Alex built: coffee from someone who knows their name, a sidewalk that gets washed at golden hour with a toddler on a hip, a place where nobody stays a stranger for long. Add your chair, and the same family covers the whole morning.</p>
+    <div class="day">
+      <div class="moment"><div class="t">8:40</div><h3>Coffee first</h3><p>Alex has the order started before the door swings shut. Somebody asks about the baby.</p></div>
+      <div class="moment"><div class="t">9:00</div><h3>Twenty steps to your chair</h3><p>Same block, same faces, no parking, no freeway. The coffee is still warm.</p></div>
+      <div class="moment"><div class="t">11:15</div><h3>Out the door, glowing</h3><p>Fresh color, a second latte, and a wave at half of Garnet on the way to the car.</p></div>
+    </div>
+    <div class="family">
+      <figure>
+        <video autoplay muted loop playsinline preload="metadata" poster="/assets/marisa-sidewalk-poster.jpg" aria-label="Marisa pressure-washing the sidewalk in front of the shop while holding her daughter">
+          <source src="/assets/marisa-sidewalk.mp4" type="video/mp4">
+        </video>
+        <figcaption>Pressure washer in one hand, daughter in the other. Nobody asked; it just gets done.</figcaption>
+      </figure>
+      <figure>
+        <img src="/assets/marisa-sidewalk.jpg" alt="Marisa in the sun holding her daughter on her hip while she washes the sidewalk outside the shop" loading="lazy">
+        <figcaption>This is what running a corner looks like. It&rsquo;s why people cross town to sit here.</figcaption>
+      </figure>
+    </div>
+    <blockquote class="quote">
+      <p>&ldquo;Nobody drives across the county for a coffee, and nobody drives across the county for a haircut. They drive for the feeling of walking in and being known. This corner already has it. With you in the back room, it has it all morning.&rdquo;</p>
+      <footer>Your neighbors at HD Laser</footer>
     </blockquote>
   </section>
 
