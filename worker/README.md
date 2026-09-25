@@ -40,7 +40,7 @@ Workers & Pages → Create → Create Worker → `hdlaser-checkout` → Deploy �
 | `TWILIO_FROM` | `+18885551234` | Text, optional. The Twilio number you bought (toll-free is simplest to verify). |
 | `ALERT_SMS_TO` | `8585551234, 6195551234` | Text, optional. Phones that get a real SMS on new orders, payments and permits. All four Twilio settings must be set for texts to go out. |
 | `RESEND_API_KEY` | API key from resend.com (step F). Turns on worker-sent email for forms, payments, resale and the digest | **Secret** |
-| `FROM_EMAIL` | `HD Laser Studio <orders@hdlaser.net>` (must be on the domain verified in Resend) | Text |
+| `FROM_EMAIL` | `HD Laser Studio <contact@hdlaser.net>` (must be on the domain verified in Resend; use a mailbox that exists, since customers reply to it) | Text |
 | `FORMSPREE_ENDPOINT` | `https://formspree.io/f/xaenoorj` (fallback only, used until RESEND_API_KEY is set) | Text |
 | `TAX_RATE` | `0.0775` (San Diego sales tax, used for the tax-exposure estimate) | Text |
 

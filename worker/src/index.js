@@ -330,10 +330,12 @@ async function submitInquiry(request, env, cors) {
 
 async function sendEmail(env, { to, subject, text, html, replyTo }) {
   if (!env.RESEND_API_KEY) return { ok: false, error: "RESEND_API_KEY not set" };
-  const from = env.FROM_EMAIL || `HD Laser Studio <orders@hdlaser.net>`;
+  const from = env.FROM_EMAIL || `HD Laser Studio <contact@hdlaser.net>`;
   const body = { from, to: Array.isArray(to) ? to : [to], subject, text };
   if (html) body.html = html;
-  if (replyTo) body.reply_to = replyTo;
+  // Replies always land in a real inbox: the customer's address when we're emailing the shop, otherwise contact@.
+  const fallbackReply = env.SUPPORT_EMAIL || "contact@hdlaser.net";
+  body.reply_to = replyTo || fallbackReply;
   try {
     const res = await fetch("https://api.resend.com/emails", { method: "POST", headers: { "Authorization": `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const data = await res.json().catch(() => ({}));
