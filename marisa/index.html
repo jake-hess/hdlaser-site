@@ -18,7 +18,7 @@ a{color:var(--rose)}
 /* hero */
 .hero{padding:56px 22px 8px}
 .eyebrow{font-size:13px;letter-spacing:2.6px;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
-h1{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:clamp(38px,7vw,64px);line-height:1.04;margin:0 0 18px;letter-spacing:-0.5px}
+h1{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:clamp(38px,7vw,58px);line-height:1.04;margin:0 0 18px;letter-spacing:-0.5px}
 h1 em{font-style:italic;color:var(--rose)}
 .hero-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:36px;align-items:center;padding:8px 0 44px}
 .hero-grid img{width:100%;border-radius:200px 200px 24px 24px;display:block;box-shadow:0 18px 40px rgba(34,32,29,.13)}
@@ -100,6 +100,35 @@ footer.page{padding:30px 0 60px;color:var(--muted);font-size:13px;text-align:cen
 .family video,.family img{width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:20px;display:block;background:#1a1613}
 .family figcaption{font-size:14px;color:var(--muted);margin-top:8px}
 
+/* the little wooden sign */
+.hero-grid>*{min-width:0}
+.portrait{position:relative}
+.sign{position:absolute;top:-6px;right:-10px;width:164px;transform-origin:50% 0;transform:rotate(-6deg);animation:swing 4.5s ease-in-out infinite;filter:drop-shadow(0 8px 10px rgba(34,32,29,.22))}
+.sign .rope{display:block;width:2px;height:40px;margin:0 auto;background:linear-gradient(#8A6A45,#6B4E2E);border-radius:2px}
+.sign .rope::before,.sign .rope::after{content:"";position:absolute;top:0;width:2px;height:44px;background:#7A5A38;border-radius:2px;left:50%;transform-origin:top;transform:rotate(38deg)}
+.sign .rope::after{transform:rotate(-38deg)}
+.sign .board{position:relative;background:linear-gradient(180deg,#A9743F,#8F5E30 55%,#7E5027);background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.06) 0 2px,rgba(0,0,0,0) 2px 7px),linear-gradient(180deg,#A9743F,#8F5E30 55%,#7E5027);border:2px solid #5A3A1B;border-radius:7px;padding:12px 14px 11px;color:#F6E7C8;font-family:Fraunces,Georgia,serif;font-weight:600;font-size:17px;line-height:1.22;text-align:center;text-shadow:0 1px 0 rgba(0,0,0,.35)}
+.sign .board small{display:block;font-family:Figtree,sans-serif;font-weight:700;font-size:10.5px;letter-spacing:1.6px;text-transform:uppercase;margin-top:7px;color:#F2D9A8}
+.sign .nail{position:absolute;top:6px;width:6px;height:6px;border-radius:50%;background:#3A2712;box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.sign .nail.l{left:8px}.sign .nail.r{right:8px}
+@keyframes swing{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(-3deg)}}
+@media (prefers-reduced-motion:reduce){.sign{animation:none}}
+@media print{.sign{filter:none}}
+
+/* earned: her ink as the backdrop */
+.earned{border:0;padding:0;margin-top:44px}
+.earned .art{position:relative;border-radius:26px;overflow:hidden;background:#EBDFC6 url("/assets/marisa-ink.webp") center/cover no-repeat;min-height:560px;display:flex;align-items:center;justify-content:center;padding-left:32%}
+.earned .panel{max-width:400px;margin:40px 24px;background:rgba(251,246,236,.82);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);border:1px solid rgba(90,58,27,.18);border-radius:20px;padding:28px 30px;text-align:center}
+.earned h2{margin-bottom:12px}
+.earned p{margin:0 0 12px;color:#3F3A35;font-size:17px}
+.earned .take{font-family:Fraunces,Georgia,serif;font-style:italic;font-size:22px;color:var(--rose);margin:6px 0 0}
+.earned .mobile-art{display:none}
+@media (max-width:760px){
+  .earned .art{background:none;min-height:0;display:block;border-radius:22px;padding-left:0}
+  .earned .mobile-art{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;object-position:35% center}
+  .earned .panel{max-width:none;margin:0;border-radius:0;border:0;background:#F3EBE2;padding:24px 22px}
+}
+
 /* the parade */
 #parade{position:fixed;left:0;bottom:0;display:flex;align-items:flex-end;gap:8px;padding:0 260px 4px 0;pointer-events:none;z-index:60;visibility:hidden;transform:translateX(-110%);will-change:transform}
 #parade.go{visibility:visible;animation:march 17s linear forwards}
@@ -150,7 +179,13 @@ footer.page{padding:30px 0 60px;color:var(--muted);font-size:13px;text-align:cen
       <p class="lede">You've also built something entirely your own: a craft, a following, and clients who drive across the county to sit in your chair. The back room behind the shop is open, and we can't think of anyone we'd rather see in it. The terms are built so you keep the upside.</p>
       <p class="sig">&mdash; With love from your neighbors at HD Laser <button class="heart" type="button" id="encore" aria-label="Play the parade again">&hearts;</button></p>
     </div>
-    <img src="/assets/marisa-portrait.jpg" alt="Marisa Lee, hair stylist">
+    <div class="portrait">
+      <img src="/assets/marisa-portrait.jpg" alt="Marisa Lee, hair stylist">
+      <div class="sign" role="note">
+        <span class="rope"></span>
+        <div class="board"><span class="nail l"></span><span class="nail r"></span>Coffee first.<br>Then talk.<small>We know the rules.</small></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -300,6 +335,18 @@ footer.page{padding:30px 0 60px;color:var(--muted);font-size:13px;text-align:cen
     </div>
   </section>
 
+  <section class="earned">
+    <div class="art">
+      <img class="mobile-art" src="/assets/marisa-ink.webp" alt="Marisa under her hat, her tattooed arm raised, beside a line drawing of an owl, hibiscus, and leaves" loading="lazy">
+      <div class="panel">
+        <h2>You&rsquo;ve already earned this.</h2>
+        <p>Not as a favor, and not because we&rsquo;re neighbors. Because of the years, the hands, the early mornings on that sidewalk, and every person who leaves your chair feeling like themselves again.</p>
+        <p>The owl on your arm has watched you do the work for a long time. It&rsquo;s time the room matched.</p>
+        <p class="take">A door with your name on it isn&rsquo;t a gift. It&rsquo;s overdue.</p>
+      </div>
+    </div>
+  </section>
+
   <section>
     <h2>If you want it, here&rsquo;s the path</h2>
     <div class="steps">
@@ -425,7 +472,7 @@ footer.page{padding:30px 0 60px;color:var(--muted);font-size:13px;text-align:cen
     var io=new IntersectionObserver(function(en){ if(en[0].isIntersecting){ once(); io.disconnect(); } },{threshold:.3});
     io.observe(target);
   }
-  setTimeout(once, /[?&]parade/.test(location.search)?0:12000);
+  setTimeout(once, /[?&]parade/.test(location.search)?0:2200);
 })();
 </script>
 </body>
