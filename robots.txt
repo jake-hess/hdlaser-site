@@ -2,5 +2,6 @@ User-agent: *
 Allow: /
 Disallow: /thanks/
 Disallow: /staff/
+Disallow: /marisa/
 
 Sitemap: https://hdlaser.net/sitemap.xml

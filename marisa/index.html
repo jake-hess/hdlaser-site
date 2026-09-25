@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>A room of your own &middot; For Marisa</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Figtree:wght@400;500;700&display=swap">
+<style>
+:root{--bg:#FBF8F4;--ink:#22201D;--muted:#6B635B;--line:#E7DFD5;--card:#FFFFFF;--gold:#C9A227;--rose:#B8766B;--deep:#2A2724;--soft:#F3EBE2}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Figtree,"Helvetica Neue",Helvetica,Arial,sans-serif;line-height:1.55}
+.serif{font-family:Fraunces,Georgia,serif}
+.wrap{max-width:900px;margin:0 auto;padding:0 22px}
+a{color:var(--rose)}
+:focus-visible{outline:3px solid var(--rose);outline-offset:3px}
+
+/* hero */
+.hero{padding:56px 0 8px}
+.eyebrow{font-size:13px;letter-spacing:2.6px;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
+h1{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:clamp(38px,7vw,64px);line-height:1.04;margin:0 0 18px;letter-spacing:-0.5px}
+h1 em{font-style:italic;color:var(--rose)}
+.hero-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:36px;align-items:center;padding:8px 0 44px}
+.hero-grid img{width:100%;border-radius:200px 200px 24px 24px;display:block;box-shadow:0 18px 40px rgba(34,32,29,.13)}
+.lede{font-size:19px;color:#3F3A35;margin:0 0 14px}
+.sig{font-family:Fraunces,Georgia,serif;font-style:italic;font-size:18px;color:var(--muted)}
+
+h2{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:clamp(26px,4.4vw,38px);line-height:1.15;margin:0 0 8px}
+h3{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:21px;margin:0 0 6px}
+section{padding:44px 0;border-top:1px solid var(--line)}
+.sub{color:var(--muted);margin:0 0 26px;font-size:17px}
+
+.quote{background:var(--soft);border-radius:20px;padding:26px 28px;margin:0}
+.quote p{font-family:Fraunces,Georgia,serif;font-size:21px;font-style:italic;margin:0 0 8px}
+.quote footer{font-size:14px;color:var(--muted)}
+
+.work{display:grid;grid-template-columns:1fr;gap:14px}
+.work img{width:100%;border-radius:18px;display:block}
+.work figcaption{font-size:14px;color:var(--muted)}
+
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:22px 24px}
+.card p{margin:0;color:#4A443D}
+.card .tag{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:8px}
+
+/* calculator */
+.calc{background:var(--deep);color:#F5F0E9;border-radius:26px;padding:30px}
+.calc h2{color:#fff;margin-bottom:4px}
+.calc .sub{color:#C9C0B5}
+.calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start}
+.ctrl{margin-bottom:18px}
+.ctrl label{display:flex;justify-content:space-between;align-items:baseline;font-size:15px;font-weight:700;margin-bottom:8px;gap:10px}
+.ctrl .val{font-family:Fraunces,Georgia,serif;font-size:20px;color:var(--gold)}
+input[type=range]{width:100%;accent-color:#C9A227;height:28px}
+.mini{font-size:13px;color:#B7AEA3;margin:-4px 0 0}
+.lines{display:flex;flex-direction:column;gap:2px;background:#353129;border-radius:18px;padding:18px 20px}
+.line{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #464036;font-size:15px}
+.line:last-child{border-bottom:0}
+.line b{font-variant-numeric:tabular-nums}
+.line.neg b{color:#E6B0A5}
+.line.total{border-top:2px solid #5A5346;margin-top:6px;padding-top:12px;font-size:17px}
+.big{background:var(--gold);color:#241F14;border-radius:18px;padding:18px 20px;margin-top:14px}
+.big .n{font-family:Fraunces,Georgia,serif;font-size:40px;font-weight:700;line-height:1}
+.big .l{font-size:14px;font-weight:700}
+.toggle{display:inline-flex;background:#3D382F;border-radius:999px;padding:4px;gap:4px;margin-bottom:18px}
+.toggle button{background:transparent;border:0;color:#D8D0C5;font:inherit;font-weight:700;padding:9px 18px;border-radius:999px;cursor:pointer;min-height:40px}
+.toggle button[aria-pressed="true"]{background:#F5F0E9;color:#241F14}
+
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{font-size:13px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted)}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+.tablecard{background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+
+.steps{counter-reset:s;display:grid;gap:14px}
+.step{display:grid;grid-template-columns:44px 1fr;gap:16px;align-items:start}
+.step .n{width:44px;height:44px;border-radius:22px;background:var(--rose);color:#fff;display:flex;align-items:center;justify-content:center;font-family:Fraunces,Georgia,serif;font-size:20px;font-weight:700}
+.cta{background:var(--soft);border-radius:26px;padding:34px;text-align:center}
+.btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:14px 26px;border-radius:999px;font-weight:700;text-decoration:none;font-size:17px;border:0;cursor:pointer;font-family:inherit}
+.btn.primary{background:var(--rose);color:#fff}
+.btn.ghost{border:2px solid var(--ink);color:var(--ink);background:transparent}
+footer.page{padding:30px 0 60px;color:var(--muted);font-size:13px;text-align:center}
+@media (max-width:760px){
+  .hero-grid,.calc-grid,.cards,.work{grid-template-columns:1fr}
+  .hero-grid img{border-radius:24px;max-width:340px;margin:0 auto}
+  .calc{padding:22px}
+}
+@media print{
+  body{background:#fff}
+  .calc{background:#fff;color:#000;border:1px solid #999}
+  .calc .sub,.mini{color:#333}
+  .lines{background:#f5f5f5}
+  .btns,.toggle{display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap hero">
+  <p class="eyebrow">A private invitation &middot; Pacific Beach</p>
+  <div class="hero-grid">
+    <div>
+      <h1>Marisa, this room <em>should be yours.</em></h1>
+      <p class="lede">You have spent years making other people's ideas work. Boards n' Beans runs the way it does partly because you run it. Meanwhile you have built something of your own: a following, a craft, and clients who drive across the county to sit in your chair.</p>
+      <p class="lede">The back room behind the shop is open. We would like you to have it, on terms built so that you keep the upside.</p>
+      <p class="sig">&mdash; With respect from your neighbors at HD Laser</p>
+    </div>
+    <img src="/assets/marisa-portrait.jpg" alt="Marisa Lee, hair stylist">
+  </div>
+</div>
+
+<div class="wrap">
+  <section>
+    <h2>Your own room, in your own community</h2>
+    <p class="sub">Three shops sharing three walls. Your husband's coffee shop on one side, Hugh's laser studio on the other, Palm &amp; Sage down the wall, and your home across the street.</p>
+    <div class="cards">
+      <div class="card"><div class="tag">The space</div><h3>A private salon room</h3><p>The back room, yours alone. Your own keys, your own hours, your own door to walk through on a Sunday if you feel like it.</p></div>
+      <div class="card"><div class="tag">The clients</div><h3>Foot traffic that already loves you</h3><p>Every person who walks into Boards n' Beans is twenty feet from your chair. Coffee first, color second, no parking, no freeway.</p></div>
+      <div class="card"><div class="tag">The family</div><h3>Ninety seconds from home</h3><p>Between appointments you are still here: with Alex, with your daughter, in the place you helped build.</p></div>
+      <div class="card"><div class="tag">The look</div><h3>Built with your taste, not ours</h3><p>We would love you to use your network and resources to bring the room up to your standard. You know what a salon should feel like. We don't.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Your work already speaks</h2>
+    <p class="sub">This is not a favor. It's an invitation to a professional whose work fills a feed and a books page.</p>
+    <figure class="work" style="margin:0">
+      <img src="/assets/marisa-work-grid.jpg" alt="A grid of Marisa's balayage, blonding, and bridal styling work">
+      <figcaption>Balayage, color, extensions, bridal, cuts &mdash; @hairby_risss</figcaption>
+    </figure>
+    <blockquote class="quote" style="margin-top:20px">
+      <p>&ldquo;My hair was styled to perfection.&rdquo;</p>
+      <footer>A client, on her engagement photos</footer>
+    </blockquote>
+  </section>
+
+  <section>
+    <div class="calc">
+      <h2>What it would actually pay you</h2>
+      <p class="sub">Move the sliders. Every number updates. Nothing here is fixed rent: in a slow month you owe less, and in a month you don't work, you owe nothing.</p>
+
+      <div class="toggle" role="group" aria-label="Show monthly or yearly">
+        <button type="button" id="btn-month" aria-pressed="true">Monthly</button>
+        <button type="button" id="btn-year" aria-pressed="false">Yearly</button>
+      </div>
+
+      <div class="calc-grid">
+        <div>
+          <div class="ctrl">
+            <label for="clients">Clients a week <span class="val" id="v-clients">8</span></label>
+            <input type="range" id="clients" min="2" max="30" step="1" value="8">
+          </div>
+          <div class="ctrl">
+            <label for="ticket">Average ticket (cut &amp; color) <span class="val" id="v-ticket">$185</span></label>
+            <input type="range" id="ticket" min="80" max="400" step="5" value="185">
+          </div>
+          <div class="ctrl">
+            <label for="color">Color &amp; product per client <span class="val" id="v-color">$28</span></label>
+            <input type="range" id="color" min="5" max="90" step="1" value="28">
+            <p class="mini">Bowl cost: color, developer, toner, foils, capes.</p>
+          </div>
+          <div class="ctrl">
+            <label for="supplies">Other costs a month <span class="val" id="v-supplies">$140</span></label>
+            <input type="range" id="supplies" min="0" max="600" step="10" value="140">
+            <p class="mini">Backbar, towels, booking software, insurance, laundry.</p>
+          </div>
+          <div class="ctrl">
+            <label for="rent">Hugh&rsquo;s monthly rent <span class="val" id="v-rent">$2,500</span></label>
+            <input type="range" id="rent" min="1000" max="6000" step="100" value="2500">
+            <p class="mini">Only used to set your ceiling. Hugh will confirm the real figure.</p>
+          </div>
+        </div>
+
+        <div>
+          <div class="lines" aria-live="polite">
+            <div class="line"><span id="lbl-rev">What you bring in</span> <b id="o-rev">$6,409</b></div>
+            <div class="line neg"><span>Color &amp; product</span> <b id="o-color">&minus;$970</b></div>
+            <div class="line neg"><span>Card processing (3%)</span> <b id="o-fees">&minus;$192</b></div>
+            <div class="line neg"><span>Other costs</span> <b id="o-supplies">&minus;$140</b></div>
+            <div class="line total"><span>Net profit</span> <b id="o-net">$5,107</b></div>
+            <div class="line neg"><span>Your 20% to HD Laser <span id="capnote" class="mini" style="display:none">(capped)</span></span> <b id="o-share">&minus;$750</b></div>
+          </div>
+          <div class="big">
+            <div class="l">YOU KEEP</div>
+            <div class="n" id="o-keep">$4,357</div>
+            <div class="l" id="o-per">about $136 per client, after everything</div>
+          </div>
+          <p class="mini" id="o-cap">Your ceiling right now: $750 a month, 30% of Hugh&rsquo;s rent. You never pay more than that, no matter how busy you get.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The terms, in plain language</h2>
+    <p class="sub">Short version: you pay a share of what you actually make, and there's a ceiling on it.</p>
+    <div class="tablecard">
+      <table>
+        <tbody>
+          <tr><td><b>What you pay</b></td><td class="r">20% of your net profit</td></tr>
+          <tr><td><b>Your ceiling</b></td><td class="r">Never more than 30% of Hugh&rsquo;s rent</td></tr>
+          <tr><td><b>Slow month</b></td><td class="r">You pay less. No profit, nothing owed.</td></tr>
+          <tr><td><b>Your keys</b></td><td class="r">Your own set, your own hours</td></tr>
+          <tr><td><b>How long</b></td><td class="r">We hope through Hugh&rsquo;s lease (17 months)</td></tr>
+          <tr><td><b>If you need to go</b></td><td class="r">30 days&rsquo; notice. No penalty, no hard feelings.</td></tr>
+          <tr><td><b>The room</b></td><td class="r">Brought up to standard with your eye and your people</td></tr>
+          <tr><td><b>The paperwork</b></td><td class="r">Your license and your own liability insurance, like any salon</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="sub" style="margin-top:18px">On that last line: each of us stays responsible for our own work, which is how every shared space works and what keeps all three businesses protected. Your insurer sends a certificate, we keep it on file, and nobody thinks about it again.</p>
+  </section>
+
+  <section>
+    <h2>How this compares to a booth</h2>
+    <p class="sub">A chair in a San Diego salon is usually fixed rent, due whether you worked or not.</p>
+    <div class="tablecard">
+      <table>
+        <thead><tr><th>&nbsp;</th><th class="r">Typical booth rental</th><th class="r">This room</th></tr></thead>
+        <tbody>
+          <tr><td>Paid when you&rsquo;re slow</td><td class="r">Full rent</td><td class="r">Less, or nothing</td></tr>
+          <tr><td>Paid when you&rsquo;re busy</td><td class="r">Full rent</td><td class="r">Capped at 30% of Hugh&rsquo;s rent</td></tr>
+          <tr><td>Commute</td><td class="r">Across town</td><td class="r">Across the street</td></tr>
+          <tr><td>Walk-in traffic</td><td class="r">Salon&rsquo;s clients</td><td class="r">Your community&rsquo;s clients</td></tr>
+          <tr><td>Leaving</td><td class="r">Lease or notice period</td><td class="r">30 days, no penalty</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>If you want it, here&rsquo;s the path</h2>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><div><h3>Walk the room with us</h3><p>Bring your list. Tell us what it needs: water, light, mirrors, storage, a door that closes properly.</p></div></div>
+      <div class="step"><div class="n">2</div><div><h3>Set the real numbers</h3><p>Hugh confirms his rent so your ceiling is exact, and we write this up in one simple page you can hand to your accountant.</p></div></div>
+      <div class="step"><div class="n">3</div><div><h3>Make it yours</h3><p>Your taste, your suppliers, your network. We help with the build where we can.</p></div></div>
+      <div class="step"><div class="n">4</div><div><h3>Open the door</h3><p>Same block, same people, first chair that is entirely your own.</p></div></div>
+    </div>
+  </section>
+
+  <section style="border:0">
+    <div class="cta">
+      <h2>You&rsquo;ve earned a space with your name on it.</h2>
+      <p class="sub" style="margin:10px auto 0;max-width:34em">Take your time with this page. When you&rsquo;re ready, say the word and we&rsquo;ll walk the room together.</p>
+      <div class="btns">
+        <a class="btn primary" href="sms:+18583739866?&body=I%20read%20the%20page.%20Let%27s%20talk%20about%20the%20room.">Text us</a>
+        <a class="btn ghost" href="tel:+18583739866">Call (858) 373-9866</a>
+        <button class="btn ghost" type="button" onclick="window.print()">Save as PDF</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<footer class="page">This page is private. It isn&rsquo;t linked anywhere or listed in search. Figures are estimates to show how the split works, not a promise of income.</footer>
+
+<script>
+(function(){
+  var yearly=false;
+  var el=function(id){return document.getElementById(id);};
+  var money=function(n){return '$'+Math.round(n).toLocaleString('en-US');};
+  var ids=['clients','ticket','color','supplies','rent'];
+  function calc(){
+    var c=+el('clients').value, t=+el('ticket').value, col=+el('color').value, sup=+el('supplies').value, rent=+el('rent').value;
+    var m=4.33, mult=yearly?12:1;
+    var rev=c*t*m, colorCost=c*col*m, fees=rev*0.03, other=sup;
+    var net=rev-colorCost-fees-other;
+    var share=Math.max(0,net*0.20), cap=rent*0.30, capped=share>cap;
+    var pay=Math.min(share,cap), keep=net-pay;
+    el('v-clients').textContent=c;
+    el('v-ticket').textContent=money(t);
+    el('v-color').textContent=money(col);
+    el('v-supplies').textContent=money(sup);
+    el('v-rent').textContent=money(rent);
+    el('lbl-rev').textContent=yearly?'What you bring in (a year)':'What you bring in';
+    el('o-rev').textContent=money(rev*mult);
+    el('o-color').textContent='\u2212'+money(colorCost*mult);
+    el('o-fees').textContent='\u2212'+money(fees*mult);
+    el('o-supplies').textContent='\u2212'+money(other*mult);
+    el('o-net').textContent=money(net*mult);
+    el('o-share').textContent='\u2212'+money(pay*mult);
+    el('o-keep').textContent=money(keep*mult);
+    el('capnote').style.display=capped?'inline':'none';
+    var perClient=keep/(c*m);
+    el('o-per').textContent='about '+money(perClient)+' per client, after everything';
+    el('o-cap').textContent='Your ceiling right now: '+money(cap)+' a month, 30% of Hugh\u2019s rent. '+(capped
+      ? 'You\u2019re busy enough to hit it, so every extra client is yours alone.'
+      : 'You never pay more than that, no matter how busy you get.');
+  }
+  ids.forEach(function(i){el(i).addEventListener('input',calc);});
+  el('btn-month').addEventListener('click',function(){yearly=false;this.setAttribute('aria-pressed','true');el('btn-year').setAttribute('aria-pressed','false');calc();});
+  el('btn-year').addEventListener('click',function(){yearly=true;this.setAttribute('aria-pressed','true');el('btn-month').setAttribute('aria-pressed','false');calc();});
+  calc();
+})();
+</script>
+</body>
+</html>
