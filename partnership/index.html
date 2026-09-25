@@ -56,14 +56,14 @@ input[type=range]{width:100%;accent-color:#F2B63D;height:28px}
 .tile.hugh .v{color:#8FC1F0} .tile.jake .v{color:#F29B90} .tile.gold .v{color:var(--gold)}
 .tile .s{font-size:13px;color:#B7BEC6;margin-top:4px}
 .chart{margin-top:16px}
-.chart .row{display:grid;grid-template-columns:118px 1fr;gap:10px;align-items:center;margin:10px 0}
+.chart .row{display:grid;grid-template-columns:1fr;gap:4px;margin:10px 0}
 .chart .lab{font-size:14px;font-weight:700;color:#E7EAEE}
 .bar{position:relative;height:30px;background:#2A3038;border-radius:6px;overflow:hidden;display:flex;gap:2px}
-.seg{height:100%;transition:width .25s ease}
+.seg{height:100%}
 .seg.h{background:var(--hugh)} .seg.j{background:var(--jake)} .seg.m{background:#7C8794} .seg.d{background:#4E5661}
 .seg{position:relative;overflow:hidden}
 .seg span{position:static;display:block}
-.seg span{position:absolute;top:0;line-height:30px;font-size:13px;font-weight:700;color:#fff;padding:0 8px;white-space:nowrap}
+.seg span{position:absolute;top:0;line-height:30px;font-size:12.5px;font-weight:700;color:#fff;padding:0 7px;white-space:nowrap}
 .legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:8px;font-size:13px;color:#C9CFD6}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
 .tip{position:absolute;z-index:5;background:#fff;color:var(--ink);font-size:13px;padding:6px 10px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.25);pointer-events:none;display:none;white-space:nowrap}
@@ -433,6 +433,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
   var money=function(n){return '$'+Math.round(n).toLocaleString('en-US');};
   var short=function(n){return n>=1e6?'$'+(n/1e6).toFixed(2).replace(/\.?0+$/,'')+'M':money(n);};
   var STAGES=[0.30,0.25,0.20,0.15];
+  window.addEventListener('resize',function(){ calc(); });
   var NOTES=['Build: Jake runs growth and operations alongside you. 30% of the growth profit.',
     'Revenue has held above $1M for two quarters. Jake still runs growth. 25%.',
     'A manager runs the floor; Jake is out of daily operations but still leads sales and marketing. 20%.',
@@ -464,9 +465,11 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
     $('o-hugh').textContent=money(hugh+defUsed); $('o-hughnote').textContent=Math.round((1-share)*100)+'% of the split ('+money(hugh)+') plus the '+money(defUsed)+' hole filled, plus all of the baseline';
     $('o-jake').textContent=money(jake); $('o-jakenote').textContent=Math.round(share*100)+'% of the split, nothing on the baseline, nothing on the hole';
     $('o-first').textContent=pool>0?'Jake\u2019s first dollar arrived at about '+money(firstRev)+' of revenue. Everything before that went to marketing and the hole.':'Jake\u2019s first dollar arrives at about '+money(firstRev)+' of revenue. Below that, all growth profit goes to marketing and the hole.';
-    function seg(id,lid,val,label){ var pct=np>0?val/np*100:0; $(id).style.width=pct>0?'calc('+pct+'% - 1px)':'0'; $(lid).textContent=pct>=22?label:''; $(id).dataset.tip=label; }
-    if(np>0){ seg('seg-m','seg-m-l',mkUsed,'Marketing '+money(mkUsed)); seg('seg-d','seg-d-l',defUsed,'Hole '+money(defUsed)); seg('seg-h','seg-h-l',hugh,'Hugh '+money(hugh)); seg('seg-j','seg-j-l',jake,'Jake '+money(jake)); }
+    var k=function(n){ return n>=1e6?'$'+(n/1e6).toFixed(2).replace(/\.?0+$/,'')+'M':(n>=1000?'$'+Math.round(n/1000)+'k':money(n)); };
+    var segs=[['seg-m','seg-m-l',mkUsed,'Mkt '+k(mkUsed),'Marketing '+money(mkUsed)],['seg-d','seg-d-l',defUsed,'Hole '+k(defUsed),'Hole filled '+money(defUsed)],['seg-h','seg-h-l',hugh,'Hugh '+k(hugh),'Hugh '+money(hugh)],['seg-j','seg-j-l',jake,'Jake '+k(jake),'Jake '+money(jake)]];
+    if(np>0){ segs.forEach(function(x){ var pct=x[2]/np*100; $(x[0]).style.width=pct>0?'calc('+pct+'% - 1px)':'0'; $(x[1]).textContent=x[3]; $(x[0]).dataset.tip=x[4]; }); }
     else { ['seg-m','seg-d','seg-j'].forEach(function(i){$(i).style.width='0';}); $('seg-h').style.width='100%'; $('seg-h-l').textContent='no growth yet'; }
+    requestAnimationFrame(function(){ segs.forEach(function(x){ var el=$(x[0]), sp=$(x[1]); if(np>0 && sp.scrollWidth>el.clientWidth-4) sp.textContent=''; }); });
     $('r-first').textContent=short(firstRev); $('r-firstnote').textContent='baseline, plus '+short(firstRev-base)+' of growth to pay marketing at '+Math.round(rate*100)+'% and fill the '+money(def)+' hole, at a '+Math.round(m*100)+'% margin';
     var ratio=(1-share)/share; var tot=ratio+1;
     $('seg-r').style.width='calc('+(ratio/tot*100)+'% - 1px)'; $('seg-r2').style.width='calc('+(1/tot*100)+'% - 1px)';
