@@ -15,6 +15,12 @@
     '#edbar .st{flex:1;min-width:160px;color:#D8D0C5}',
     '#edbar button{background:#F5F0E9;color:#22201D;border:0;border-radius:999px;padding:7px 14px;font:inherit;font-weight:700;cursor:pointer}',
     '#edbar button.ghost{background:transparent;color:#F5F0E9;border:1.5px solid #8A8178}',
+    '#edpanel{display:none;flex-basis:100%;background:#2E2A26;border-radius:12px;padding:14px 16px;margin-top:4px;line-height:1.45}',
+    '#edpanel.open{display:block}',
+    '#edpanel ol{margin:6px 0 10px 18px;padding:0}',
+    '#edpanel a{color:#F2B63D}',
+    '#edpanel .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}',
+    '#edpanel input{flex:1;min-width:220px;padding:9px 12px;border-radius:8px;border:1.5px solid #8A8178;background:#F5F0E9;color:#22201D;font:inherit}',
     '.edit-host{position:relative;scroll-margin-top:72px}',
     '.edit-ui{position:absolute;top:8px;right:8px;z-index:20;display:flex;gap:6px}',
     '.edit-ui button{background:#B8766B;color:#fff;border:0;border-radius:999px;padding:7px 14px;font:700 13px/1 Figtree,system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2)}',
@@ -30,7 +36,13 @@
 
   var bar = document.createElement('div'); bar.id = 'edbar';
   bar.innerHTML = '<b>Editing Marisa’s page</b><span class="st" id="edstatus">Click Edit on any section. Save commits it and the live page updates in about a minute.</span>' +
-    '<button class="ghost" id="edtoken"></button><button id="eddone">Done editing</button>';
+    '<button class="ghost" id="edtoken"></button><button id="eddone">Done editing</button>' +
+    '<div id="edpanel"><b>Connect this browser to GitHub (one time).</b> Take as long as you need; nothing here times out and your edits stay on the page.' +
+    '<ol><li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Open the GitHub token page</a> (Settings \u2192 Developer settings \u2192 Personal access tokens \u2192 Fine-grained).</li>' +
+    '<li>Repository access: <b>Only select repositories</b> \u2192 hdlaser-site.</li>' +
+    '<li>Repository permissions: <b>Contents \u2192 Read and write</b>. Pick any expiration you like.</li>' +
+    '<li>Generate, copy the token, paste it below.</li></ol>' +
+    '<div class="row"><input id="edtokenin" type="password" autocomplete="off" placeholder="github_pat_\u2026"><button id="edtokensave">Use this token</button><button class="ghost" id="edtokenclose">Close</button></div></div>';
   document.body.appendChild(bar);
   var status = document.getElementById('edstatus');
   function say(msg, isErr) { status.textContent = msg; status.style.color = isErr ? '#F2B0A5' : '#D8D0C5'; }
@@ -38,14 +50,30 @@
   function getToken() { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
   function setToken(t) { try { if (t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); } catch (e) {} refreshTokenBtn(); }
   function refreshTokenBtn() { document.getElementById('edtoken').textContent = getToken() ? 'Forget GitHub token' : 'Set GitHub token'; }
-  function askToken() {
-    var t = window.prompt('Paste a GitHub fine-grained token for jake-hess/hdlaser-site with Contents: Read and write.\n\nGitHub → Settings → Developer settings → Personal access tokens → Fine-grained → Generate. Repository access: only hdlaser-site. Permissions: Contents → Read and write.\n\nIt stays in this browser only.');
-    if (t) { setToken(t.trim()); say('Token saved in this browser.'); }
-    return getToken();
+  var pendingSave = null;
+  function askToken(block) {
+    pendingSave = block || null;
+    document.getElementById('edpanel').classList.add('open');
+    var inp = document.getElementById('edtokenin'); inp.value = ''; inp.focus();
+    say(block ? 'One more step: connect this browser to GitHub, then the save finishes on its own.' : 'Connect this browser to GitHub.');
+    return '';
   }
+  document.getElementById('edtokensave').addEventListener('click', function () {
+    var t = document.getElementById('edtokenin').value.trim();
+    if (!t) { say('Paste the token first.', true); return; }
+    setToken(t);
+    document.getElementById('edtokenin').value = '';
+    document.getElementById('edpanel').classList.remove('open');
+    say('Connected. This browser can now save changes.');
+    if (pendingSave) { var b = pendingSave; pendingSave = null; save(b); }
+  });
+  document.getElementById('edtokenclose').addEventListener('click', function () {
+    document.getElementById('edpanel').classList.remove('open'); pendingSave = null;
+    say(current ? 'Still editing \u201c' + title(current) + '\u201d. Connect GitHub when you are ready to save.' : 'Click Edit on any section.');
+  });
   document.getElementById('edtoken').addEventListener('click', function () {
     if (getToken()) { if (confirm('Forget the GitHub token stored in this browser?')) { setToken(''); say('Token removed from this browser.'); } }
-    else askToken();
+    else askToken(null);
   });
   document.getElementById('eddone').addEventListener('click', function () {
     if (current && !confirm('You are still editing a section. Leave without saving it?')) return;
@@ -129,8 +157,8 @@
   }
 
   function save(block) {
-    var token = getToken() || askToken();
-    if (!token) { say('No token, nothing saved. Your edits are still on screen.', true); return; }
+    var token = getToken();
+    if (!token) { askToken(block); return; }
     var key = block.getAttribute('data-edit');
     var html = serialize(block);
     var btns = uiFor(block).querySelectorAll('button');
