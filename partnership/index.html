@@ -73,7 +73,7 @@ th,td{text-align:right;padding:10px 12px;border-bottom:1px solid var(--line);fon
 th:first-child,td:first-child{text-align:left}
 thead th{background:var(--sand);font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted)}
 td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
-#bud{min-width:680px} #scen{min-width:640px} #trade{min-width:640px} #trade td{text-align:left;vertical-align:top;font-size:14px} #bud td{vertical-align:top;font-size:14px;white-space:normal} #bud td:nth-child(2){white-space:nowrap} #bud .small{font-size:12px;color:var(--muted)}
+#bud{min-width:680px} #scen{min-width:640px} #trade{min-width:640px} #trade td{text-align:left;vertical-align:top;font-size:14px} #buyt td:first-child{white-space:nowrap} #bud td{vertical-align:top;font-size:14px;white-space:normal} #bud td:nth-child(2){white-space:nowrap} #bud .small{font-size:12px;color:var(--muted)}
 #bud input.pct{width:58px;font:inherit;font-size:15px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;text-align:right;background:#fff}
 #bud tfoot td{background:var(--sand);border-bottom:0}
 .tablecard{border:1px solid var(--line);border-radius:14px;overflow:auto}
@@ -126,7 +126,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
     <div class="cards">
       <div class="card hugh"><div class="n">$180k</div><h3>Your baseline is protected</h3><p>The first $180,000 of revenue every year is yours, entirely. Jake earns nothing on it. That number is what you are finishing this year at, so day one of the deal changes nothing about your income.</p></div>
       <div class="card jake"><div class="n">30%</div><h3>Jake is paid on growth only, last in line</h3><p>On revenue above the baseline, the marketing budget is paid first, then the $30,000 hole the business is in today is filled. Only then is the net profit split: 70% to you, 30% to Jake. If the growth doesn&rsquo;t come, Jake earned nothing and you lost nothing.</p></div>
-      <div class="card gold"><div class="n">30 &rarr; 15%</div><h3>It steps down in four stages</h3><p>Once revenue holds above $1,000,000, Jake&rsquo;s share steps down as he hands off: 25% when the $1M holds, 20% when a manager runs the floor, 15% when Jake has stepped out and a team runs it. If revenue falls back under $1M, Jake steps back in and the 30% returns until it&rsquo;s rebuilt.</p></div>
+      <div class="card gold"><div class="n">30 &rarr; 15%</div><h3>It steps down in four stages, and each step is bought, not given</h3><p>Once revenue holds above $1,000,000, Jake&rsquo;s share steps down as he hands off: 25% when the $1M holds, 20% when a manager runs the floor, 15% when a team runs it. Each 5 points he releases is bought back at four times its annual value, so the points return to your cap table paid for. If revenue falls back under $1M, Jake steps back in and the 30% returns until it&rsquo;s rebuilt.</p></div>
     </div>
   </section>
 
@@ -293,10 +293,47 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
     <h2>How the company grows up, one stage at a time</h2>
     <p class="sub">Each stage is a milestone you can see on the dashboards, not a date on a calendar. Jake&rsquo;s share only steps down when the milestone is real.</p>
     <div class="phase"><div class="num">30%</div><div><h3>Build (now to $1M)</h3><p>Jake runs growth: sales, marketing, systems, the website and dashboards you already have, hiring the first people who can quote and produce without you. You keep 100% of the baseline and 70% of the growth profit.</p></div></div>
-    <div class="phase"><div class="num blue">25%</div><div><h3>Hold ($1M held for two quarters)</h3><p>Revenue has stayed above $1M for two quarters in a row. Jake still runs growth, but the first step-down happens here because the shop has proven it can carry the size. You keep 75% of the growth profit.</p></div></div>
-    <div class="phase"><div class="num blue">20%</div><div><h3>Hand off (a manager runs the floor)</h3><p>A floor manager owns the daily open, the queue and the close, using the checklists and the staff portal. Jake is out of daily operations and leads only sales and marketing. Part of the step-down funds the manager. You keep 80%.</p></div></div>
-    <div class="phase"><div class="num blue">15%</div><div><h3>Run (Jake stepped out)</h3><p>A small team runs it and the dashboards have stayed green for two quarters without Jake in the building. His share settles at 15%. The rest of the room he gave up goes to the people who run it, who will need a stake or a bonus pool to stay. You are an owner now, not the operator, and you keep 85%.</p></div></div>
+    <div class="phase"><div class="num blue">25%</div><div><h3>Hold ($1M held for two quarters)</h3><p>Revenue has stayed above $1M for two quarters in a row. Jake still runs growth, but the first step-down happens here because the shop has proven it can carry the size. You keep 75% of the growth profit. The 5 points Jake released are bought back at 4&times; their annual value (see below).</p></div></div>
+    <div class="phase"><div class="num blue">20%</div><div><h3>Hand off (a manager runs the floor)</h3><p>A floor manager owns the daily open, the queue and the close, using the checklists and the staff portal. Jake is out of daily operations and leads only sales and marketing. Part of the step-down funds the manager. You keep 80%. Another 5 points bought back.</p></div></div>
+    <div class="phase"><div class="num blue">15%</div><div><h3>Run (Jake stepped out)</h3><p>A small team runs it and the dashboards have stayed green for two quarters without Jake in the building. His share settles at 15%. The last 5 points are bought back. The room he gave up is now yours to keep, to grant to the people who run it, or to sell to a strategic partner. You are an owner now, not the operator, and you keep 85%.</p></div></div>
     <div class="phase"><div class="num gold">&#8635;</div><div><h3>Rebuild, if needed</h3><p>If revenue falls back under $1M at any stage, Jake comes back in, the share returns to 30%, and it stays there until the shop is back above $1M for two quarters. Then the ladder starts again from 25%. You are never left holding a bigger company alone.</p></div></div>
+  </section>
+
+  <section>
+    <h2>When Jake&rsquo;s share comes down, it is bought, not lost</h2>
+    <p class="sub">Jake is building something that will be worth more at every step. If he simply handed points back, he would be paid for the work and nothing for the build. So each 5-point step is a buy-back: the points return to your cap table at a price, valued at a multiple of what they earn in a year. That is how every growth company treats a stake, and it is what makes the points worth something to a strategic partner later.</p>
+    <div class="calc" id="buy">
+      <div class="grid">
+        <div>
+          <div class="ctrl">
+            <label for="mult">Multiple of annual value <span class="val" id="v-mult">4&times;</span></label>
+            <input type="range" id="mult" min="2" max="6" step="0.5" value="4">
+            <p class="mini">Four times what the points earn in a year. Small profitable service businesses trade in the 3 to 5 range; 4&times; is the middle.</p>
+          </div>
+          <div class="ctrl">
+            <label for="term">Paid over <span class="val" id="v-term">48 months</span></label>
+            <input type="range" id="term" min="12" max="60" step="6" value="48">
+            <p class="mini">Paid from the profit those points now earn you. At 48 months and 4&times;, the points pay for themselves: nothing comes out of your pocket.</p>
+          </div>
+          <div class="tiles">
+            <div class="tile gold"><div class="l">Pool the points are priced on</div><div class="v" id="b-pool">$0</div><div class="s">left to split, from the calculator above</div></div>
+            <div class="tile"><div class="l">One step, 5 points</div><div class="v" id="b-step">$0</div><div class="s" id="b-stepnote">4&times; what 5% earns in a year</div></div>
+            <div class="tile hugh"><div class="l">Your net while paying</div><div class="v" id="b-net">$0</div><div class="s" id="b-netnote">per month: what the points earn you, minus the payment</div></div>
+            <div class="tile"><div class="l">All three steps</div><div class="v" id="b-all">$0</div><div class="s">15 points back on your cap table, paid for</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="tablecard" style="background:#232930;border-color:#3A424C">
+            <table id="buyt" style="background:transparent;color:#F3F4F6;min-width:0">
+              <thead><tr><th style="background:#2A3038;color:#B7BEC6">Step</th><th style="background:#2A3038;color:#B7BEC6">Points earn / yr</th><th style="background:#2A3038;color:#B7BEC6">Buy-back</th><th style="background:#2A3038;color:#B7BEC6">Per month</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="mini" style="margin-top:10px">Priced on the pool set in the calculator. In practice each step is priced on the trailing twelve months at the moment it happens, so a bigger company pays more for the points, which is the point.</p>
+          <p class="mini" style="margin-top:8px"><b style="color:#F3F4F6">Two ways to pay for it.</b> From the points themselves, over the term above, so it is cash-neutral to you. Or sell the released points to a strategic partner at the same valuation: they pay Jake, you keep your full share, and the partner brings capital or accounts. Implied value of the whole growth-profit pool at this multiple: <b id="b-val" style="color:var(--gold)">$0</b>.</p>
+        </div>
+      </div>
+    </div>
   </section>
 
   <section>
@@ -359,6 +396,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
         <li>Marketing is a share of growth revenue, not a bill. It starts near zero, scales only as revenue arrives, is capped at $12,000 a month, and comes off the top so it is never paid twice.</li>
         <li>The hole is filled before the first split. You start from zero, not from behind.</li>
         <li>You keep 70 cents of every new profit dollar, rising to 75, 80 and 85 cents as Jake steps down.</li>
+        <li>The buy-backs are paid from the points themselves over 48 months, or by a strategic partner. Nothing comes out of your pocket, and the points come back to a cap table that is yours to keep, grant or sell.</li>
         <li>One set of books. Both of you read the same money page, the same P&amp;L, the same ledger. Nothing is calculated in someone&rsquo;s head.</li>
         <li>The shop stays yours. This is a share of profit, not a share of the company.</li>
         <li>Either of you can end it with 60 days&rsquo; notice. Jake&rsquo;s share applies only to revenue booked before the end date.</li>
@@ -367,6 +405,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
         <li>The definition of net profit is written down: revenue, minus cost of goods, minus operating costs, before owner draws and before Jake&rsquo;s share. Agreed once, checked by a CPA.</li>
         <li>Monthly statement, quarterly settlement, from the money page.</li>
         <li>Each step-down happens only when its milestone is real and visible on the dashboards: $1M held two quarters, a manager running the floor, a team running it without him.</li>
+        <li>No points are given back for free. Each 5-point step is bought at 4&times; its annual value, priced on the trailing twelve months, so Jake is paid for the build as well as the work.</li>
         <li>If revenue slips under $1M, the 30% comes back. Jake&rsquo;s time is protected the same way your baseline is.</li>
         <li>Growth spend (ads, hires, tools) is agreed before it&rsquo;s spent and comes out before profit is split, so nobody is paid on money that was reinvested.</li>
         <li>The marketing rate is committed for at least six months. Growth can&rsquo;t be judged on a budget that was cut halfway.</li>
@@ -393,6 +432,8 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
         <li><b>Baseline.</b> The $180,000 of revenue that stays entirely yours. The line the split starts above.</li>
         <li><b>Owner draw.</b> Money you take out of the business for yourself. Not an expense of the business; it comes after net profit.</li>
         <li><b>Cap table.</b> Who owns what share of a company. Yours has one name on it and this deal does not change that. It matters later, when the people who run the shop need a stake to stay.</li>
+        <li><b>Multiple.</b> A price expressed as years of earnings. 4&times; means paying four years of what something earns to own it outright.</li>
+        <li><b>Buy-back.</b> Paying for points that come off Jake&rsquo;s share instead of taking them for free. They return to your cap table paid for.</li>
         <li><b>Owner vs operator.</b> The operator does the work. The owner owns the thing that does the work. The whole plan is moving you from the first to the second without giving anything up.</li>
       </ul></div>
     </div>
@@ -408,6 +449,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
         <li><b>Who decides on spending?</b> The marketing rate and ceiling are agreed up front and Jake runs the envelope. Anything else over an agreed amount needs both of you. All of it comes off the top before the split.</li>
         <li><b>Where does the $30,000 figure come from?</b> The money page. Confirm it together with the CPA before signing, and write the exact number on the page.</li>
         <li><b>What does each milestone mean in writing?</b> $1M held: two consecutive quarters above $250,000. Manager runs the floor: a named person owns open, queue and close for a full quarter. Stepped out: Jake not in daily operations and dashboards green for two quarters.</li>
+        <li><b>How is a buy-back priced, exactly?</b> Points released &times; the trailing-twelve-month pool &times; the multiple. Written on the page with a worked example so there is nothing to argue about later.</li>
         <li><b>What about the people who run it later?</b> The 20% and 15% stages set aside part of the profit for the manager and the team. That comes from Jake&rsquo;s step-down first, not from your baseline.</li>
       </ul>
     </div>
@@ -470,6 +512,7 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
     if(np>0){ segs.forEach(function(x){ var pct=x[2]/np*100; $(x[0]).style.width=pct>0?'calc('+pct+'% - 1px)':'0'; $(x[1]).textContent=x[3]; $(x[0]).dataset.tip=x[4]; }); }
     else { ['seg-m','seg-d','seg-j'].forEach(function(i){$(i).style.width='0';}); $('seg-h').style.width='100%'; $('seg-h-l').textContent='no growth yet'; }
     requestAnimationFrame(function(){ segs.forEach(function(x){ var el=$(x[0]), sp=$(x[1]); if(np>0 && sp.scrollWidth>el.clientWidth-4) sp.textContent=''; }); });
+    window.__pool=pool; buyback();
     $('r-first').textContent=short(firstRev); $('r-firstnote').textContent='baseline, plus '+short(firstRev-base)+' of growth to pay marketing at '+Math.round(rate*100)+'% and fill the '+money(def)+' hole, at a '+Math.round(m*100)+'% margin';
     var ratio=(1-share)/share; var tot=ratio+1;
     $('seg-r').style.width='calc('+(ratio/tot*100)+'% - 1px)'; $('seg-r2').style.width='calc('+(1/tot*100)+'% - 1px)';
@@ -490,6 +533,21 @@ td.h{color:var(--hugh);font-weight:700} td.j{color:var(--jake);font-weight:700}
     $('t-hugh').textContent=money(poolNeeded-target+def); $('t-rev').textContent=short(rNeeded);
     $('t-revnote').textContent='baseline plus '+short(gNeeded)+' of growth: '+money(mkNeeded)+' of marketing and the '+money(def)+' hole first, then a '+money(poolNeeded)+' split, at a '+Math.round(m*100)+'% margin';
   }
+  function buyback(){
+    var pool=window.__pool||0, mult=+$('mult').value, term=+$('term').value;
+    $('v-mult').textContent=mult+'\u00d7'; $('v-term').textContent=term+' months';
+    var stepYr=pool*0.05, stepBuy=stepYr*mult, pay=stepBuy/term, net=stepYr/12-pay;
+    $('b-pool').textContent=money(pool);
+    $('b-step').textContent=money(stepBuy); $('b-stepnote').textContent=mult+'\u00d7 the '+money(stepYr)+' that 5% earns in a year';
+    $('b-net').textContent=(net<0?'\u2212':'')+money(Math.abs(net)); $('b-netnote').textContent='per month: '+money(stepYr/12)+' the points earn you, minus the '+money(pay)+' payment';
+    $('b-all').textContent=money(stepBuy*3);
+    $('b-val').textContent=money(pool*mult);
+    var rows=[['30% \u2192 25%',25],['25% \u2192 20%',20],['20% \u2192 15%',15]], html='';
+    rows.forEach(function(r){ html+='<tr><td style="border-color:#3A424C">'+r[0]+'</td><td style="border-color:#3A424C">'+money(stepYr)+'</td><td style="border-color:#3A424C"><b>'+money(stepBuy)+'</b></td><td style="border-color:#3A424C">'+money(pay)+'</td></tr>'; });
+    html+='<tr><td style="border:0"><b>All three</b></td><td style="border:0">'+money(stepYr*3)+'</td><td style="border:0"><b>'+money(stepBuy*3)+'</b></td><td style="border:0"></td></tr>';
+    $('buyt').querySelector('tbody').innerHTML=html;
+  }
+  ['mult','term'].forEach(function(i){ $(i).addEventListener('input',buyback); });
   var PCT_KEYS=['materials','labor','software','equipment','fees','reserve'];
   function budgets(){
     var rev=+$('rev').value, mrev=rev/12, fixed=+$('fixed').value/12, sum=0;
