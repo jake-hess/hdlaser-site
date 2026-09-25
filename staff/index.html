@@ -70,6 +70,7 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
     <form id="loginform" style="display:flex;flex-direction:column;gap:12px" autocomplete="off">
       <label>Your name<input name="name" placeholder="As it appears on the team list" required autocapitalize="words"></label>
       <label>PIN<input name="pin" inputmode="numeric" pattern="\d{4,8}" placeholder="4 to 8 digits" required type="password"></label>
+      <label class="consent" style="display:flex;flex-direction:row;gap:10px;align-items:flex-start;font-weight:400;font-size:14px;line-height:1.5"><input type="checkbox" name="smsConsent" style="width:22px;height:22px;padding:0;margin:3px 0 0;flex:none;accent-color:#C8372A"><span><b>Text me shop alerts.</b> I agree to receive text messages from HD Laser Studio at my cell number on file about my shifts, clock-ins and shop coverage (for example, when nobody has opened the shop). Msg frequency varies. Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help. This is optional, and my number is never shared. <a href="/terms/" target="_blank" rel="noopener">Terms &amp; Privacy</a>.</span></label>
       <button class="btn red" type="submit">Sign in</button>
       <p class="note">Everyone has their own name and PIN. Don't share yours. Forgot it? Ask Hugh or a manager to reset it.</p>
       <div class="err" id="loginerr" hidden></div>
@@ -161,7 +162,7 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
   function signOut(){ token=null; try{localStorage.removeItem('hd_staff_token');}catch(e){} $('#app').hidden=true; $('#login').hidden=false; $('#who').innerHTML='<a href="/" style="color:var(--muted)">hdlaser.net</a>'; }
 
   $('#loginform').addEventListener('submit',function(e){ e.preventDefault(); var f=e.target; $('#loginerr').hidden=true;
-    api('/staff/login',{name:f.name.value,pin:f.pin.value}).then(function(j){ token=j.token; try{localStorage.setItem('hd_staff_token',token);}catch(e){} f.reset(); load(); }).catch(function(err){ $('#loginerr').textContent=err.message; $('#loginerr').hidden=false; }); });
+    api('/staff/login',{name:f.name.value,pin:f.pin.value,smsConsent:!!(f.smsConsent&&f.smsConsent.checked)}).then(function(j){ token=j.token; try{localStorage.setItem('hd_staff_token',token);}catch(e){} f.reset(); load(); }).catch(function(err){ $('#loginerr').textContent=err.message; $('#loginerr').hidden=false; }); });
   $('#logout').onclick=function(){ api('/staff/logout',{}).catch(function(){}).then(signOut); };
 
   function load(){ if(!token){ signOut(); return; }

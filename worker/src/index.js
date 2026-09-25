@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS plaid_items (item_id TEXT PRIMARY KEY, access_token T
 CREATE TABLE IF NOT EXISTS coffee_orders (ref TEXT PRIMARY KEY, created_at TEXT NOT NULL, status TEXT NOT NULL, name TEXT, phone TEXT, email TEXT, items TEXT, summary TEXT, total_cents INTEGER, pickup TEXT, note TEXT, text_consent INTEGER DEFAULT 0, square_order_id TEXT, square_payment_id TEXT, paid_at TEXT, paid_cents INTEGER DEFAULT 0, tip_cents INTEGER DEFAULT 0, notified_at TEXT, ready_at TEXT, picked_up_at TEXT);
 CREATE INDEX IF NOT EXISTS coffee_created ON coffee_orders(created_at);`;
 // Columns added after the first release. Each ALTER is tried once and ignored if the column already exists.
-const ALTERS = ["ALTER TABLE orders ADD COLUMN notified_paid_at TEXT", "ALTER TABLE payments ADD COLUMN team_member_id TEXT", "ALTER TABLE staff ADD COLUMN hourly_rate_cents INTEGER DEFAULT 0", "ALTER TABLE staff ADD COLUMN commission_pct REAL DEFAULT 0"];
+const ALTERS = ["ALTER TABLE staff ADD COLUMN sms_consent_at TEXT", "ALTER TABLE orders ADD COLUMN notified_paid_at TEXT", "ALTER TABLE payments ADD COLUMN team_member_id TEXT", "ALTER TABLE staff ADD COLUMN hourly_rate_cents INTEGER DEFAULT 0", "ALTER TABLE staff ADD COLUMN commission_pct REAL DEFAULT 0"];
 
 let migrated = false;
 async function ensureSchema(env) {
@@ -922,6 +922,7 @@ async function staffRoutes(request, env, cors, path, url) {
     if (!p || !p.pin_hash || !timingSafeEqual(await pbkdf(pin, p.pin_salt), p.pin_hash)) { await staffLog(env, p && p.id, "login_failed", name); return json({ error: "Name or PIN doesn't match" }, 401, cors); }
     const token = randomHex(32);
     await env.DB.prepare(`INSERT INTO staff_sessions (token, staff_id, created_at, expires_at, ip) VALUES (?,?,?,?,?)`).bind(token, p.id, now, new Date(Date.now() + 14 * 3600000).toISOString(), ip).run();
+    if (b.smsConsent === true && !p.sms_consent_at) { await env.DB.prepare(`UPDATE staff SET sms_consent_at = ? WHERE id = ?`).bind(now, p.id).run(); await staffLog(env, p.id, "sms_consent", ip); p.sms_consent_at = now; }
     await staffLog(env, p.id, "login", ip);
     return json({ ok: true, token, me: pub(p) }, 200, cors);
   }
@@ -1017,7 +1018,7 @@ async function staffRoutes(request, env, cors, path, url) {
   }
   return json({ error: "Not found" }, 404, cors);
 }
-function pub(p) { return { id: p.id, name: p.name, role: p.role, phone: p.phone || "", email: p.email || "", on_call: !!p.on_call, active: p.active !== 0, hourly_rate_cents: p.hourly_rate_cents || 0, commission_pct: p.commission_pct || 0 }; }
+function pub(p) { return { id: p.id, name: p.name, role: p.role, phone: p.phone || "", email: p.email || "", on_call: !!p.on_call, active: p.active !== 0, hourly_rate_cents: p.hourly_rate_cents || 0, commission_pct: p.commission_pct || 0, sms_consent_at: p.sms_consent_at || null }; }
 
 async function upsertStaff(env, b) {
   const name = String(b.name || "").trim().slice(0, 60);
@@ -1160,7 +1161,7 @@ async function noShowCheck(env) {
   if (p && p.date !== l.date) p = null;
   const hourLabel = new Date().toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" });
   if (!p) {
-    const onCall = await env.DB.prepare(`SELECT * FROM staff WHERE active = 1 AND on_call = 1 AND phone != '' ORDER BY role, name LIMIT 1`).first();
+    const onCall = await env.DB.prepare(`SELECT * FROM staff WHERE active = 1 AND on_call = 1 AND phone != '' AND sms_consent_at IS NOT NULL ORDER BY role, name LIMIT 1`).first();
     let sentToOnCall = false;
     if (onCall && onCall.phone) sentToOnCall = (await sendSms(env, onCall.phone, `HD Laser: nobody has clocked in and the shop should be open. Are you on your way? Reply 1 for yes, 2 if you can't make it.`)).ok;
     p = { date: l.date, on_call_id: onCall ? onCall.id : null, on_call_name: onCall ? onCall.name : null, last_hour: l.hour, muted: false };
@@ -1199,7 +1200,7 @@ async function twilioInbound(request, env) {
   if (owners.includes(from)) {
     if (!p) return twiml("HD Laser: nothing is waiting on a reply right now.");
     if (body === "1") {
-      const others = staffRow.results.filter((s) => s.id !== p.on_call_id && !owners.includes(e164(s.phone)));
+      const others = staffRow.results.filter((s) => s.id !== p.on_call_id && !owners.includes(e164(s.phone)) && s.sms_consent_at);
       let n = 0; for (const s of others) if ((await sendSms(env, s.phone, `HD Laser: nobody has opened the shop yet. Can you come in? Reply 1 for yes.`)).ok) n++;
       return twiml(`Texted ${n} team member${n === 1 ? "" : "s"}. I'll tell you who replies.`);
     }
