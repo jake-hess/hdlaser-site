@@ -33,6 +33,12 @@ section{padding:44px 0;border-top:1px solid var(--line)}
 .quote{background:var(--soft);border-radius:20px;padding:26px 28px;margin:0}
 .quote p{font-family:Fraunces,Georgia,serif;font-size:21px;font-style:italic;margin:0 0 8px}
 .quote footer{font-size:14px;color:var(--muted)}
+.quote-split{display:grid;grid-template-columns:1.5fr 1fr;gap:22px;align-items:center}
+.quote-side{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;text-decoration:none;color:var(--ink);border-left:1px solid rgba(90,58,27,.18);padding:6px 0 6px 22px}
+.quote-side img{width:88px;height:88px;border-radius:50%;object-fit:cover;border:1.5px solid rgba(201,162,39,.6);box-shadow:0 3px 8px rgba(34,32,29,.14);margin-bottom:4px}
+.quote-side b{font-family:Fraunces,Georgia,serif;font-size:19px;font-weight:600}
+.quote-side span{font-size:14px;color:var(--muted);max-width:22ch}
+.quote-side:hover img{transform:rotate(-6deg) scale(1.05);transition:transform .25s}
 
 .work{display:grid;grid-template-columns:1fr;gap:14px}
 .work img{width:100%;border-radius:18px;display:block}
@@ -168,7 +174,8 @@ footer.page{padding:30px 0 60px;color:var(--muted);font-size:13px;text-align:cen
 }
 @media print{#parade{display:none}}
 @media (max-width:760px){
-  .hero-grid,.calc-grid,.cards,.work,.day,.family{grid-template-columns:1fr}
+  .hero-grid,.calc-grid,.cards,.work,.day,.family,.quote-split{grid-template-columns:1fr}
+  .quote-side{border-left:0;border-top:1px solid rgba(90,58,27,.18);padding:16px 0 4px}
   .family figure{max-width:360px;margin:0 auto}
   .hero-grid img{border-radius:24px;max-width:340px;margin:0 auto}
   .calc{padding:22px}
@@ -225,9 +232,16 @@ footer.page{padding:30px 0 60px;color:var(--muted);font-size:13px;text-align:cen
       <img src="/assets/marisa-work-grid.jpg" alt="A grid of Marisa's balayage, blonding, and bridal styling work">
       <figcaption>Balayage, color, extensions, bridal, cuts &mdash; @hairby_risss</figcaption>
     </figure>
-    <blockquote class="quote" style="margin-top:20px">
-      <p>&ldquo;My hair was styled to perfection.&rdquo;</p>
-      <footer>A client, on her engagement photos</footer>
+    <blockquote class="quote quote-split" style="margin-top:20px">
+      <div>
+        <p>&ldquo;My hair was styled to perfection.&rdquo;</p>
+        <footer>A client, on her engagement photos</footer>
+      </div>
+      <a class="quote-side" href="https://www.instagram.com/hairby_risss/" target="_blank" rel="noopener">
+        <img src="/assets/ink-hibiscus.webp" alt="">
+        <b>@hairby_risss</b>
+        <span>Clients drive across the county for this chair.</span>
+      </a>
     </blockquote>
   </section>
   <!-- /edit:work -->
