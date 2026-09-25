@@ -61,6 +61,7 @@
   document.getElementById('edtokensave').addEventListener('click', function () {
     var t = document.getElementById('edtokenin').value.trim();
     if (!t) { say('Paste the token first.', true); return; }
+    if (!/^(github_pat_|ghp_)[A-Za-z0-9_]{20,}$/.test(t)) { say('That doesn’t look like a GitHub token. Tokens start with github_pat_ and are about 90 characters long. Copy the token itself (use the copy icon next to it), not its name.', true); return; }
     setToken(t);
     document.getElementById('edtokenin').value = '';
     document.getElementById('edpanel').classList.remove('open');
@@ -179,7 +180,8 @@
     }).catch(function (err) {
       Array.prototype.forEach.call(btns, function (b) { b.disabled = false; });
       var msg = err && err.message ? err.message : String(err);
-      if (err && (err.status === 401 || err.status === 403)) msg += ' — the token was refused. Use “Forget GitHub token” and set a new one.';
+      if (err && err.status === 401) msg = 'GitHub doesn’t recognize this token. It was probably copied incompletely, never generated, or has expired. Click “Forget GitHub token”, make a fresh one, and paste the whole thing.';
+      else if (err && (err.status === 403 || err.status === 404)) msg = 'GitHub recognized the token but it can’t write to hdlaser-site. On the token, set repository access to hdlaser-site and Contents to Read and write.';
       if (err && err.status === 409) msg += ' — the file changed on GitHub while you were editing. Click Save again.';
       say('Not saved: ' + msg, true);
     });
