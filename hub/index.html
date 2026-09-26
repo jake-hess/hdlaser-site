@@ -143,8 +143,7 @@ input{font:inherit;font-size:17px;color:var(--ink);background:#fff;border:1px so
     var mgr=me&&['manager','owner'].indexOf(me.role)>=0, own=me&&me.role==='owner';
     var by=encodeURIComponent(me?me.name:'');
     var list=[
-      {href:'/order/?via=hub&by='+by,ic:'order',t:'New order',s:'Price it and take payment on the same page customers use',cls:'primary',tag:'start here'},
-      {href:'/quote/',ic:'quote',t:'Quote request',s:'Something the order page can’t price yet'},
+      {href:'/order/?via=hub&by='+by,ic:'order',t:'New order',s:'Every job starts here: price it, preview it, take payment. Anything it can’t price links to the quote form.',cls:'primary',tag:'start here'},
       {view:'samples',ic:'samples',t:'Samples',s:'Show what we’ve made, by category'},
       {view:'prices',ic:'prices',t:'Price list',s:'Sizes, items, quantity breaks'},
       {href:'/staff/#queue',ic:'queue',t:'Work queue',s:'What’s waiting, most urgent first'},
