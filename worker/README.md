@@ -97,6 +97,18 @@ Setup, once:
 
 Endpoints (all under `/staff/`, Bearer token from `/staff/login`): `me`, `clock`, `checklist`, `jobs`, `jobs/:id`, `orders/:ref`, `team` (managers). Admin: `/api/team`, `/api/staff`, `/api/noshow-check`.
 
+## Order builder, price book and pricing review
+
+Every order starts on the same page, whether the customer does it at home or an employee walks them through it on the shop screen: **hdlaser.net/order**. It reads the price book from `GET /pricing`, shows the HD Laser logo on a to-scale drawing of the item (the customer's own file replaces it), and prices the job live: service (engraving or UV print) × artwork size in half-inch steps × material factor, plus the item if we supply it, quantity breaks on the work, setup once per order, rush, sales tax. `POST /order/checkout` re-prices on the server, so the page can never undercharge, then opens Square.
+
+**Sizing confirmation.** Before paying, the customer reads a red box that says we make exactly what they specified and that mistakes in size, spelling, artwork or quantity are at their expense, and types their initials. The initials must match the name on the order. The exact wording, initials, time, IP address and browser are stored on the order (`attest_*` columns) with a hash, tied to their name, email and phone. They are restated in the confirmation email and shown on the dashboard.
+
+**Price book.** Lives in D1 (`meta.price_book`), seeded from `DEFAULT_BOOK` in the worker. Edit any number on the money page (press Enter); every change is logged to `price_history`.
+
+**Pricing review.** Runs every Monday before the digest (and from the button on the money page). It only suggests: the owner approves or denies each item in the red box at the top of `/admin/money`, and each one explains why. Rules: the size ladder must climb by a little more each half inch; every item must clear the target margin after blank, labor and consumables; sizes or items priced often but rarely bought (or bought far above average) in the last 90 days; materials taking a bigger share of sales than the year before. Approving applies the change to the book immediately.
+
+**Shop hub.** `hdlaser.net/hub` is the app-style screen for the in-store display and employee phones (sign in with name and PIN; open it once with `?kiosk` on the shop screen to hide Sign out). Its "New order" tile opens the same public order page with the employee's name attached to the order. Not linked from the public site.
+
 ## Money page (`/admin/money`)
 
 Live P&L, bank ledger, Square reconciliation, unit economics and a 13-week cash forecast. Same login as the dashboard.

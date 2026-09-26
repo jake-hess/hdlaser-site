@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Build your order | HD Laser Studio, Pacific Beach</title>
+<meta name="description" content="Pick the item, engraving or full-color print, the size and how many. See your price and a preview of your logo on it, then pay securely. Made in Pacific Beach.">
+<link rel="canonical" href="https://hdlaser.net/order/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="HD Laser Studio">
+<meta property="og:title" content="Build your order | HD Laser Studio, Pacific Beach">
+<meta property="og:description" content="Pick the item, engraving or full-color print, the size and how many. See your price and a preview of your logo on it, then pay securely.">
+<meta property="og:url" content="https://hdlaser.net/order/">
+<meta property="og:image" content="https://hdlaser.net/assets/og-image.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#15191E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&amp;family=Figtree:wght@400;500;700;800&amp;family=Caveat:wght@600&amp;display=swap">
+<style>
+:root{--bg:#F6F4EF;--ink:#15191E;--muted:#545B63;--red:#C8372A;--redd:#A32C21;--line:#E4E0D8;--field:#A9A196;--sel:#FBE9E6;--gold:#F2B63D;--green:#2F6B4F}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Figtree,"Helvetica Neue",Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%}
+a{color:var(--redd)}
+:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+header{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px 24px;border-bottom:1px solid var(--line);max-width:1200px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--ink);font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-weight:800;letter-spacing:2px;font-size:17px}
+.call{font-weight:700;color:var(--ink);text-decoration:none;white-space:nowrap}
+.hubbar{background:var(--ink);color:#F3F4F6;font-size:14px;padding:8px 24px;display:flex;justify-content:space-between;gap:12px;align-items:center}
+.hubbar a{color:var(--gold);font-weight:700;text-decoration:none}
+main{max-width:1200px;margin:0 auto;padding:28px 24px 120px;display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:36px;align-items:start}
+h1{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:44px;line-height:1.05;margin:0 0 8px}
+.lead{margin:0 0 26px;font-size:18px;line-height:1.5;color:var(--muted);max-width:640px}
+.step{background:#fff;border:1px solid var(--line);border-radius:22px;padding:24px;margin-bottom:16px}
+.step h2{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:24px;margin:0 0 4px;display:flex;align-items:center;gap:12px}
+.step h2 .n{flex:none;width:32px;height:32px;border-radius:50%;background:var(--ink);color:#fff;font-size:15px;display:grid;place-items:center;font-family:Figtree,sans-serif}
+.step.done h2 .n{background:var(--green)}
+.step .sub{margin:0 0 16px;color:var(--muted);line-height:1.45}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.tile{position:relative;border:2px solid var(--line);border-radius:16px;background:#fff;padding:10px 10px 12px;cursor:pointer;text-align:center;font:inherit;color:var(--ink);display:flex;flex-direction:column;align-items:center;gap:6px;min-height:150px}
+.tile svg{width:76px;height:76px}
+.tile b{font-size:15px;line-height:1.2}
+.tile small{color:var(--muted);font-size:13px}
+.tile.on{border-color:var(--red);background:var(--sel)}
+.tile.on::after{content:"✓";position:absolute;top:8px;right:10px;width:22px;height:22px;border-radius:50%;background:var(--red);color:#fff;font-size:13px;display:grid;place-items:center}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{border:2px solid var(--line);background:#fff;border-radius:999px;padding:9px 16px;font:inherit;font-weight:700;cursor:pointer;color:var(--ink)}
+.chip.on{border-color:var(--red);background:var(--sel)}
+.chip:disabled{opacity:.45;cursor:not-allowed}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.svc{border:2px solid var(--line);border-radius:16px;background:#fff;padding:14px 16px;text-align:left;cursor:pointer;font:inherit;color:var(--ink)}
+.svc b{display:block;font-size:17px;margin-bottom:3px}.svc span{color:var(--muted);font-size:14px;line-height:1.4}
+.svc.on{border-color:var(--red);background:var(--sel)}
+.svc:disabled{opacity:.45;cursor:not-allowed}
+.sizerow{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.readout{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:40px;font-weight:700;line-height:1;min-width:120px}
+.readout small{font-size:16px;color:var(--muted);font-family:Figtree,sans-serif;font-weight:500;display:block;margin-top:4px}
+input[type=range]{flex:1 1 220px;accent-color:var(--red);height:40px}
+.nudge{margin:10px 0 0;font-size:14px;color:var(--muted)}
+.nudge b{color:var(--ink)}
+.qty{display:flex;align-items:center;gap:0;border:2px solid var(--line);border-radius:999px;overflow:hidden;width:max-content}
+.qty button{width:50px;height:50px;border:0;background:#fff;font-size:24px;cursor:pointer;color:var(--ink)}
+.qty input{width:80px;height:50px;border:0;text-align:center;font:inherit;font-size:22px;font-weight:700;color:var(--ink)}
+.qty input::-webkit-outer-spin-button,.qty input::-webkit-inner-spin-button{-webkit-appearance:none}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.f{display:flex;flex-direction:column;gap:6px}
+.f label{font-weight:700}.f small{color:var(--muted);font-weight:400}
+input[type=text],input[type=email],input[type=tel],input[type=date],textarea{font:inherit;font-size:16px;padding:13px 14px;border:1px solid var(--field);border-radius:12px;background:#fff;color:var(--ink);width:100%}
+.check{display:flex;gap:12px;align-items:flex-start;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px;line-height:1.5}
+.check input{width:22px;height:22px;accent-color:var(--red);flex:none;margin-top:2px}
+.upload{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:2px solid var(--ink);background:#fff;color:var(--ink);border-radius:999px;padding:12px 22px;font:inherit;font-weight:700;cursor:pointer;text-decoration:none;min-height:48px}
+.btn.red{background:var(--red);border-color:var(--red);color:#fff;font-size:18px;padding:16px 30px}
+.btn.red:hover{background:var(--redd);border-color:var(--redd)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.attest{border:3px solid var(--red);border-radius:18px;padding:20px;background:#FFF7F6}
+.attest h3{margin:0 0 6px;font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:22px;color:var(--redd)}
+.attest .words{font-size:17px;line-height:1.55;margin:0 0 16px}
+.attest .words b{background:#fff;padding:0 4px;border-radius:4px}
+.initials{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.initials input{width:120px;font-size:26px;font-weight:800;letter-spacing:6px;text-transform:uppercase;text-align:center;border:2px solid var(--red)}
+.sig{font-family:Caveat,cursive;font-size:38px;line-height:1;color:var(--ink);min-width:80px;border-bottom:2px solid var(--ink);padding:0 8px 2px}
+.sig.empty{color:#B7B0A4;border-bottom-color:#B7B0A4}
+.hint{font-size:14px;color:var(--muted);margin:8px 0 0}
+.hint.bad{color:var(--redd);font-weight:600}
+.err{background:#FBE9E6;border:1px solid #E8B4AE;border-radius:12px;padding:12px 14px;color:var(--redd);font-weight:600}
+.side{position:sticky;top:16px;display:flex;flex-direction:column;gap:14px}
+.preview{background:#fff;border:1px solid var(--line);border-radius:22px;padding:18px;text-align:center}
+.preview svg{width:100%;max-height:340px;display:block}
+.preview .cap{margin:10px 0 0;font-size:14px;color:var(--muted)}
+.preview .cap b{color:var(--ink)}
+.summary{background:var(--ink);color:#D5DADF;border-radius:22px;padding:22px 24px}
+.summary h2{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:22px;color:#fff;margin:0 0 10px}
+.summary dl{margin:0;padding:0}
+.summary div{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #2A3038;font-size:15px}
+.summary dt{margin:0}.summary dd{margin:0;font-weight:700;color:#fff;white-space:nowrap}
+.summary .tot{border-bottom:0;padding-top:12px;align-items:center}.summary .tot dt{color:#fff;font-weight:700;font-size:17px}.summary .tot dd{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:32px;color:var(--gold)}
+.summary p{font-size:13px;line-height:1.5;margin:10px 0 0;color:#9AA3AD}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--ink);color:#fff;padding:12px 18px;display:none;justify-content:space-between;align-items:center;gap:12px;z-index:9;box-shadow:0 -8px 24px rgba(0,0,0,.25)}
+.bar b{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:24px;color:var(--gold)}
+.bar a{background:var(--red);color:#fff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:999px}
+.note{font-size:14px;color:var(--muted);margin:0}
+@media (max-width:960px){main{grid-template-columns:1fr}.side{position:static}.preview svg{max-height:260px}.bar{display:flex}}
+@media (max-width:560px){main{padding:20px 16px 120px}.step{padding:18px 16px}h1{font-size:34px}.grid,.two{grid-template-columns:1fr}.tiles{grid-template-columns:repeat(2,1fr)}.readout{font-size:32px}}
+</style>
+</head>
+<body>
+<div class="hubbar" id="hubbar" hidden><span id="hubwho">Counter order</span><a href="/hub/">&#8592; Back to the hub</a></div>
+<header>
+  <a class="brand" href="/" aria-label="HD Laser Studio home"><svg width="78" height="26" viewBox="220 115 1930 640" aria-hidden="true"><path fill="#C8372A" d="M510 125 L730 125 L636 371 L963 371 L1072 125 L2000 125 C2100 125 2160 210 2130 300 L2010 610 C1970 700 1880 742 1790 742 L1115 742 L1283 341 L1525 341 L1425 595 L1800 595 L1938 272 L1222 272 L1030 742 L808 742 L907 523 L572 523 L483 742 L232 742 Z"></path></svg><span>LASER STUDIO</span></a>
+  <a class="call" href="tel:+18583739866">(858) 373-9866</a>
+</header>
+<main>
+<div>
+  <h1>Build your order.</h1>
+  <p class="lead">Four quick choices and you&#8217;ll see your price and a preview of your logo on the item. Nothing is made until you approve a digital proof. <a href="/quote/">Rather talk it through? Ask for a quote.</a></p>
+  <p class="err" id="loaderr" hidden></p>
+
+  <section class="step" id="s-product">
+    <h2><span class="n">1</span>What are we putting it on?</h2>
+    <p class="sub">The logo shown is ours. Yours takes its place in step 5.</p>
+    <div class="tiles" id="products"></div>
+    <div id="materials" hidden><p class="sub" style="margin:16px 0 0">What is it made of?</p><div class="chips" id="matchips"></div></div>
+  </section>
+
+  <section class="step" id="s-service">
+    <h2><span class="n">2</span>Engraving or full-color print?</h2>
+    <p class="sub">Engraving is etched into the surface, one tone, forever. UV printing lays down full color.</p>
+    <div class="two" id="services"></div>
+  </section>
+
+  <section class="step" id="s-size">
+    <h2><span class="n">3</span>How big is the artwork?</h2>
+    <p class="sub">Measured on the longest side of your logo or text. Slide it and watch the preview.</p>
+    <div class="sizerow">
+      <div class="readout"><span id="inches">2</span> in<small id="ppu"></small></div>
+      <input type="range" id="size" min="0.5" max="4" step="0.5" value="2" aria-label="Artwork size in inches">
+    </div>
+    <p class="nudge" id="nudge"></p>
+  </section>
+
+  <section class="step" id="s-qty">
+    <h2><span class="n">4</span>How many?</h2>
+    <p class="sub">Every piece gets the same artwork. Names or numbers that change piece to piece? Mention it in the notes.</p>
+    <div class="qty"><button type="button" id="minus" aria-label="Fewer">&#8722;</button><input type="number" id="qty" min="1" max="500" value="1" inputmode="numeric" aria-label="Quantity"><button type="button" id="plus" aria-label="More">+</button></div>
+    <p class="nudge" id="qnudge"></p>
+  </section>
+
+  <section class="step" id="s-logo">
+    <h2><span class="n">5</span>Your logo or artwork</h2>
+    <p class="sub">Optional now. PNG, JPG, SVG or WebP. A clean file with a plain background previews best; we tidy it up before the proof either way.</p>
+    <div class="upload">
+      <label class="btn" for="logo">Choose a file<input type="file" id="logo" accept=".png,.jpg,.jpeg,.svg,.webp,image/png,image/jpeg,image/svg+xml,image/webp" hidden></label>
+      <span class="note" id="logoname">No file yet. You can email it after ordering.</span>
+      <button type="button" class="chip" id="logoclear" hidden>Remove</button>
+    </div>
+  </section>
+
+  <section class="step" id="s-when">
+    <h2><span class="n">6</span>When do you need it?</h2>
+    <div class="grid">
+      <div class="f"><label for="needed">Needed by <small>(optional)</small></label><input type="date" id="needed"></div>
+      <label class="check" style="align-self:end"><input type="checkbox" id="rush"><span><b>Rush it</b><br><small style="color:var(--muted)">Under 3 business days. Adds <span id="rushpct">50</span>% to the work, not the item.</small></span></label>
+    </div>
+  </section>
+
+  <section class="step" id="s-you">
+    <h2><span class="n">7</span>How do we reach you?</h2>
+    <div class="grid">
+      <div class="f"><label for="name">Your name</label><input id="name" type="text" autocomplete="name" required></div>
+      <div class="f"><label for="business">Business <small>(optional)</small></label><input id="business" type="text" autocomplete="organization"></div>
+      <div class="f"><label for="email">Email</label><input id="email" type="email" autocomplete="email" required></div>
+      <div class="f"><label for="phone">Phone</label><input id="phone" type="tel" autocomplete="tel" required></div>
+    </div>
+    <div class="f" style="margin-top:14px"><label for="notes">Anything we should know? <small>(optional)</small></label><textarea id="notes" rows="3" placeholder="Text to engrave, names, colors, where on the item it goes."></textarea></div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">
+      <label class="check"><input type="checkbox" id="agree"><span>I agree to HD Laser&#8217;s <a href="/terms/" target="_blank" rel="noopener">Terms of Sale &amp; Privacy Notice</a>. Custom orders are <b>final once paid</b>. HD Laser may email or call me about my order and future offers; I can unsubscribe at any time.</span></label>
+      <label class="check"><input type="checkbox" id="sms"><span><b>Text me order updates.</b> I agree to receive text messages from HD Laser Studio at the number above about this order (proof ready, payment received, ready for pickup). Consent is not a condition of purchase. Msg frequency varies. Msg &amp; data rates may apply. Reply STOP to cancel, HELP for help. We never share your number. <a href="/terms/" target="_blank" rel="noopener">Terms &amp; Privacy</a>.</span></label>
+    </div>
+  </section>
+
+  <section class="step" id="s-confirm">
+    <h2><span class="n">8</span>Read this. Then sign it.</h2>
+    <div class="attest">
+      <h3>We make exactly what you tell us to make.</h3>
+      <p class="words" id="words"></p>
+      <div class="initials">
+        <label for="initials" style="font-weight:700">Type your initials</label>
+        <input type="text" id="initials" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="inithint">
+        <div class="sig empty" id="sig">your initials</div>
+      </div>
+      <p class="hint" id="inithint">Your initials are your signature on this. We keep them with your order, your name and the time you signed.</p>
+    </div>
+    <p class="err" id="err" hidden style="margin:14px 0 0"></p>
+    <div style="margin-top:18px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+      <button type="button" class="btn red" id="pay">Pay securely</button>
+      <span class="note">Square handles the card. We never see it.</span>
+    </div>
+  </section>
+</div>
+
+<aside class="side">
+  <div class="preview" id="preview"><svg viewBox="0 0 10 10" aria-label="Preview of your artwork on the item"></svg><p class="cap" id="cap">Pick an item to see the preview.</p></div>
+  <div class="summary">
+    <h2>Your price</h2>
+    <dl id="lines"></dl>
+    <p id="sumnote">Price updates as you choose. Sales tax is added at checkout.</p>
+  </div>
+</aside>
+</main>
+<div class="bar" id="bar"><div><div style="font-size:12px;color:#9AA3AD">Your total</div><b id="bartot">$0</b></div><a href="#s-confirm">Review &amp; pay</a></div>
+
+<script src="/assets/site-config.js?v=4"></script>
+<script>
+(function(){
+  var CFG = window.HD_CONFIG || {}, BASE = CFG.WORKER_BASE || '';
+  var $ = function(s){ return document.querySelector(s); };
+  var esc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); };
+  var money = function(c){ return '$' + (c/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+  var money0 = function(c){ return '$' + Math.round(c/100).toLocaleString('en-US'); };
+  var qs = new URLSearchParams(location.search);
+  var HUB = qs.get('via') === 'hub', BY = (qs.get('by') || '').slice(0,60);
+  if (HUB) { $('#hubbar').hidden = false; $('#hubwho').textContent = 'Counter order' + (BY ? ' · taken by ' + BY : '') + '. Walk the customer through it; they sign step 8 themselves.'; }
+
+  var SAMPLE = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="220 115 1930 640"><path fill="#C8372A" d="M510 125 L730 125 L636 371 L963 371 L1072 125 L2000 125 C2100 125 2160 210 2130 300 L2010 610 C1970 700 1880 742 1790 742 L1115 742 L1283 341 L1525 341 L1425 595 L1800 595 L1938 272 L1222 272 L1030 742 L808 742 L907 523 L572 523 L483 742 L232 742 Z"/></svg>');
+  var BOOK = null, TAX = 0.0775;
+  var S = { product:null, material:null, service:null, inches:2, qty:1, rush:false, logo:null, logoName:'' };
+
+  // ---- the same arithmetic the worker uses; the worker re-prices at checkout, so the page can never undercharge
+  function r25(c){ return Math.max(0, Math.round(c/25)*25); }
+  function quote(){
+    if (!BOOK) return null;
+    var product = BOOK.products.filter(function(p){return p.key===S.product;})[0]; if(!product) return null;
+    var matKey = product.material || S.material; var material = BOOK.materials.filter(function(m){return m.key===matKey;})[0]; if(!material) return null;
+    var service = BOOK.services.filter(function(s){return s.key===S.service;})[0]; if(!service || material.services.indexOf(service.key)<0) return null;
+    var size = BOOK.sizes.filter(function(s){return s.inches===S.inches;})[0]; if(!size) return null;
+    var qty = S.qty;
+    var workUnit = r25(size[service.key+'_cents']*material.factor);
+    var brk = BOOK.qty_breaks.slice().sort(function(a,b){return b.min-a.min;}).filter(function(b){return qty>=b.min;})[0] || {off_pct:0};
+    var workAfter = r25(workUnit*(1-brk.off_pct/100));
+    var handling = product.key==='own' ? BOOK.own_item_handling_cents : 0;
+    var work = workAfter*qty, blank = (product.blank_cents||0)*qty, hand = handling*qty;
+    var rush = S.rush ? r25(work*BOOK.rush_pct/100) : 0;
+    var subtotal = work+blank+hand+rush+service.setup_cents; var top = Math.max(0, BOOK.min_order_cents-subtotal); subtotal += top;
+    var next = BOOK.qty_breaks.slice().sort(function(a,b){return a.min-b.min;}).filter(function(b){return b.min>qty;})[0] || null;
+    return { product:product, material:material, service:service, qty:qty, workUnit:workUnit, workAfter:workAfter, off:brk.off_pct, work:work, blank:blank, blankUnit:product.blank_cents||0, hand:hand, handUnit:handling, rush:rush, setup:service.setup_cents, top:top, subtotal:subtotal, tax:Math.round(subtotal*TAX), next:next };
+  }
+  function unitFor(productKey, matKey, svcKey, inches){ var p=BOOK.products.filter(function(x){return x.key===productKey;})[0], m=BOOK.materials.filter(function(x){return x.key===(p.material||matKey);})[0], s=BOOK.sizes.filter(function(x){return x.inches===inches;})[0]; if(!p||!m||!s) return null; return r25(s[svcKey+'_cents']*m.factor); }
+
+  // ---- product drawings in real inches, so the artwork box is the size they chose
+  function shapeSvg(p, logoSrc, inches, mode){
+    var W=p.w_in, H=p.h_in, pad=0.6, vb='0 0 '+(W+pad*2)+' '+(H+pad*2);
+    var body='', cx=pad+W/2, cy=pad+H/2, tone='#3B4148';
+    var wood='<linearGradient id="wd" x1="0" x2="1"><stop offset="0" stop-color="#E2BE86"/><stop offset=".5" stop-color="#D3A96E"/><stop offset="1" stop-color="#E2BE86"/></linearGradient>';
+    var steel='<linearGradient id="st" x1="0" x2="1"><stop offset="0" stop-color="#9CA3AA"/><stop offset=".35" stop-color="#E6E9EC"/><stop offset=".6" stop-color="#C3C8CD"/><stop offset="1" stop-color="#8E959C"/></linearGradient>';
+    var defs='<defs>'+wood+steel+'<pattern id="grain" width="0.6" height="0.15" patternUnits="userSpaceOnUse"><path d="M0 0.07 Q0.3 0.02 0.6 0.07" stroke="rgba(120,80,30,.18)" stroke-width="0.02" fill="none"/></pattern></defs>';
+    var x=pad, y=pad;
+    if (p.shape==='tumbler'){ var tw=W, bw=W*0.86; body='<path d="M'+x+' '+(y+0.9)+' L'+(x+tw)+' '+(y+0.9)+' L'+(x+tw-(tw-bw)/2)+' '+(y+H-0.25)+' Q'+cx+' '+(y+H+0.05)+' '+(x+(tw-bw)/2)+' '+(y+H-0.25)+' Z" fill="url(#st)" stroke="#6B737B" stroke-width="0.03"/><rect x="'+(x+0.15)+'" y="'+y+'" width="'+(tw-0.3)+'" height="0.95" rx="0.3" fill="#2A2F35"/><rect x="'+(x+0.5)+'" y="'+(y+0.2)+'" width="'+(tw-1)+'" height="0.25" rx="0.12" fill="#4A5158"/>'; cy=y+0.9+(H-0.9)*0.5; tone='#1E2328'; }
+    else if (p.shape==='bottle'){ body='<path d="M'+(x+W*0.3)+' '+(y+1.2)+' L'+(x+W*0.3)+' '+(y+0.35)+' L'+(x+W*0.7)+' '+(y+0.35)+' L'+(x+W*0.7)+' '+(y+1.2)+' Q'+(x+W)+' '+(y+1.7)+' '+(x+W)+' '+(y+2.4)+' L'+(x+W)+' '+(y+H-0.35)+' Q'+(x+W)+' '+(y+H)+' '+(x+W-0.35)+' '+(y+H)+' L'+(x+0.35)+' '+(y+H)+' Q'+x+' '+(y+H)+' '+x+' '+(y+H-0.35)+' L'+x+' '+(y+2.4)+' Q'+x+' '+(y+1.7)+' '+(x+W*0.3)+' '+(y+1.2)+' Z" fill="url(#st)" stroke="#6B737B" stroke-width="0.03"/><rect x="'+(x+W*0.28)+'" y="'+y+'" width="'+(W*0.44)+'" height="0.5" rx="0.12" fill="#2A2F35"/>'; cy=y+2.4+(H-2.4)*0.45; tone='#1E2328'; }
+    else if (p.shape==='glass'){ body='<path d="M'+x+' '+y+' L'+(x+W)+' '+y+' L'+(x+W*0.85)+' '+(y+H-0.2)+' Q'+cx+' '+(y+H+0.1)+' '+(x+W*0.15)+' '+(y+H-0.2)+' Z" fill="#EAF2F6" fill-opacity=".9" stroke="#9FB3BE" stroke-width="0.04"/><path d="M'+(x+0.25)+' '+(y+0.3)+' L'+(x+0.5)+' '+(y+H-0.6)+'" stroke="#fff" stroke-width="0.12" opacity=".9"/><ellipse cx="'+cx+'" cy="'+y+'" rx="'+(W/2)+'" ry="0.12" fill="#fff" stroke="#9FB3BE" stroke-width="0.03"/>'; cy=y+H*0.52; tone='#5B6E7A'; }
+    else if (p.shape==='board'){ body='<rect x="'+x+'" y="'+y+'" width="'+W+'" height="'+H+'" rx="0.9" fill="url(#wd)" stroke="#8A6234" stroke-width="0.05"/><rect x="'+x+'" y="'+y+'" width="'+W+'" height="'+H+'" rx="0.9" fill="url(#grain)"/><circle cx="'+cx+'" cy="'+(y+1.1)+'" r="0.45" fill="#F6F4EF" stroke="#8A6234" stroke-width="0.04"/>'; cy=y+1.9+(H-1.9)/2; tone='#3A2412'; }
+    else if (p.shape==='plaque'){ body='<rect x="'+x+'" y="'+y+'" width="'+W+'" height="'+H+'" rx="0.25" fill="url(#wd)" stroke="#6E4A22" stroke-width="0.06"/><rect x="'+(x+0.45)+'" y="'+(y+0.45)+'" width="'+(W-0.9)+'" height="'+(H-0.9)+'" rx="0.1" fill="none" stroke="#8A6234" stroke-width="0.05"/><rect x="'+x+'" y="'+y+'" width="'+W+'" height="'+H+'" rx="0.25" fill="url(#grain)"/>'; tone='#3A2412'; }
+    else if (p.shape==='tag'){ body='<rect x="'+x+'" y="'+y+'" width="'+W+'" height="'+H+'" rx="0.3" fill="url(#st)" stroke="#6B737B" stroke-width="0.04"/><circle cx="'+(x+0.35)+'" cy="'+cy+'" r="0.14" fill="#F6F4EF" stroke="#6B737B" stroke-width="0.03"/>'; cx=x+0.55+(W-0.55)/2; tone='#1E2328'; }
+    else if (p.shape==='patch'){ body='<rect x="'+x+'" y="'+y+'" width="'+W+'" height="'+H+'" rx="0.35" fill="#9B6A3E" stroke="#6E4623" stroke-width="0.05"/><rect x="'+(x+0.18)+'" y="'+(y+0.18)+'" width="'+(W-0.36)+'" height="'+(H-0.36)+'" rx="0.25" fill="none" stroke="#E9D8B8" stroke-width="0.04" stroke-dasharray="0.12 0.1"/>'; tone='#2F1A08'; }
+    else { body='<rect x="'+x+'" y="'+y+'" width="'+W+'" height="'+H+'" rx="0.6" fill="#fff" stroke="#A9A196" stroke-width="0.06" stroke-dasharray="0.3 0.2"/><text x="'+cx+'" y="'+(y+0.7)+'" text-anchor="middle" font-size="0.42" fill="#A9A196" font-family="Figtree,sans-serif">your item</text>'; tone='#3B4148'; }
+    var box = inches, lx = cx-box/2, ly = cy-box/2;
+    var img = logoSrc ? '<image href="'+logoSrc+'" x="'+lx+'" y="'+ly+'" width="'+box+'" height="'+box+'" preserveAspectRatio="xMidYMid meet"'+(mode==='engrave' ? ' style="filter:grayscale(1) contrast(1.15) brightness(.3)" opacity=".92"' : '')+'/>' : '';
+    if (mode==='engrave' && logoSrc) img = '<g style="mix-blend-mode:multiply">'+img+'</g>';
+    var dim = '<g stroke="#C8372A" stroke-width="0.035" fill="none"><line x1="'+lx+'" y1="'+(ly+box+0.28)+'" x2="'+(lx+box)+'" y2="'+(ly+box+0.28)+'"/><line x1="'+lx+'" y1="'+(ly+box+0.16)+'" x2="'+lx+'" y2="'+(ly+box+0.4)+'"/><line x1="'+(lx+box)+'" y1="'+(ly+box+0.16)+'" x2="'+(lx+box)+'" y2="'+(ly+box+0.4)+'"/></g><text x="'+cx+'" y="'+(ly+box+0.62)+'" text-anchor="middle" font-size="'+Math.max(0.28, Math.min(0.5, W/12))+'" font-weight="700" fill="#C8372A" font-family="Figtree,sans-serif">'+inches+' in</text>';
+    return '<svg viewBox="'+vb+'" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-label="'+esc(p.name)+' with '+inches+' inch artwork">'+defs+body+img+dim+'</svg>';
+  }
+  function thumb(p){ return shapeSvg(p, SAMPLE, Math.min(p.max_inches, 2.5), 'engrave').replace(/<g stroke="#C8372A"[\s\S]*?<\/text>/, ''); }
+
+  // ---- render
+  function renderProducts(){
+    $('#products').innerHTML = BOOK.products.map(function(p){ var from = p.key==='own' ? null : unitFor(p.key, null, 'engrave', 0.5) + p.blank_cents; return '<button type="button" class="tile'+(S.product===p.key?' on':'')+'" data-p="'+p.key+'">'+thumb(p)+'<b>'+esc(p.name)+'</b><small>'+(from!=null ? 'from '+money0(from) : 'we price the work only')+'</small></button>'; }).join('');
+    var own = S.product==='own'; $('#materials').hidden = !own;
+    if (own) $('#matchips').innerHTML = BOOK.materials.map(function(m){ return '<button type="button" class="chip'+(S.material===m.key?' on':'')+'" data-m="'+m.key+'">'+esc(m.name)+'</button>'; }).join('');
+  }
+  function renderServices(){
+    var p = BOOK.products.filter(function(x){return x.key===S.product;})[0]; var m = p ? BOOK.materials.filter(function(x){return x.key===(p.material||S.material);})[0] : null;
+    $('#services').innerHTML = BOOK.services.map(function(s){ var ok = !m || m.services.indexOf(s.key)>=0; return '<button type="button" class="svc'+(S.service===s.key?' on':'')+'" data-s="'+s.key+'"'+(ok?'':' disabled')+'><b>'+esc(s.name)+'</b><span>'+esc(s.blurb)+(ok?'':' Not on '+esc(m.name.toLowerCase())+'.')+'</span></button>'; }).join('');
+  }
+  function renderSize(){
+    var p = BOOK.products.filter(function(x){return x.key===S.product;})[0]; var max = p ? Math.min(p.max_inches, BOOK.max_inches) : BOOK.max_inches;
+    var r = $('#size'); r.max = max; if (S.inches>max) S.inches = max; r.value = S.inches; $('#inches').textContent = S.inches;
+    var q = quote(); var m = p ? BOOK.materials.filter(function(x){return x.key===(p.material||S.material);})[0] : null;
+    if (q) { $('#ppu').textContent = money(q.workUnit)+' per piece for the work'; var up = S.inches+0.5<=max ? unitFor(S.product, S.material, S.service, S.inches+0.5) : null; $('#nudge').innerHTML = up!=null ? 'Half an inch bigger is <b>'+money(up-q.workUnit)+' more</b> per piece. Bigger reads better from across the room.' : 'That is as big as this item takes. Need larger? <a href="/quote/">Ask for a quote.</a>'; }
+    else { $('#ppu').textContent = ''; $('#nudge').textContent = p && m && !S.service ? 'Pick engraving or printing to see the price.' : ''; }
+  }
+  function renderQty(){ $('#qty').value = S.qty; var q = quote(); $('#qnudge').innerHTML = q ? (q.off ? '<b>'+q.off+'% off the work</b> at this quantity.' : '') + (q.next ? (q.off?' ':'')+'Order <b>'+q.next.min+' or more</b> and the work is '+q.next.off_pct+'% off.' : '') : ''; }
+  function renderPreview(){
+    var p = BOOK.products.filter(function(x){return x.key===S.product;})[0]; var box = $('#preview');
+    if (!p) { box.querySelector('svg').outerHTML = shapeSvg(BOOK.products[0], SAMPLE, 2, 'engrave'); $('#cap').innerHTML = 'Pick an item to see the preview.'; return; }
+    box.querySelector('svg').outerHTML = shapeSvg(p, S.logo || SAMPLE, S.inches, S.service==='uv' ? 'uv' : 'engrave');
+    $('#cap').innerHTML = (S.logo ? '<b>Your logo</b>' : '<b>Our logo as a stand-in.</b> Yours goes here') + ' at <b>'+S.inches+' in</b> on the '+esc(p.name.toLowerCase())+(S.service ? ', '+(S.service==='uv'?'full color':'engraved') : '')+'. Drawn to scale.';
+  }
+  function renderSummary(){
+    var q = quote(); var dl = $('#lines');
+    if (!q) { dl.innerHTML = '<div><dt>Pick the item, the finish and the size.</dt><dd></dd></div>'; $('#bartot').textContent = '$0'; $('#pay').textContent = 'Pay securely'; return; }
+    var rows = [['<b>'+q.qty+' × '+esc(q.service.name.toLowerCase())+'</b>, '+S.inches+' in'+(q.off?' <small>('+q.off+'% off)</small>':''), money(q.work)]];
+    if (q.blankUnit) rows.push([q.qty+' × '+esc(q.product.name), money(q.blank)]);
+    if (q.handUnit) rows.push([q.qty+' × handling your own item', money(q.hand)]);
+    rows.push(['Setup, artwork prep <small>(one time)</small>', money(q.setup)]);
+    if (q.rush) rows.push(['Rush, '+BOOK.rush_pct+'% on the work', money(q.rush)]);
+    if (q.top) rows.push(['Shop minimum', money(q.top)]);
+    rows.push(['Sales tax, est.', money(q.tax)]);
+    dl.innerHTML = rows.map(function(r){ return '<div><dt>'+r[0]+'</dt><dd>'+r[1]+'</dd></div>'; }).join('') + '<div class="tot"><dt>Total</dt><dd>'+money(q.subtotal+q.tax)+'</dd></div>';
+    $('#bartot').textContent = money(q.subtotal+q.tax); $('#pay').textContent = 'Pay '+money(q.subtotal+q.tax)+' securely';
+  }
+  function renderWords(){
+    var q = quote(); var name = $('#name').value.trim() || 'I';
+    if (!q) { $('#words').innerHTML = 'Finish steps 1 to 4 and your confirmation appears here.'; return; }
+    var item = q.product.key==='own' ? 'my own '+q.material.name.toLowerCase()+' item' : 'a '+q.product.name.toLowerCase();
+    $('#words').innerHTML = 'I, <b>'+esc(name==='I'?'(your name)':name)+'</b>, have checked this order myself. HD Laser Studio will make exactly what I have specified here: <b>'+esc(q.service.name.toLowerCase())+'</b> on <b>'+esc(item)+'</b>, artwork <b>'+S.inches+' inches</b> on its longest side, quantity <b>'+q.qty+'</b>. I understand that engraving and printing are permanent and cannot be undone. If the size, spelling, artwork or quantity I chose turns out to be wrong, or I change my mind after approving the proof, <b>any redo or replacement is at my expense.</b>';
+  }
+  function initialsFor(name){ var w = String(name||'').trim().split(/\s+/).filter(Boolean); if(!w.length) return ''; return (w[0][0] + (w.length>1 ? w[w.length-1][0] : '')).toUpperCase(); }
+  function renderInitials(){
+    var v = $('#initials').value.toUpperCase().replace(/[^A-Z]/g,''); $('#initials').value = v;
+    var sig = $('#sig'); sig.textContent = v || 'your initials'; sig.classList.toggle('empty', !v);
+    var want = initialsFor($('#name').value), hint = $('#inithint');
+    if (v && want && v.indexOf(want)!==0) { hint.className = 'hint bad'; hint.textContent = 'Those don’t match the name above. We expect them to start with '+want.split('').join('.')+'.'; return false; }
+    hint.className = 'hint'; hint.textContent = v ? 'Signed. We keep your initials with your order, your name and the time you signed.' : 'Your initials are your signature on this. We keep them with your order, your name and the time you signed.';
+    if (v && want && v.indexOf(want)===0 && !renderInitials.sent) { renderInitials.sent = true; if (window.hdTrack) hdTrack('order_attested'); }
+    return !!(v && want && v.indexOf(want)===0);
+  }
+  var lastSpec = '', specTimer = null, seen = {};
+  function renderAll(){
+    renderProducts(); renderServices(); renderSize(); renderQty(); renderPreview(); renderSummary(); renderWords(); renderInitials();
+    ['s-product','s-service','s-size','s-qty'].forEach(function(id, i){ var ok = [S.product && (S.product!=='own' || S.material), S.service, S.service && S.product, S.service && S.product][i]; document.getElementById(id).classList.toggle('done', !!ok); });
+    var q = quote(); var key = q ? S.product+'|'+S.service+'|'+S.inches : '';
+    if (key && key!==lastSpec) { lastSpec = key; clearTimeout(specTimer); specTimer = setTimeout(function(){ if (seen[key] || !window.hdTrack) return; seen[key] = 1; hdTrack('spec_view', null, { product:S.product, service:S.service, inches:S.inches, qty:S.qty }); }, 2500); }
+  }
+
+  // ---- events
+  document.addEventListener('click', function(e){
+    var t = e.target.closest('[data-p]'); if (t) { S.product = t.dataset.p; var p = BOOK.products.filter(function(x){return x.key===S.product;})[0]; if (p.material) S.material = p.material; else if (S.material && p.key==='own') {} ; var m = BOOK.materials.filter(function(x){return x.key===(p.material||S.material);})[0]; if (m && S.service && m.services.indexOf(S.service)<0) S.service = null; renderAll(); return; }
+    var c = e.target.closest('[data-m]'); if (c) { S.material = c.dataset.m; var mm = BOOK.materials.filter(function(x){return x.key===S.material;})[0]; if (mm && S.service && mm.services.indexOf(S.service)<0) S.service = null; renderAll(); return; }
+    var s = e.target.closest('[data-s]'); if (s && !s.disabled) { S.service = s.dataset.s; renderAll(); return; }
+  });
+  $('#size').addEventListener('input', function(){ S.inches = Math.round(+this.value*2)/2; renderAll(); });
+  $('#minus').onclick = function(){ S.qty = Math.max(1, S.qty-1); renderAll(); };
+  $('#plus').onclick = function(){ S.qty = Math.min(500, S.qty+1); renderAll(); };
+  $('#qty').addEventListener('input', function(){ var n = parseInt(this.value,10); if (n>=1 && n<=500) { S.qty = n; renderAll(); } });
+  $('#qty').addEventListener('blur', function(){ this.value = S.qty; });
+  $('#rush').addEventListener('change', function(){ S.rush = this.checked; renderAll(); });
+  $('#name').addEventListener('input', function(){ renderWords(); renderInitials(); });
+  $('#initials').addEventListener('input', renderInitials);
+  $('#logoclear').onclick = function(){ S.logo = null; S.logoName = ''; $('#logo').value = ''; $('#logoname').textContent = 'No file yet. You can email it after ordering.'; this.hidden = true; renderAll(); };
+  $('#logo').addEventListener('change', function(){
+    var f = this.files && this.files[0]; if (!f) return;
+    if (f.size > 12*1024*1024) { alert('That file is over 12 MB. Email it to contact@hdlaser.net after ordering instead.'); this.value=''; return; }
+    var done = function(dataUrl){ S.logo = dataUrl; S.logoName = f.name; $('#logoname').textContent = f.name; $('#logoclear').hidden = false; renderAll(); };
+    if (f.type === 'image/svg+xml') { var rd = new FileReader(); rd.onload = function(){ var txt = String(rd.result); if (txt.length > 900000) { alert('That SVG is very large. We’ll show a preview but please email the file too.'); } done('data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(txt.slice(0, 900000))))); }; rd.readAsText(f); return; }
+    var img = new Image(); var url = URL.createObjectURL(f);
+    img.onload = function(){ var max = 1400, sc = Math.min(1, max/Math.max(img.width, img.height)); var cv = document.createElement('canvas'); cv.width = Math.round(img.width*sc); cv.height = Math.round(img.height*sc); cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); var out = f.type==='image/jpeg' ? cv.toDataURL('image/jpeg', 0.86) : cv.toDataURL('image/png'); if (out.length > 900000) out = cv.toDataURL('image/jpeg', 0.8); URL.revokeObjectURL(url); done(out); };
+    img.onerror = function(){ URL.revokeObjectURL(url); alert('We couldn’t read that image. Try a PNG or JPG, or email it after ordering.'); };
+    img.src = url;
+  });
+
+  // ---- checkout
+  var ref = 'HD-' + Date.now().toString(36).toUpperCase();
+  function fail(msg){ var e = $('#err'); e.textContent = msg; e.hidden = false; e.scrollIntoView({behavior:'smooth', block:'center'}); $('#pay').disabled = false; renderSummary(); }
+  $('#pay').onclick = function(){
+    $('#err').hidden = true; var q = quote();
+    if (!q) return fail('Finish steps 1 to 4 first: the item, the finish and the size.');
+    var name = $('#name').value.trim(), email = $('#email').value.trim(), phone = $('#phone').value.trim();
+    if (name.length < 2) return fail('Tell us your name (step 7).');
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail('That email doesn’t look right (step 7).');
+    if (phone.replace(/\D/g,'').length < 10) return fail('We need a phone number for pickup texts (step 7).');
+    if (!$('#agree').checked) return fail('Please agree to the Terms of Sale (step 7).');
+    if (!renderInitials()) return fail('Type your initials in step 8. That is your sign-off on the size, the artwork and the quantity.');
+    var btn = $('#pay'); btn.disabled = true; btn.textContent = 'Opening secure payment…';
+    var body = { ref: ref, spec: { product:S.product, material:S.material, service:S.service, inches:S.inches, qty:S.qty, rush:S.rush },
+      customer: { name:name, business:$('#business').value.trim(), email:email, phone:phone, agreed:true, textConsent:$('#sms').checked },
+      notes: $('#notes').value.trim(), needed_by: $('#needed').value || null, attest: { initials: $('#initials').value, version: '2026-09-26' }, taken_by: HUB ? BY : null,
+      logo: S.logo ? { name: S.logoName, data: S.logo } : null };
+    fetch(BASE + '/order/checkout', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
+      .then(function(r){ return r.json().then(function(d){ d._status = r.status; return d; }); })
+      .then(function(d){
+        if (d && d.url) { if (window.hdTrack) hdTrack('payment_started', d.ref || ref); location.href = d.url; return; }
+        if (d && d.ok) { location.href = '/thanks/?kind=custom&pay=later&ref=' + encodeURIComponent(d.ref || ref) + (S.logo ? '&logo=1' : ''); return; }
+        fail((d && d.error) || 'Something went wrong. Call us at (858) 373-9866 and we’ll finish it by hand.');
+      })
+      .catch(function(){ fail('We couldn’t reach the shop’s server. Try again in a minute, or call (858) 373-9866.'); });
+  };
+
+  // on phones the drawing sits right under step 1 instead of at the bottom of the page
+  if (window.matchMedia('(max-width:960px)').matches) { var pv = $('#preview'); $('#s-product').insertAdjacentElement('afterend', pv); pv.style.marginBottom = '16px'; }
+  // ---- boot
+  function boot(b){ BOOK = b.book; TAX = b.tax_rate || 0; $('#rushpct').textContent = BOOK.rush_pct;
+    var pre = qs.get('product'); if (pre && BOOK.products.some(function(p){return p.key===pre;})) { S.product = pre; var pp = BOOK.products.filter(function(p){return p.key===pre;})[0]; S.material = pp.material; }
+    var svc = qs.get('service'); if (svc==='engrave' || svc==='uv') S.service = svc;
+    renderAll(); if (window.hdTrack) hdTrack('order_view'); }
+  if (!BASE) { $('#loaderr').textContent = 'Online ordering isn’t switched on yet. Use the quote form or call (858) 373-9866.'; $('#loaderr').hidden = false; }
+  else fetch(BASE + '/pricing').then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); }).then(boot).catch(function(){ $('#loaderr').innerHTML = 'Prices didn’t load. Refresh in a moment, or <a href="/quote/">ask for a quote</a> and we’ll price it by hand.'; $('#loaderr').hidden = false; });
+})();
+</script>
+</body>
+</html>

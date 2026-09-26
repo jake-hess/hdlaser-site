@@ -17,11 +17,11 @@ window.HD_CONFIG = {
 };
 
 // Cookieless funnel beacon. One random id per browser tab session; no personal data.
-window.hdTrack = function (name, ref) {
+window.hdTrack = function (name, ref, detail) {
   try {
     var base = window.HD_CONFIG.WORKER_BASE; if (!base) return;
     var sid = sessionStorage.getItem('hd_sid'); if (!sid) { sid = Math.random().toString(36).slice(2, 12); sessionStorage.setItem('hd_sid', sid); }
-    var body = JSON.stringify({ name: name, session: sid, ref: ref || null, path: location.pathname });
+    var body = JSON.stringify({ name: name, session: sid, ref: ref || null, path: location.pathname, detail: detail || undefined });
     if (navigator.sendBeacon) { navigator.sendBeacon(base + '/event', new Blob([body], { type: 'application/json' })); }
     else { fetch(base + '/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function () {}); }
   } catch (e) {}

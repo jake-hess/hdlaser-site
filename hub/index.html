@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hub | HD Laser Studio</title>
+<meta name="robots" content="noindex, nofollow, noarchive">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#15191E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Figtree:wght@400;500;700;800&display=swap">
+<style>
+:root{--ink:#15191E;--ink2:#1D2229;--cream:#F6F4EF;--muted:#9AA3AD;--red:#C8372A;--redd:#A32C21;--gold:#F2B63D;--gold2:#C99A2E;--line:#E4E0D8;--green:#2F6B4F}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{margin:0;min-height:100%}
+body{background:var(--ink);color:var(--cream);font-family:Figtree,"Helvetica Neue",Arial,sans-serif;-webkit-text-size-adjust:100%;
+  background-image:radial-gradient(ellipse at 50% -10%,rgba(242,182,61,.16),transparent 55%),radial-gradient(ellipse at 100% 100%,rgba(200,55,42,.14),transparent 50%),repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 7px);}
+.serif{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:22px 32px 10px;max-width:1240px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--cream);font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-weight:800;letter-spacing:3px;font-size:16px}
+.clock{text-align:right;line-height:1.2}.clock b{display:block;font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:30px;letter-spacing:1px}.clock span{font-size:13px;color:var(--muted)}
+.rule{height:1px;max-width:1176px;margin:6px auto 0;background:linear-gradient(90deg,transparent,var(--gold2) 20%,var(--gold) 50%,var(--gold2) 80%,transparent)}
+.hello{max-width:1240px;margin:0 auto;padding:22px 32px 6px;display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap}
+.hello h1{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:36px;margin:0;letter-spacing:.5px}
+.hello p{margin:0;color:var(--muted);font-size:15px}
+.hello a,.hello button{color:var(--gold);background:none;border:1px solid rgba(242,182,61,.5);border-radius:999px;padding:8px 14px;font:inherit;font-size:14px;cursor:pointer;text-decoration:none}
+main{max-width:1240px;margin:0 auto;padding:16px 32px 60px}
+.apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:18px}
+.app{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:186px;padding:20px 14px;border-radius:22px;background:linear-gradient(160deg,#FBFAF7,#EFEBE2);color:var(--ink);text-decoration:none;font:inherit;cursor:pointer;border:0;text-align:center;box-shadow:0 1px 0 rgba(255,255,255,.35) inset,0 14px 30px rgba(0,0,0,.35);transition:transform .12s ease,box-shadow .12s ease}
+.app::before{content:"";position:absolute;inset:7px;border:1px solid rgba(201,154,46,.55);border-radius:16px;pointer-events:none}
+.app::after{content:"";position:absolute;inset:11px;border:1px solid rgba(21,25,30,.12);border-radius:13px;pointer-events:none}
+.app:hover,.app:focus-visible{transform:translateY(-3px);box-shadow:0 1px 0 rgba(255,255,255,.35) inset,0 22px 40px rgba(0,0,0,.45);outline:none}
+.app:active{transform:translateY(0)}
+.app .ic{width:64px;height:64px;border-radius:50%;background:var(--ink);display:grid;place-items:center;box-shadow:0 0 0 4px #F6F4EF,0 0 0 5px var(--gold2)}
+.app .ic svg{width:32px;height:32px;stroke:var(--gold);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.app b{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:19px;line-height:1.1;letter-spacing:.2px}
+.app small{color:#545B63;font-size:13px;line-height:1.35;max-width:170px}
+.app.primary{background:linear-gradient(160deg,#D64535,#A32C21);color:#fff}
+.app.primary .ic{background:#fff;box-shadow:0 0 0 4px #B7311F,0 0 0 5px var(--gold)}.app.primary .ic svg{stroke:var(--red)}
+.app.primary small{color:#FBE9E6}.app.primary::before{border-color:rgba(255,255,255,.45)}.app.primary::after{border-color:rgba(255,255,255,.15)}
+.app .tag{position:absolute;top:14px;right:14px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--redd);background:#FBE9E6;border-radius:999px;padding:3px 8px}
+.sect{margin:34px 0 12px;display:flex;align-items:center;gap:14px;color:var(--gold);font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:14px;letter-spacing:.2em;text-transform:uppercase}
+.sect::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,rgba(242,182,61,.6),transparent)}
+.panel{background:var(--cream);color:var(--ink);border-radius:22px;padding:22px 24px;box-shadow:0 14px 30px rgba(0,0,0,.35)}
+.panel h2{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:28px;margin:0 0 6px}
+.panel .back{display:inline-flex;align-items:center;gap:8px;font-weight:700;color:var(--redd);text-decoration:none;background:none;border:0;font:inherit;cursor:pointer;padding:0;margin-bottom:12px}
+.cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.cat{position:relative;border-radius:16px;overflow:hidden;border:0;padding:0;cursor:pointer;background:#000;min-height:150px;text-align:left}
+.cat img{width:100%;height:150px;object-fit:cover;display:block;opacity:.85}
+.cat span{position:absolute;left:0;right:0;bottom:0;padding:26px 14px 12px;background:linear-gradient(transparent,rgba(0,0,0,.8));color:#fff;font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:19px;font-weight:700}
+.cat i{position:absolute;top:10px;right:10px;background:var(--gold);color:var(--ink);font-style:normal;font-weight:800;font-size:12px;border-radius:999px;padding:3px 8px}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.gal figure{margin:0;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.gal img{width:100%;height:200px;object-fit:cover;display:block;cursor:zoom-in}
+.gal figcaption{padding:8px 12px;font-size:14px;color:#545B63}
+table{border-collapse:collapse;width:100%;font-size:15px}th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}th{font-size:12px;color:#545B63;text-transform:uppercase;letter-spacing:.06em}td.num,th.num{text-align:right;white-space:nowrap}
+.pcols{display:grid;grid-template-columns:1.2fr 1fr;gap:20px}
+.login{max-width:440px;margin:40px auto;background:var(--cream);color:var(--ink);border-radius:22px;padding:28px}
+.login h1{font-family:"Bricolage Grotesque","Trebuchet MS",sans-serif;font-size:30px;margin:0 0 4px}
+.login p{color:#545B63;margin:0 0 16px;line-height:1.45}
+label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700;color:#545B63;margin-bottom:12px}
+input{font:inherit;font-size:17px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;width:100%}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:12px 24px;border-radius:999px;border:0;font:inherit;font-weight:700;font-size:17px;cursor:pointer;background:var(--red);color:#fff;width:100%}
+.err{background:#FBE9E6;border:1px solid #E8B4AE;border-radius:12px;padding:10px 12px;color:var(--redd);font-weight:600;margin-top:10px}
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);display:grid;place-items:center;z-index:20;cursor:zoom-out}.lightbox img{max-width:96vw;max-height:92vh;border-radius:8px}
+@media (max-width:700px){.top{padding:16px 18px 8px}.hello{padding:16px 18px 4px}.hello h1{font-size:28px}main{padding:12px 18px 60px}.apps{grid-template-columns:repeat(2,1fr);gap:12px}.app{min-height:160px;padding:16px 10px}.app b{font-size:17px}.pcols{grid-template-columns:1fr}.clock b{font-size:22px}.panel{padding:18px 16px}}
+</style>
+</head>
+<body>
+<div class="top">
+  <a class="brand" href="/hub/"><svg width="86" height="29" viewBox="220 115 1930 640" aria-hidden="true"><path fill="#C8372A" d="M510 125 L730 125 L636 371 L963 371 L1072 125 L2000 125 C2100 125 2160 210 2130 300 L2010 610 C1970 700 1880 742 1790 742 L1115 742 L1283 341 L1525 341 L1425 595 L1800 595 L1938 272 L1222 272 L1030 742 L808 742 L907 523 L572 523 L483 742 L232 742 Z"></path></svg><span>LASER STUDIO</span></a>
+  <div class="clock"><b id="time">–</b><span id="date"></span></div>
+</div>
+<div class="rule"></div>
+
+<section id="login" hidden>
+  <div class="login">
+    <h1>Shop hub</h1>
+    <p>Sign in with your name and PIN. This screen is for the team; customers use the website.</p>
+    <form id="loginform" autocomplete="off">
+      <label>Your name<input name="name" required autocapitalize="words" placeholder="As it appears on the team list"></label>
+      <label>PIN<input name="pin" type="password" inputmode="numeric" pattern="\d{4,8}" required placeholder="4 to 8 digits"></label>
+      <button class="btn" type="submit">Open the hub</button>
+      <div class="err" id="loginerr" hidden></div>
+    </form>
+  </div>
+</section>
+
+<section id="app" hidden>
+  <div class="hello"><div><h1 id="greet">Hello</h1><p id="sub">Pick what you need. Every order, walk-in or online, starts from the same page the customer sees.</p></div><div><a href="/staff/" id="clocklink">Clock in</a> <button type="button" id="signout">Sign out</button></div></div>
+  <main>
+    <div id="home">
+      <div class="apps" id="apps"></div>
+    </div>
+    <div id="view" hidden></div>
+  </main>
+</section>
+
+<script src="/assets/site-config.js?v=4"></script>
+<script>
+(function(){
+  var BASE=(window.HD_CONFIG&&HD_CONFIG.WORKER_BASE)||'';
+  var $=function(s){return document.querySelector(s);};
+  var esc=function(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});};
+  var TZ='America/Los_Angeles';
+  var token=null; try{token=localStorage.getItem('hd_staff_token');}catch(e){}
+  var me=null, BOOK=null;
+  var qs=new URLSearchParams(location.search); if(qs.has('kiosk')){ try{localStorage.setItem('hd_kiosk','1');}catch(e){} }
+  var KIOSK=false; try{KIOSK=localStorage.getItem('hd_kiosk')==='1';}catch(e){}
+
+  function tick(){ var n=new Date(); $('#time').textContent=n.toLocaleTimeString('en-US',{timeZone:TZ,hour:'numeric',minute:'2-digit'}); $('#date').textContent=n.toLocaleDateString('en-US',{timeZone:TZ,weekday:'long',month:'long',day:'numeric'}); }
+  tick(); setInterval(tick,15000);
+
+  function api(path,body,method){ var h={'Content-Type':'application/json'}; if(token) h['Authorization']='Bearer '+token;
+    return fetch(BASE+path,{method:method||(body?'POST':'GET'),headers:h,body:body?JSON.stringify(body):undefined}).then(function(r){ return r.json().then(function(j){ if(r.status===401&&path!=='/staff/login'){ signOut(); } if(!r.ok) throw new Error(j.error||('Error '+r.status)); return j; }); }); }
+  function signOut(){ token=null; me=null; try{localStorage.removeItem('hd_staff_token');}catch(e){} $('#app').hidden=true; $('#login').hidden=false; }
+
+  $('#loginform').addEventListener('submit',function(e){ e.preventDefault(); var f=e.target; $('#loginerr').hidden=true;
+    api('/staff/login',{name:f.name.value,pin:f.pin.value}).then(function(j){ token=j.token; try{localStorage.setItem('hd_staff_token',token);}catch(e){} f.reset(); load(); }).catch(function(err){ $('#loginerr').textContent=err.message; $('#loginerr').hidden=false; }); });
+  $('#signout').onclick=function(){ api('/staff/logout',{}).catch(function(){}).then(signOut); };
+
+  var I={
+    order:'<svg viewBox="0 0 24 24"><path d="M4 7h16l-1.5 11h-13z"/><path d="M9 7V5a3 3 0 0 1 6 0v2"/><path d="M9 12h6"/></svg>',
+    quote:'<svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg>',
+    samples:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.5"/></svg>',
+    prices:'<svg viewBox="0 0 24 24"><path d="M20 12l-8 8-9-9V4h7z"/><circle cx="8" cy="8" r="1.5"/></svg>',
+    queue:'<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h13"/><circle cx="19" cy="17" r="2.5"/></svg>',
+    clock:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    walkin:'<svg viewBox="0 0 24 24"><path d="M12 3l9 8h-3v9h-4v-6h-4v6H6v-9H3z"/></svg>',
+    me:'<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>',
+    sop:'<svg viewBox="0 0 24 24"><path d="M5 4h9l5 5v11H5z"/><path d="M14 4v5h5M8 13h8M8 17h6"/></svg>',
+    team:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="2.5"/><path d="M2 20a7 7 0 0 1 14 0M15 15a5 5 0 0 1 7 5"/></svg>',
+    sales:'<svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 3 6-8 3 4"/><path d="M3 21h18"/></svg>',
+    money:'<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9h.01M18 15h.01"/></svg>',
+    web:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>',
+    terms:'<svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>'
+  };
+  function apps(){
+    var mgr=me&&['manager','owner'].indexOf(me.role)>=0, own=me&&me.role==='owner';
+    var by=encodeURIComponent(me?me.name:'');
+    var list=[
+      {href:'/order/?via=hub&by='+by,ic:'order',t:'New order',s:'Price it and take payment on the same page customers use',cls:'primary',tag:'start here'},
+      {href:'/quote/',ic:'quote',t:'Quote request',s:'Something the order page can’t price yet'},
+      {view:'samples',ic:'samples',t:'Samples',s:'Show what we’ve made, by category'},
+      {view:'prices',ic:'prices',t:'Price list',s:'Sizes, items, quantity breaks'},
+      {href:'/staff/#queue',ic:'queue',t:'Work queue',s:'What’s waiting, most urgent first'},
+      {href:'/staff/#job',ic:'walkin',t:'Log a walk-in',s:'Same-day job taken at the counter'},
+      {href:'/staff/',ic:'clock',t:'Clock in & checklists',s:'Opening, closing, your shift'},
+      {href:'/staff/#me',ic:'me',t:'My numbers',s:'Hours, jobs, pay this period'},
+      {href:'/staff/sop/',ic:'sop',t:'The SOP',s:'How the day runs, start to finish'},
+      mgr?{href:'/staff/#team',ic:'team',t:'Team',s:'Who’s in, PINs, rates'}:null,
+      own?{href:BASE+'/admin',ic:'sales',t:'Sales dashboard',s:'Orders, funnel, tax exposure'}:null,
+      own?{href:BASE+'/admin/money',ic:'money',t:'Money',s:'P&L, cash forecast, pricing review'}:null,
+      {href:'/',ic:'web',t:'The website',s:'What customers see'},
+      {href:'/terms/',ic:'terms',t:'Terms of sale',s:'What every customer agrees to'}
+    ].filter(Boolean);
+    $('#apps').innerHTML=list.map(function(a){ var inner='<span class="ic">'+I[a.ic]+'</span><b>'+esc(a.t)+'</b><small>'+esc(a.s)+'</small>'+(a.tag?'<span class="tag">'+esc(a.tag)+'</span>':''); return a.view?'<button type="button" class="app'+(a.cls?' '+a.cls:'')+'" data-view="'+a.view+'">'+inner+'</button>':'<a class="app'+(a.cls?' '+a.cls:'')+'" href="'+esc(a.href)+'">'+inner+'</a>'; }).join('');
+  }
+
+  // Samples: photos already on the website, grouped the way customers ask for them
+  var CATS=[
+    {k:'tumblers',n:'Tumblers',cover:'corp-crest-tumbler.jpg',f:['corp-crest-tumbler','corp-cell-rice-tumbler','corp-oktoberfest-tumbler','corporate-conway-yeti','corp-fritolay-yetis','engrave-red-tumbler-poster','team-detectives-tumblers','drink-monogram-tumblers','hero-laser-tumbler-poster']},
+    {k:'bottles',n:'Bottles',cover:'corp-ucsd-bottle.jpg',f:['corp-ucsd-bottle','corp-dhs-bottle','corp-hummingbird-bottle','corp-prevost-bottle','corp-target-bottles','drink-mina-bottle','engrave-name-bottles','engrave-white-bottle-poster','team-name-bottles','wed-21st-bottle','award-regionals-bottles']},
+    {k:'cups',n:'Coffee shop cups',cover:'bnb-cups-printed-group.jpg',f:['bnb-cups-printed-group','bnb-cup-printed-closeup','bnb-cups-engraved','team-letter-shot-cups','cup-cream','cup-black','cup-navy','cup-pink','cup-bikini-pink','cup-yellow','cup-orange','cup-purple','cup-light-green','cup-army-green','cup-light-blue','cup-dark-gray']},
+    {k:'wood',n:'Boards & wood',cover:'wood-wedding-board.jpg',f:['wood-wedding-board','wood-family-crest','corp-bbq-board','gift-logo-board','gift-olive-board','wed-family-board','wed-live-edge-slice','engrave-tree-plaque','engrave-wood-flask','wed-date-blocks','award-pizza-paddle','award-mojave-box']},
+    {k:'awards',n:'Awards & plaques',cover:'award-usmc-retirement.jpg',f:['award-usmc-retirement','award-metal-glass-trophy','award-sledgehammer','award-rugby-whistles','award-regionals-bottles','engrave-copper-plate-poster','corp-space-plate','laser-metal-plate-poster']},
+    {k:'glass',n:'Glassware',cover:'engrave-wine-glasses.jpg',f:['engrave-wine-glasses','gift-champagne','award-metal-glass-trophy']},
+    {k:'leather',n:'Leather',cover:'gift-leather-portfolio.jpg',f:['gift-leather-portfolio','team-leather-padfolio','award-leather-pen-sleeve','uv-mandala-wallet']},
+    {k:'metal',n:'Metal, tags & knives',cover:'engrave-steak-knives.jpg',f:['engrave-steak-knives','corporate-sdyc-knives','engrave-anodized-tags','laser-metal-plate-poster','corp-garza-shakers','engrave-lunchbox-live','engrave-peace-sign']},
+    {k:'uv',n:'UV printing, full color',cover:'corp-notebook-poster.jpg',f:['corp-notebook-poster','uv-mandala-wallet','bnb-cup-printed-closeup','bnb-cups-printed-group','corp-ng-mug','corp-nmmf-mug']},
+    {k:'cutting',n:'Laser cutting',cover:'cutting-layered-flag.jpg',f:['cutting-layered-flag','cutting-flag-full','cutting-goldfish','cutting-hamsa','cutting-sea-turtle','cutting-tree-of-life','cutting-vajra-ornament']},
+    {k:'gifts',n:'Gifts & weddings',cover:'gift-watch-box.jpg',f:['gift-watch-box','gift-cigar-humidor','gift-cribbage','gift-heart-box','gift-waterman-pen','tech-airpods','engrave-birth-frame','engrave-led-lamp','wed-bridal-shoe','wed-date-blocks','gift-champagne']}
+  ];
+  var cap=function(f){ return f.replace(/-poster$/,'').replace(/^(corp|corporate|award|gift|wed|engrave|cutting|drink|team|tech|wood|uv|bnb|cup|hero-laser)-/,'').replace(/-/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();}); };
+  function view(name,arg){
+    var v=$('#view'); $('#home').hidden=true; v.hidden=false; window.scrollTo(0,0);
+    if(name==='samples'&&!arg){ v.innerHTML='<div class="panel"><button class="back" data-home>&#8592; Hub</button><h2>Samples</h2><p style="margin:0 0 16px;color:#545B63">Tap a category. Tap a photo to fill the screen.</p><div class="cats">'+CATS.map(function(c){ return '<button type="button" class="cat" data-cat="'+c.k+'"><img src="/assets/'+c.cover+'" alt=""><i>'+c.f.length+'</i><span>'+esc(c.n)+'</span></button>'; }).join('')+'</div></div>'; return; }
+    if(name==='samples'){ var c=CATS.filter(function(x){return x.k===arg;})[0]; v.innerHTML='<div class="panel"><button class="back" data-view="samples">&#8592; All categories</button><h2>'+esc(c.n)+'</h2><div class="gal">'+c.f.map(function(f){ return '<figure><img src="/assets/'+f+'.jpg" alt="'+esc(cap(f))+'" loading="lazy" data-zoom><figcaption>'+esc(cap(f))+'</figcaption></figure>'; }).join('')+'</div></div>'; return; }
+    if(name==='prices'){ v.innerHTML='<div class="panel"><button class="back" data-home>&#8592; Hub</button><h2>Price list</h2><p id="pnote" style="margin:0 0 14px;color:#545B63">Loading…</p><div id="ptable"></div></div>';
+      var render=function(b){ var cents=function(c){return '$'+(c/100).toFixed(2);};
+        $('#pnote').textContent='Per piece, by the longest side of the artwork. Multiply by the material factor, then add the item if we supply it. The order page does this for you; this is for quick answers at the counter.';
+        $('#ptable').innerHTML='<div class="pcols"><div><table><tr><th>Artwork size</th><th class="num">Engraving</th><th class="num">UV print</th></tr>'+b.sizes.map(function(s){ return '<tr><td>'+s.inches+' in</td><td class="num">'+cents(s.engrave_cents)+'</td><td class="num">'+cents(s.uv_cents)+'</td></tr>'; }).join('')+'</table></div><div><table><tr><th>Item we supply</th><th class="num">Price</th><th class="num">Max art</th></tr>'+b.products.filter(function(p){return p.key!=='own';}).map(function(p){ return '<tr><td>'+esc(p.name)+'</td><td class="num">'+cents(p.blank_cents)+'</td><td class="num">'+p.max_inches+' in</td></tr>'; }).join('')+'</table><table style="margin-top:16px"><tr><th>Material</th><th class="num">Factor</th><th>Available</th></tr>'+b.materials.map(function(m){ return '<tr><td>'+esc(m.name)+'</td><td class="num">×'+m.factor+'</td><td>'+m.services.map(function(k){return k==='uv'?'UV print':'Engraving';}).join(', ')+'</td></tr>'; }).join('')+'</table><p style="font-size:14px;color:#545B63;line-height:1.5;margin:16px 0 0"><b>Quantity:</b> '+b.qty_breaks.filter(function(x){return x.off_pct;}).map(function(x){return x.min+'+ pieces '+x.off_pct+'% off the work';}).join(' · ')+'.<br><b>Setup:</b> '+b.services.map(function(s){return esc(s.name)+' '+cents(s.setup_cents);}).join(', ')+' (once per order). <b>Rush:</b> +'+b.rush_pct+'% on the work. <b>Customer’s own item:</b> +'+cents(b.own_item_handling_cents)+' each. <b>Minimum order:</b> '+cents(b.min_order_cents)+'.</p></div></div>'; };
+      if(BOOK) render(BOOK); else fetch(BASE+'/pricing').then(function(r){return r.json();}).then(function(d){ BOOK=d.book; render(BOOK); }).catch(function(){ $('#pnote').textContent='Prices didn’t load. Open the order page instead.'; });
+      return; }
+  }
+  document.addEventListener('click',function(e){
+    var z=e.target.closest('[data-zoom]'); if(z){ var lb=document.createElement('div'); lb.className='lightbox'; lb.innerHTML='<img src="'+z.getAttribute('src')+'" alt="">'; lb.onclick=function(){lb.remove();}; document.body.appendChild(lb); return; }
+    var h=e.target.closest('[data-home]'); if(h){ $('#view').hidden=true; $('#home').hidden=false; window.scrollTo(0,0); return; }
+    var c=e.target.closest('[data-cat]'); if(c){ view('samples',c.dataset.cat); return; }
+    var v=e.target.closest('[data-view]'); if(v){ view(v.dataset.view); return; }
+  });
+
+  function load(){ if(!token){ signOut(); return; }
+    api('/staff/me').then(function(s){ me=s.me; $('#login').hidden=true; $('#app').hidden=false;
+      var h=new Date().toLocaleString('en-US',{timeZone:TZ,hour:'numeric',hour12:false}); var part=+h<12?'Good morning':+h<17?'Good afternoon':'Good evening';
+      $('#greet').textContent=part+', '+me.name.split(' ')[0]+'.';
+      $('#clocklink').textContent=s.shift?'Clocked in '+new Date(s.shift.in_at).toLocaleTimeString('en-US',{timeZone:TZ,hour:'numeric',minute:'2-digit'}):'Clock in';
+      $('#signout').hidden=KIOSK; apps(); }).catch(function(err){ if(token) { $('#login').hidden=false; $('#loginerr').textContent=err.message; $('#loginerr').hidden=false; } });
+  }
+  load();
+  setInterval(function(){ if(token&&!document.hidden) load(); },300000);
+})();
+</script>
+</body>
+</html>

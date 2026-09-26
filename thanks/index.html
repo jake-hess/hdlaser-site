@@ -130,12 +130,20 @@ button[type=submit]:hover{background:var(--redd)}
 
   <p class="btns"><a href="/" class="btn ghost">Back to home</a><a href="/#work" class="btn ghost">See more of our work</a></p>
 </main>
-<script src="/assets/site-config.js?v=3"></script>
+<script src="/assets/site-config.js?v=4"></script>
 <script>
   var qs = new URLSearchParams(location.search), ref = (qs.get('ref') || '').replace(/[^A-Z0-9-]/gi, ''), h1 = document.getElementById('h1'), lead = document.getElementById('lead');
+  var custom = qs.get('kind') === 'custom', hasLogo = qs.get('logo') === '1';
+  if (custom) {
+    // an order from the order builder: no cups, no resale certificate; tax was charged at checkout
+    var pb = document.querySelector('.pb'); if (pb) pb.hidden = true;
+    var rc = document.getElementById('resale'); if (rc && rc.closest('.card')) rc.closest('.card').hidden = true;
+    var steps = document.querySelectorAll('ul.steps li'); if (steps[2]) steps[2].innerHTML = 'Once approved, we make it and text you when it&#8217;s ready for pickup at 759 Turquoise St, Pacific Beach.';
+    if (hasLogo) { var lc = document.getElementById('logo-mail'); if (lc && lc.closest('.card')) { lc.closest('.card').querySelector('h2').textContent = 'Your logo came through'; lc.closest('.card').querySelector('p').textContent = 'We have the file you added. If you have a better version (vector AI, EPS, SVG or PDF), send it and we\u2019ll use that for the proof.'; } }
+  }
   if (qs.get('paid') === '1') {
     h1.textContent = 'You’re in. Order ' + ref + ' is confirmed.';
-    lead.textContent = 'Payment received. Two quick things below and we’ll get your proof started. Your receipt from Square is on its way to your inbox.';
+    lead.textContent = custom ? 'Payment received. Your proof is next, and your receipt from Square is on its way to your inbox.' : 'Payment received. Two quick things below and we’ll get your proof started. Your receipt from Square is on its way to your inbox.';
     document.getElementById('paid').hidden = false;
     if (window.hdTrack) hdTrack('paid_return', ref);
   } else if (qs.get('pay') === 'later') {

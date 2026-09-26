@@ -16,6 +16,8 @@
 //   /api/plaid/*              live bank feed (PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV); synced hourly with the Square job
 //   POST /resale              resale permit info from the thank-you page
 //   POST /webhooks/square     Square webhook (payment.*, refund.*), verified with the signature key
+//   GET  /pricing              the price book the order builder uses (public); POST /order/checkout places a priced custom order
+//   /api/pricing*             price book, weekly pricing review suggestions (approve/deny), edit history (Basic auth)
 //   GET  /health
 //   GET  /admin               KPI dashboard (Basic auth, password = ADMIN_KEY)
 //   GET  /api/kpis?from&to    KPI JSON (Basic auth)
@@ -33,7 +35,7 @@ const PRICING = {
   minCups: 50,
 };
 const COLORS = ["Pink", "Bikini Pink", "Cream", "Yellow", "Orange", "Purple", "Light Green", "Army Green", "Light Blue", "Navy", "Dark Gray", "Black"];
-const EVENT_NAMES = ["calc_view", "add_line", "checkout_click", "details_submitted", "payment_started", "quote_request", "paid_return"];
+const EVENT_NAMES = ["calc_view", "add_line", "checkout_click", "details_submitted", "payment_started", "quote_request", "paid_return", "order_view", "spec_view", "order_attested", "order_checkout"];
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS orders (ref TEXT PRIMARY KEY, created_at TEXT NOT NULL, status TEXT NOT NULL, business TEXT, name TEXT, email TEXT, phone TEXT, notes TEXT, text_consent INTEGER DEFAULT 0, cups INTEGER, base_price_cents INTEGER, cups_subtotal_cents INTEGER, setup_fee_cents INTEGER, total_cents INTEGER, deposit_percent INTEGER, square_order_id TEXT, square_payment_id TEXT, paid_at TEXT, paid_cents INTEGER DEFAULT 0, fee_cents INTEGER DEFAULT 0, refunded_cents INTEGER DEFAULT 0, resale_permit TEXT, resale_business TEXT, resale_received_at TEXT, logo_received_at TEXT, proof_approved_at TEXT, completed_at TEXT, tax_invoiced_at TEXT, admin_notes TEXT);
@@ -50,6 +52,10 @@ CREATE INDEX IF NOT EXISTS square_items_created ON square_items(created_at);
 CREATE TABLE IF NOT EXISTS inquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, kind TEXT NOT NULL, ref TEXT, name TEXT, business TEXT, email TEXT, phone TEXT, fields TEXT, emailed INTEGER DEFAULT 0);
 CREATE INDEX IF NOT EXISTS inquiries_created ON inquiries(created_at);
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
+CREATE TABLE IF NOT EXISTS order_items (id INTEGER PRIMARY KEY AUTOINCREMENT, ref TEXT NOT NULL, product TEXT, material TEXT, service TEXT, inches REAL, qty INTEGER, work_unit_cents INTEGER, blank_unit_cents INTEGER, discount_pct REAL, line_cents INTEGER);
+CREATE TABLE IF NOT EXISTS order_assets (id INTEGER PRIMARY KEY AUTOINCREMENT, ref TEXT NOT NULL, created_at TEXT, name TEXT, type TEXT, bytes INTEGER, data TEXT);
+CREATE TABLE IF NOT EXISTS price_suggestions (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', rule TEXT, target TEXT NOT NULL, current_cents INTEGER, proposed_cents INTEGER, reason TEXT, evidence TEXT, decided_at TEXT, note TEXT);
+CREATE TABLE IF NOT EXISTS price_history (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, target TEXT NOT NULL, from_cents INTEGER, to_cents INTEGER, source TEXT, suggestion_id INTEGER, note TEXT);
 CREATE TABLE IF NOT EXISTS staff (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'staff', phone TEXT DEFAULT '', email TEXT DEFAULT '', pin_hash TEXT, pin_salt TEXT, on_call INTEGER DEFAULT 0, active INTEGER DEFAULT 1, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS staff_sessions (token TEXT PRIMARY KEY, staff_id INTEGER NOT NULL, created_at TEXT, expires_at TEXT, ip TEXT);
 CREATE TABLE IF NOT EXISTS shifts (id INTEGER PRIMARY KEY AUTOINCREMENT, staff_id INTEGER NOT NULL, in_at TEXT NOT NULL, out_at TEXT, minutes INTEGER, note TEXT);
@@ -68,7 +74,7 @@ CREATE TABLE IF NOT EXISTS plaid_items (item_id TEXT PRIMARY KEY, access_token T
 CREATE TABLE IF NOT EXISTS coffee_orders (ref TEXT PRIMARY KEY, created_at TEXT NOT NULL, status TEXT NOT NULL, name TEXT, phone TEXT, email TEXT, items TEXT, summary TEXT, total_cents INTEGER, pickup TEXT, note TEXT, text_consent INTEGER DEFAULT 0, square_order_id TEXT, square_payment_id TEXT, paid_at TEXT, paid_cents INTEGER DEFAULT 0, tip_cents INTEGER DEFAULT 0, notified_at TEXT, ready_at TEXT, picked_up_at TEXT);
 CREATE INDEX IF NOT EXISTS coffee_created ON coffee_orders(created_at);`;
 // Columns added after the first release. Each ALTER is tried once and ignored if the column already exists.
-const ALTERS = ["ALTER TABLE staff ADD COLUMN sms_consent_at TEXT", "ALTER TABLE orders ADD COLUMN notified_paid_at TEXT", "ALTER TABLE payments ADD COLUMN team_member_id TEXT", "ALTER TABLE staff ADD COLUMN hourly_rate_cents INTEGER DEFAULT 0", "ALTER TABLE staff ADD COLUMN commission_pct REAL DEFAULT 0"];
+const ALTERS = ["ALTER TABLE events ADD COLUMN detail TEXT", "ALTER TABLE orders ADD COLUMN kind TEXT DEFAULT 'cups'", "ALTER TABLE orders ADD COLUMN spec TEXT", "ALTER TABLE orders ADD COLUMN needed_by TEXT", "ALTER TABLE orders ADD COLUMN rush INTEGER DEFAULT 0", "ALTER TABLE orders ADD COLUMN taken_by TEXT", "ALTER TABLE orders ADD COLUMN tax_cents INTEGER DEFAULT 0", "ALTER TABLE orders ADD COLUMN attest_initials TEXT", "ALTER TABLE orders ADD COLUMN attest_text TEXT", "ALTER TABLE orders ADD COLUMN attest_at TEXT", "ALTER TABLE orders ADD COLUMN attest_ip TEXT", "ALTER TABLE orders ADD COLUMN attest_ua TEXT", "ALTER TABLE orders ADD COLUMN attest_hash TEXT", "ALTER TABLE orders ADD COLUMN logo_asset_id INTEGER", "ALTER TABLE staff ADD COLUMN sms_consent_at TEXT", "ALTER TABLE orders ADD COLUMN notified_paid_at TEXT", "ALTER TABLE payments ADD COLUMN team_member_id TEXT", "ALTER TABLE staff ADD COLUMN hourly_rate_cents INTEGER DEFAULT 0", "ALTER TABLE staff ADD COLUMN commission_pct REAL DEFAULT 0"];
 
 let migrated = false;
 async function ensureSchema(env) {
@@ -103,6 +109,8 @@ export default {
       if (path === "/event" && request.method === "POST") return requireOrigin(cors) || recordEvent(request, env, cors);
       if (path === "/submit" && request.method === "POST") return requireOrigin(cors) || submitInquiry(request, env, cors);
       if (path === "/resale" && request.method === "POST") return requireOrigin(cors) || recordResale(request, env, cors);
+      if (path === "/pricing") return json({ book: publicBook(await priceBook(env)), tax_rate: parseFloat(env.TAX_RATE || "0.0775") || 0, attest_version: ATTEST_VERSION }, 200, { ...cors, "Cache-Control": "public, max-age=120" });
+      if (path === "/order/checkout" && request.method === "POST") return requireOrigin(cors) || orderCheckout(request, env, cors);
       // ---- Boards n' Beans coffee counter (order ahead, pay through Square, the bar gets a text) ----
       if (path === "/coffee/menu") return json({ menu: COFFEE.menu, milks: COFFEE.milks, extras: COFFEE.extras, shop: COFFEE.shop }, 200, { ...cors, "Cache-Control": "public, max-age=300" });
       if (path === "/coffee/checkout" && request.method === "POST") return requireOrigin(cors) || coffeeCheckout(request, env, cors);
@@ -125,6 +133,13 @@ export default {
           return json(await syncSquare(env, days, from, to), 200);
         }
         if (path === "/api/whoami") return json(await whoami(env), 200);
+        if (path === "/api/pricing") return json(await pricingAdmin(env), 200, { "Cache-Control": "no-store" });
+        if (path === "/api/pricing/analyze" && request.method === "POST") return json(await analyzePricing(env), 200);
+        if (path === "/api/pricing/book" && request.method === "POST") { const r = await editBook(env, await request.json()); return json(r, r.ok ? 200 : 400); }
+        const ps = path.match(/^\/api\/pricing\/suggestions\/(\d+)$/);
+        if (ps && request.method === "POST") { const r = await decideSuggestion(env, +ps[1], await request.json()); return json(r, r.ok ? 200 : 400); }
+        const am = path.match(/^\/api\/assets\/(\d+)$/);
+        if (am) return assetResponse(env, +am[1]);
         if (path === "/admin/money") return new Response(moneyHtml(env), { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
         if (path === "/api/money/yoy") return json(await yearOverYear(env), 200, { "Cache-Control": "no-store" });
         if (path === "/api/money/trends") return json(await trends(env), 200, { "Cache-Control": "no-store" });
@@ -175,7 +190,7 @@ export default {
       if (d.getUTCMinutes() >= 10) return;                                 // the :15 crons exist only for the 10:15 check
       await syncSquare(env, 3);
       if (env.PLAID_CLIENT_ID) await plaidSync(env, null, 12);
-      if (d.getUTCDay() === 1 && d.getUTCHours() === 15) await sendDigest(env);
+      if (d.getUTCDay() === 1 && d.getUTCHours() === 15) { await analyzePricing(env).catch((e) => console.error("pricing review", e)); await sendDigest(env); }
     })());
   },
 };
@@ -282,7 +297,8 @@ async function recordEvent(request, env, cors) {
   const session = String(b.session || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40) || null;
   const ref = /^HD-[A-Z0-9]{4,12}$/.test(String(b.ref || "")) ? b.ref : null;
   const path = String(b.path || "").slice(0, 120);
-  await env.DB.prepare(`INSERT INTO events (ts, name, session, ref, path) VALUES (?,?,?,?,?)`).bind(new Date().toISOString(), name, session, ref, path).run();
+  const detail = b.detail && typeof b.detail === "object" ? JSON.stringify(b.detail).slice(0, 300) : null;
+  await env.DB.prepare(`INSERT INTO events (ts, name, session, ref, path, detail) VALUES (?,?,?,?,?,?)`).bind(new Date().toISOString(), name, session, ref, path, detail).run();
   return json({ ok: true }, 200, cors);
 }
 
@@ -509,6 +525,7 @@ async function notifyPaid(env, ref) {
   if (!env.RESEND_API_KEY) return;
   const o = await env.DB.prepare(`SELECT * FROM orders WHERE ref = ? AND status = 'paid' AND notified_paid_at IS NULL`).bind(ref).first();
   if (!o) return;
+  if (o.kind === "custom") return notifyPaidCustom(env, o);
   const lines = (await env.DB.prepare(`SELECT qty, size, finish, color, lid, unit_cents FROM order_lines WHERE ref = ?`).bind(ref).all()).results;
   const items = lines.map((l) => `- ${l.qty} x ${l.size} oz ${l.finish === "printed" ? "UV printed" : "laser engraved"}, ${l.color}, ${l.lid} lid @ $${l.unit_cents / 100}`).join("\n");
   const total = "$" + (o.paid_cents / 100).toLocaleString("en-US");
@@ -536,6 +553,32 @@ HD Laser Studio
   await sendEmail(env, { to: env.SUPPORT_EMAIL, replyTo: o.email || undefined, subject: `PAID ${total}: ${o.business || o.name} (${ref})`, text: `Order ${ref} is paid.\n\nCustomer: ${[o.name, o.business, o.email, o.phone].filter(Boolean).join(" · ")}\n${items}\nTotal paid: ${total}\nResale permit: ${o.resale_permit || "not yet"}\n\nNext: watch for their logo, then send the proof. Dashboard: ${env.WORKER_URL || ""}/admin` });
   await sendAlert(env, `PAID ${total} by ${o.business || o.name} (${ref}). ${lines.reduce((n, l) => n + l.qty, 0)} cups. Logo + proof next.`);
   await env.DB.prepare(`UPDATE orders SET notified_paid_at = ? WHERE ref = ?`).bind(new Date().toISOString(), ref).run();
+}
+
+async function notifyPaidCustom(env, o) {
+  let spec = {}; try { spec = JSON.parse(o.spec || "{}"); } catch {}
+  const total = "$" + (o.paid_cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
+  const first = (o.name || "").split(" ")[0] || "there";
+  await sendEmail(env, { to: o.email, subject: `Paid. Order ${o.ref} is confirmed`, text:
+`Hi ${first},
+
+Payment received, ${total}. Thank you.
+
+Your order (${o.ref}): ${spec.summary || ""}
+${o.logo_asset_id ? "We have your logo file." : "If you haven't yet, send your logo or artwork to " + env.SUPPORT_EMAIL + " or text it to (858) 373-9866."}
+
+What happens next:
+- Digital proof by email within 1-2 business days. Unlimited revisions until it's right.
+- Once you approve it we make it${o.rush ? " on the rush schedule" : ""} and text you when it's ready for pickup in Pacific Beach.
+
+Reminder of what you initialed (${o.attest_initials}): we make exactly what you specified, and changes after approval are at your expense.
+
+HD Laser Studio
+759 Turquoise St, Pacific Beach
+(858) 373-9866 · hdlaser.net` });
+  await sendEmail(env, { to: env.SUPPORT_EMAIL, replyTo: o.email || undefined, subject: `PAID ${total}: ${o.business || o.name} (${o.ref})`, text: `Order ${o.ref} is paid.\n\nCustomer: ${[o.name, o.business, o.email, o.phone].filter(Boolean).join(" · ")}\n${spec.summary || ""}\n${o.needed_by ? "Needed by " + o.needed_by + "\n" : ""}Logo: ${o.logo_asset_id ? "on the order in the dashboard" : "not uploaded yet"}\nInitialed ${o.attest_initials} at ${o.attest_at}\n\nNext: proof, then make it. Dashboard: ${env.WORKER_URL || ""}/admin` });
+  await sendAlert(env, `PAID ${total} by ${o.business || o.name} (${o.ref}): ${spec.summary || "custom order"}. Proof next.`);
+  await env.DB.prepare(`UPDATE orders SET notified_paid_at = ? WHERE ref = ?`).bind(new Date().toISOString(), o.ref).run();
 }
 
 async function upsertRefund(env, r) {
@@ -590,7 +633,8 @@ async function kpis(env, from, to) {
     in_production: (await q(`SELECT ref, paid_at, proof_approved_at, business, name, cups FROM orders WHERE status = 'paid' AND proof_approved_at IS NOT NULL AND completed_at IS NULL ORDER BY proof_approved_at ASC LIMIT 50`).all()).results,
   };
   const recent = (await q(`SELECT o.ref, o.created_at, o.paid_at, o.status, o.business, o.name, o.email, o.phone, o.cups, o.total_cents, o.paid_cents, o.fee_cents, o.refunded_cents, o.resale_received_at, o.logo_received_at, o.proof_approved_at, o.completed_at, o.tax_invoiced_at, o.admin_notes,
-      (SELECT GROUP_CONCAT(qty || ' x ' || size || 'oz ' || finish || ' ' || color || ' (' || lid || ')', '; ') FROM order_lines l WHERE l.ref = o.ref) items
+      o.kind, o.spec, o.attest_initials, o.attest_at, o.logo_asset_id, o.taken_by, o.needed_by, o.rush,
+      COALESCE((SELECT GROUP_CONCAT(qty || ' x ' || size || 'oz ' || finish || ' ' || color || ' (' || lid || ')', '; ') FROM order_lines l WHERE l.ref = o.ref), (SELECT GROUP_CONCAT(qty || ' x ' || service || ' ' || inches || 'in on ' || product, '; ') FROM order_items i WHERE i.ref = o.ref)) items
       FROM orders o ORDER BY o.created_at DESC LIMIT 100`).all()).results;
   const lastSync = await q(`SELECT v FROM meta WHERE k = 'last_sync'`).first();
   const inqCount = await q(`SELECT COUNT(*) n FROM inquiries WHERE kind = 'quote' AND created_at >= ? AND created_at < ?`, fromIso, toIso).first();
@@ -661,6 +705,8 @@ async function sendDigest(env) {
     ``,
     `Dashboard: ${env.WORKER_URL || ""}/admin`,
   ];
+  const pend = await env.DB.prepare(`SELECT COUNT(*) n FROM price_suggestions WHERE status = 'pending'`).first().catch(() => ({ n: 0 }));
+  if (pend && pend.n) lines.splice(lines.length - 1, 0, `PRICING: ${pend.n} suggested price change${pend.n === 1 ? "" : "s"} waiting for your approve/deny, with the reasoning, at the top of ${env.WORKER_URL || ""}/admin/money`, ``);
   const text = lines.join("\n");
   if (env.RESEND_API_KEY) {
     const r = await sendEmail(env, { to: env.SUPPORT_EMAIL, subject: `HD Laser weekly numbers: ${$(k.sales.revenue_cents)} from ${k.sales.orders} orders`, text });
@@ -750,7 +796,7 @@ async function load(){
     list('Missing logo',a.missing_logo,r=>'<tr><td><b>'+r.ref+'</b><div class="small">paid '+fmtDate(r.paid_at)+'</div></td><td>'+who(r)+'</td><td>'+flag(r.ref,'logo_received_at',0,'Logo received')+'</td></tr>')+
     list('Sales tax to invoice',a.tax_due,r=>'<tr><td><b>'+r.ref+'</b><div class="small">paid '+fmtDate(r.paid_at)+'</div></td><td>'+who(r)+'</td><td class="num">'+money(r.tax_cents)+'<div class="small">on '+money(r.base_cents)+'</div></td><td>'+flag(r.ref,'tax_invoiced_at',0,'Invoiced')+flag(r.ref,'resale_received_at',0,'Cert received')+'</td></tr>')+
     list('In production',a.in_production,r=>'<tr><td><b>'+r.ref+'</b><div class="small">approved '+fmtDate(r.proof_approved_at)+'</div></td><td>'+esc(r.business||r.name)+'<div class="small">'+r.cups+' cups</div></td><td>'+flag(r.ref,'completed_at',0,'Done')+'</td></tr>');
-  $('#orders').innerHTML='<tr><th>Ref</th><th>Customer</th><th>Items</th><th class="num">Total</th><th>Status</th><th>Progress</th></tr>'+k.recent.map(r=>'<tr><td><b>'+r.ref+'</b><div class="small">'+fmtDate(r.created_at)+'</div></td><td>'+who(r)+'</td><td class="small">'+esc(r.items||'')+'</td><td class="num">'+money(r.total_cents)+(r.refunded_cents?'<div class="small">refunded '+money(r.refunded_cents)+'</div>':'')+(r.fee_cents?'<div class="small">fee '+money(r.fee_cents)+'</div>':'')+'</td><td><span class="pill '+r.status+'">'+r.status.replace('_',' ')+'</span></td><td>'+flag(r.ref,'logo_received_at',r.logo_received_at,'Logo')+flag(r.ref,'proof_approved_at',r.proof_approved_at,'Proof OK')+flag(r.ref,'completed_at',r.completed_at,'Done')+flag(r.ref,'resale_received_at',r.resale_received_at,'Resale cert')+flag(r.ref,'tax_invoiced_at',r.tax_invoiced_at,'Tax invoiced')+'</td></tr>').join('');
+  $('#orders').innerHTML='<tr><th>Ref</th><th>Customer</th><th>Items</th><th class="num">Total</th><th>Status</th><th>Progress</th></tr>'+k.recent.map(r=>'<tr><td><b>'+r.ref+'</b><div class="small">'+fmtDate(r.created_at)+'</div></td><td>'+who(r)+'</td><td class="small">'+esc(r.items||'')+(r.kind==='custom'?'<div>'+(r.attest_initials?'<span class="pill" style="background:#FBE9E6;color:var(--red)">initialed '+esc(r.attest_initials)+'</span> ':'')+(r.logo_asset_id?'<a href="/api/assets/'+r.logo_asset_id+'" target="_blank">logo file</a> ':'')+(r.taken_by?'at the counter by '+esc(r.taken_by)+' ':'')+(r.needed_by?'· needed by '+esc(r.needed_by):'')+(r.rush?' · <b>RUSH</b>':'')+'</div>':'')+'</td><td class="num">'+money(r.total_cents)+(r.refunded_cents?'<div class="small">refunded '+money(r.refunded_cents)+'</div>':'')+(r.fee_cents?'<div class="small">fee '+money(r.fee_cents)+'</div>':'')+'</td><td><span class="pill '+r.status+'">'+r.status.replace('_',' ')+'</span></td><td>'+flag(r.ref,'logo_received_at',r.logo_received_at,'Logo')+flag(r.ref,'proof_approved_at',r.proof_approved_at,'Proof OK')+flag(r.ref,'completed_at',r.completed_at,'Done')+flag(r.ref,'resale_received_at',r.resale_received_at,'Resale cert')+flag(r.ref,'tax_invoiced_at',r.tax_invoiced_at,'Tax invoiced')+'</td></tr>').join('');
   loadTeam(); loadCoffee();
   $('#inq').innerHTML=k.inquiries.length?'<tr><th>When</th><th>Type</th><th>Who</th><th>Details</th><th>Sent</th></tr>'+k.inquiries.map(i=>'<tr><td class="small">'+fmtDate(i.created_at)+'</td><td><span class="pill">'+esc(i.kind)+(i.ref?' '+i.ref:'')+'</span></td><td>'+who(i)+'</td><td class="small">'+esc(Object.entries(i.fields).filter(([k])=>!['Name','Business','Phone','Agreed to Terms of Sale','Terms version','Text message consent'].includes(k)).map(([k,v])=>k+': '+v).join(' · ')).slice(0,400)+'</td><td class="small">'+(i.emailed&1?'shop ✓ ':'')+(i.emailed&2?'customer ✓':'')+'</td></tr>').join(''):'<tr><td class="empty">'+(k.email_configured?'No submissions yet.':'Forms still go through Formspree until RESEND_API_KEY is set on the worker.')+'</td></tr>';
 }
@@ -1077,14 +1123,18 @@ async function workQueue(env) {
   const items = [];
   const jobs = (await q(`SELECT j.*, p.name staff_name FROM jobs j LEFT JOIN staff p ON p.id = j.staff_id WHERE j.status IN ('queued','started') ORDER BY j.created_at`).all()).results;
   for (const j of jobs) items.push({ kind: "job", id: j.id, title: `${j.customer || "Walk-in"}: ${prodName(env, j.product)} x${j.qty}`, note: j.note, phone: j.phone, minutes: j.minutes, amount_cents: j.amount_cents, due_at: j.due_at, created_at: j.created_at, status: j.status, by: j.staff_name });
-  const orders = (await q(`SELECT o.ref, o.business, o.name, o.phone, o.cups, o.paid_at, o.paid_cents, o.logo_received_at, o.proof_approved_at,
+  const orders = (await q(`SELECT o.ref, o.business, o.name, o.phone, o.cups, o.paid_at, o.paid_cents, o.logo_received_at, o.proof_approved_at, o.kind, o.spec, o.needed_by, o.rush, o.logo_asset_id, o.attest_initials,
       (SELECT SUM(CASE WHEN finish='printed' THEN qty*3+30 ELSE qty*2.5+20 END) FROM order_lines l WHERE l.ref=o.ref) minutes,
+      (SELECT SUM(qty * (CASE WHEN service='uv' THEN 3 + inches*1.5 ELSE 4 + inches*2 END)) + 10 FROM order_items i WHERE i.ref=o.ref) cminutes,
       (SELECT GROUP_CONCAT(qty || ' x ' || size || 'oz ' || finish || ' ' || color || ' (' || lid || ')', '; ') FROM order_lines l WHERE l.ref = o.ref) items
       FROM orders o WHERE o.status = 'paid' AND o.completed_at IS NULL ORDER BY o.paid_at`).all()).results;
   for (const o of orders) {
+    const custom = o.kind === "custom"; let spec = {}; if (custom) { try { spec = JSON.parse(o.spec || "{}"); } catch {} if (o.logo_asset_id && !o.logo_received_at) o.logo_received_at = o.paid_at; o.minutes = o.cminutes; }
     const stage = !o.logo_received_at ? "waiting for logo" : !o.proof_approved_at ? "send proof" : "in production";
-    const due = o.proof_approved_at ? new Date(new Date(o.proof_approved_at).getTime() + 21 * 86400000).toISOString() : (o.logo_received_at ? new Date(new Date(o.logo_received_at).getTime() + 2 * 86400000).toISOString() : null);
-    items.push({ kind: "order", id: o.ref, title: `${o.business || o.name}: ${o.cups} logo cups`, note: o.items, phone: o.phone, minutes: stage === "in production" ? Math.round(o.minutes || 0) : stage === "send proof" ? 20 : 0, amount_cents: o.paid_cents, due_at: due, created_at: o.paid_at, status: stage, stage, logo: !!o.logo_received_at, proof: !!o.proof_approved_at });
+    const wait = custom ? (o.rush ? 3 : 7) : 21;
+    let due = o.proof_approved_at ? new Date(new Date(o.proof_approved_at).getTime() + wait * 86400000).toISOString() : (o.logo_received_at ? new Date(new Date(o.logo_received_at).getTime() + 2 * 86400000).toISOString() : null);
+    if (custom && o.needed_by && (!due || o.needed_by + "T23:00:00Z" < due)) due = o.needed_by + "T23:00:00Z";
+    items.push({ kind: "order", id: o.ref, title: custom ? `${o.business || o.name}: ${spec.summary || "custom order"}` : `${o.business || o.name}: ${o.cups} logo cups`, note: custom ? `Initialed ${o.attest_initials || "?"}${o.logo_asset_id ? " · logo on file" : ""}` : o.items, phone: o.phone, minutes: stage === "in production" ? Math.round(o.minutes || 0) : stage === "send proof" ? 20 : 0, amount_cents: o.paid_cents, due_at: due, created_at: o.paid_at, status: stage, stage, logo: !!o.logo_received_at, proof: !!o.proof_approved_at });
   }
   const now = Date.now();
   for (const it of items) {
@@ -1766,10 +1816,20 @@ svg text{font-size:11px;fill:var(--muted)}
 #err{background:#FBE9E6;color:var(--red);padding:10px 14px;border-radius:10px;margin:12px 0;display:none}
 @media (max-width:640px){.score{flex-direction:column;align-items:flex-start}}
 .btn{font:inherit;font-size:12px;padding:3px 9px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;white-space:nowrap}.btn.done{background:#FBE9E6;border-color:#EFC3BC;color:var(--red)}
+#pricebox{background:var(--red);color:#fff;border-radius:16px;padding:18px 20px;margin:12px 0 20px;box-shadow:0 10px 30px rgba(200,55,42,.35)}
+#pricebox h2{margin:0 0 4px;font-size:22px;color:#fff;letter-spacing:.02em}#pricebox .lead{margin:0 0 14px;color:#FBE9E6;font-size:14px}
+.sug{background:#fff;color:var(--ink);border-radius:12px;padding:14px 16px;margin-top:10px;display:grid;grid-template-columns:1fr auto;gap:14px;align-items:start}
+.sug .what{font-size:17px;font-weight:700}.sug .what span{color:var(--red)}.sug .why{margin:6px 0 0;line-height:1.5}.sug .ev{font-size:12px;color:var(--muted);margin-top:6px}
+.sug .acts{display:flex;flex-direction:column;gap:6px;min-width:120px}.sug .acts button{font:inherit;font-weight:700;padding:9px 14px;border-radius:999px;cursor:pointer;border:2px solid var(--ink)}
+.sug .acts .ok{background:var(--green);border-color:var(--green);color:#fff}.sug .acts .no{background:#fff;color:var(--ink)}
+#pricebox .foot{margin:12px 0 0;font-size:13px;color:#FBE9E6}#pricebox .foot button{font:inherit;font-size:13px;padding:5px 12px;border-radius:999px;border:1px solid #fff;background:transparent;color:#fff;cursor:pointer}
+#pricelist input{width:78px;font:inherit;padding:4px 6px;border:1px solid var(--line);border-radius:6px;text-align:right}
+@media (max-width:640px){.sug{grid-template-columns:1fr}.sug .acts{flex-direction:row}}
 </style></head><body>
 <header><h1>HD Laser money</h1><div><a class="act" href="/admin" style="text-decoration:none;color:inherit">Sales dashboard</a> <button class="act" id="sync">Sync Square</button> <a class="act" href="/api/bank/export.csv" style="text-decoration:none;color:inherit">Export ledger</a></div></header>
 <main>
 <div id="err"></div>
+<div id="pricebox" hidden><h2>PRICE CHANGES WAITING FOR YOUR DECISION</h2><p class="lead">The pricing review found these. Nothing changes until you press Approve. Each one says why.</p><div id="sugs"></div><p class="foot" id="pricefoot"></p></div>
 <div class="grid" style="grid-template-columns:1.2fr 2fr">
   <div class="card"><h3>Financial health</h3><div class="score"><div class="ring" id="ring" style="--p:0"><span id="scoreN">–</span></div><div><div id="level" style="font-size:18px;font-weight:700"></div><div class="small" id="streak"></div><div class="small" id="parts" style="margin-top:6px;line-height:1.6"></div></div></div></div>
   <div class="card"><h3>Last 6 months</h3><div class="tiles" id="tiles"></div></div>
@@ -1810,6 +1870,10 @@ svg text{font-size:11px;fill:var(--muted)}
   <div class="card"><h3>Reconciliation with Square <span class="pill" id="recpill"></span></h3><div id="recon"></div></div>
 </div>
 <div class="card" style="margin-top:14px"><h3>Uncategorized <span class="pill" id="uncpill">0</span></h3><p class="small">Pick a category. Tick "rule" to apply it to everything with the same name, now and in future imports.</p><div id="unc"></div></div>
+
+<h2>Price list <span class="small">what the order page charges; edit a number and press Enter to change it</span></h2>
+<div class="grid" id="pricelist"></div>
+<div class="card" style="margin-top:14px"><h3>Pricing review</h3><p class="small" id="reviewmeta"></p><p><button class="act dark" id="runreview">Run the pricing review now</button> <span class="small" id="reviewmsg"></span></p><p class="small">It runs by itself every Monday and looks at four things: the size ladder keeps climbing by a little more each half inch; every item clears the target margin after the blank, labor and consumables; sizes and items that get priced often but rarely bought (or bought far more than average); and materials taking a bigger share of sales than they used to. Suggestions land in the red box at the top. Decided ones are listed below.</p><div id="decided"></div></div>
 
 <h2>Unit economics, logo cups</h2>
 <div class="grid">
@@ -1878,6 +1942,22 @@ document.addEventListener('click',e=>{ const tr=e.target.closest('tr[data-cat]')
 $('#dclose').onclick=()=>$('#drawer').classList.remove('open');
 document.addEventListener('change',async e=>{ const s=e.target.closest('select[data-id]'); if(!s||!s.value) return; const rule=document.querySelector('input[data-rule="'+s.dataset.id+'"]'); const r=await fetch('/api/bank/txns/'+s.dataset.id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:s.value,make_rule:!!(rule&&rule.checked)})}); const j=await r.json(); if(!j.ok) alert(j.error||'Failed'); else { const row=s.closest('tr'); row.style.opacity='.4'; if(j.applied) $('#impmsg').textContent='Rule applied to '+j.applied+' more.'; setTimeout(load,300); } });
 $('#w-run').onclick=load;
+const cents=c=>'$'+((c||0)/100).toFixed(2);
+async function loadPricing(){ const r=await fetch('/api/pricing'); if(!r.ok) return; const P=await r.json(); const B=P.book;
+  const box=$('#pricebox'); box.hidden=!P.pending.length;
+  $('#sugs').innerHTML=P.pending.map(s=>{ const ladder=s.target.type==='ladder'; const dir=s.proposed_cents>s.current_cents?'up':'down'; const pct=s.current_cents?Math.round((s.proposed_cents-s.current_cents)/s.current_cents*100):0;
+    return '<div class="sug" data-id="'+s.id+'"><div><div class="what">'+esc(s.label)+': <span>'+cents(s.current_cents)+' \u2192 '+cents(s.proposed_cents)+'</span> ('+(pct>0?'+':'')+pct+'%'+(ladder?', every size':'')+')</div><p class="why"><b>Why:</b> '+esc(s.reason)+'</p><div class="ev">Found '+new Date(s.created_at).toLocaleDateString()+' \u00b7 rule: '+esc(s.rule.replace(/_/g,' '))+'</div></div><div class="acts"><button class="ok" data-dec="approve">Approve</button><button class="no" data-dec="deny">Deny</button></div></div>'; }).join('');
+  $('#pricefoot').innerHTML=P.pending.length+' waiting. <button id="rr2">Run the review again</button>';
+  $('#reviewmeta').textContent=(P.last_review?'Last review '+new Date(P.last_review).toLocaleString():'The review has not run yet.')+' \u00b7 target margin '+Math.round(P.target_margin*100)+'%';
+  const soldOf=(svc,inch)=>{ const r=P.sold.find(x=>x.service===svc&&x.inches===inch); return r?r.n:0; };
+  const sizes='<div class="card"><h3>Per piece by artwork size <span class="small">longest side; \u00d7 material factor</span></h3><table><tr><th>Size</th><th class="num">Engraving</th><th class="num">UV print</th><th class="num">Sold</th></tr>'+B.sizes.map(z=>'<tr><td>'+z.inches+' in</td><td class="num"><input data-t=\\''+JSON.stringify({type:'size',service:'engrave',inches:z.inches})+'\\' value="'+(z.engrave_cents/100).toFixed(2)+'"></td><td class="num"><input data-t=\\''+JSON.stringify({type:'size',service:'uv',inches:z.inches})+'\\' value="'+(z.uv_cents/100).toFixed(2)+'"></td><td class="num small">'+(soldOf('engrave',z.inches)+soldOf('uv',z.inches))+'</td></tr>').join('')+'</table></div>';
+  const items='<div class="card"><h3>Items we supply</h3><table><tr><th>Item</th><th>Material</th><th class="num">Price</th><th class="num">Our cost</th><th class="num">Max art</th></tr>'+B.products.filter(p=>p.key!=='own').map(p=>'<tr><td>'+esc(p.name)+'</td><td class="small">'+esc(p.material)+'</td><td class="num"><input data-t=\\''+JSON.stringify({type:'product',key:p.key,field:'blank_cents'})+'\\' value="'+(p.blank_cents/100).toFixed(2)+'"></td><td class="num"><input data-t=\\''+JSON.stringify({type:'product',key:p.key,field:'cost_cents'})+'\\' value="'+((p.cost_cents||0)/100).toFixed(2)+'"></td><td class="num small">'+p.max_inches+' in</td></tr>').join('')+'</table><p class="small" style="margin-top:8px">Materials: '+B.materials.map(m=>esc(m.name)+' \u00d7'+m.factor).join(', ')+'. Quantity: '+B.qty_breaks.filter(b=>b.off_pct).map(b=>b.min+'+ '+b.off_pct+'% off the work').join(', ')+'. Setup '+B.services.map(s=>esc(s.name)+' '+cents(s.setup_cents)).join(', ')+'. Rush +'+B.rush_pct+'%. Own item handling '+cents(B.own_item_handling_cents)+' each. Minimum order '+cents(B.min_order_cents)+'.</p></div>';
+  $('#pricelist').innerHTML=sizes+items;
+  $('#decided').innerHTML=(P.decided.length?'<table>'+P.decided.map(d=>'<tr><td class="small">'+new Date(d.decided_at).toLocaleDateString()+'</td><td>'+esc(d.label)+'</td><td class="num">'+cents(d.current_cents)+' \u2192 '+cents(d.proposed_cents)+'</td><td><span class="pill '+(d.status==='approved'?'good':'over')+'">'+d.status+'</span></td><td class="small">'+esc(d.note||'')+'</td></tr>').join('')+'</table>':'<p class="small">No decisions yet.</p>')
+    +(P.history.length?'<p class="small" style="margin-top:10px"><b>Every price change</b></p><table>'+P.history.map(h=>'<tr><td class="small">'+new Date(h.ts).toLocaleDateString()+'</td><td>'+esc(h.label)+'</td><td class="num">'+cents(h.from_cents)+' \u2192 '+cents(h.to_cents)+'</td><td class="small">'+esc(h.source)+(h.note?' \u00b7 '+esc(h.note):'')+'</td></tr>').join('')+'</table>':''); }
+document.addEventListener('click',async e=>{ const b=e.target.closest('button[data-dec]'); if(b){ const id=b.closest('.sug').dataset.id; const dec=b.dataset.dec; const note=dec==='deny'?(prompt('Why not? (optional, kept with the record)')||''):''; b.disabled=true; const r=await (await fetch('/api/pricing/suggestions/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision:dec,note})})).json(); if(!r.ok) alert(r.error||'Failed'); loadPricing(); return; }
+  if(e.target.id==='runreview'||e.target.id==='rr2'){ e.target.disabled=true; const r=await (await fetch('/api/pricing/analyze',{method:'POST'})).json(); e.target.disabled=false; $('#reviewmsg').textContent=r.ok?('Checked '+r.checked+' thing'+(r.checked===1?'':'s')+', '+r.created+' new suggestion'+(r.created===1?'':'s')+'.'):(r.error||'Failed'); loadPricing(); } });
+document.addEventListener('keydown',async e=>{ const i=e.target.closest('#pricelist input[data-t]'); if(!i||e.key!=='Enter') return; const c=Math.round(parseFloat(i.value)*100); if(!(c>=0)) return; i.disabled=true; const r=await (await fetch('/api/pricing/book',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:JSON.parse(i.dataset.t),cents:c,note:'edited on the money page'})})).json(); if(!r.ok) alert(r.error||'Failed'); loadPricing(); });
 $('#w-save').onclick=async()=>{ const body={cash_balance_cents:Math.round((+$('#w-cash').value||0)*100),cash_as_of:new Date().toISOString().slice(0,10),reserve_months:+$('#w-reserve').value||1,monthly_fixed_costs_cents:Math.round((+$('#w-fixed').value||0)*100)}; await fetch('/api/money/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); load(); };
 $('#unitsave').onclick=async()=>{ const unit={}; document.querySelectorAll('input[data-unit]').forEach(i=>unit[i.dataset.unit]=+i.value); await fetch('/api/money/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({unit})}); $('#unitmsg').textContent='Saved.'; load(); };
 $('#sync').onclick=async()=>{ $('#sync').disabled=true; $('#sync').textContent='Working…'; const r=await fetch('/api/sync?days=30',{method:'POST'}); const j=await r.json(); $('#sync').disabled=false; $('#sync').textContent='Sync Square'; if(j.payout_error) alert('Payments synced, but payouts could not be read: '+j.payout_error+'\\n\\nIn Square Developer, give the app the PAYOUTS_READ permission and create a new access token.'); load(); };
@@ -1893,7 +1973,7 @@ $('#imp').onclick=async()=>{ const f=$('#csv').files[0]; if(!f){ alert('Choose a
   const el=document.getElementById('retention'); if(el) el.innerHTML=(soon?'<b style="color:var(--red)">Data retention review is due '+due+'.</b> ':'Next data retention review: <b>'+due+'</b>. ')+'Delete records past their period per the <a href="https://hdlaser.net/staff/data-retention-policy/" target="_blank" rel="noopener">Data Retention Policy</a> and note it in your records.'; })();
 async function loadSources(){ const r=await fetch('/api/bank/sources'); if(!r.ok) return; const d=await r.json();
   $('#sources').innerHTML=d.sources.length?'<table>'+d.sources.map(s=>'<tr><td>'+esc(s.source||'(no source)')+(s.attached?'':' <span class="pill" style="background:#FBE9E6;color:var(--red)">not connected</span>')+'<div class="small">'+s.rows+' rows · '+(s.first||'').slice(0,10)+' to '+(s.last||'').slice(0,10)+'</div></td><td class="num">'+money(s.total_cents)+'</td><td>'+(s.attached?'':'<button class="btn" data-delsrc="'+esc(s.source)+'">Delete rows</button>')+'</td></tr>').join('')+'</table>':'<p class="empty">No bank rows yet.</p>';
-  $('#sources').querySelectorAll('button[data-delsrc]').forEach(b=>b.addEventListener('click',async()=>{ if(!confirm('Delete every ledger row from "'+b.dataset.delsrc+'"? This cannot be undone.')) return; b.disabled=true; const r=await (await fetch('/api/bank/sources?source='+encodeURIComponent(b.dataset.delsrc),{method:'DELETE'})).json(); $('#recatmsg').textContent=r.ok?('Deleted '+r.deleted+' rows.'):(r.error||'Failed'); loadSources(); load(); })); }
+  $('#sources').querySelectorAll('button[data-delsrc]').forEach(b=>b.addEventListener('click',async()=>{ if(!confirm('Delete every ledger row from "'+b.dataset.delsrc+'"? This cannot be undone.')) return; b.disabled=true; const r=await (await fetch('/api/bank/sources?source='+encodeURIComponent(b.dataset.delsrc),{method:'DELETE'})).json(); $('#recatmsg').textContent=r.ok?('Deleted '+r.deleted+' rows.'):(r.error||'Failed'); load(); loadSources(); })); }
 $('#recat').onclick=async()=>{ const b=$('#recat'); b.disabled=true; $('#recatmsg').textContent='Working…'; const r=await (await fetch('/api/bank/recategorize',{method:'POST'})).json(); b.disabled=false; $('#recatmsg').textContent=r.ok?('Checked '+r.checked.toLocaleString()+' rows, re-filed '+r.changed.toLocaleString()+'.'):(r.error||'Failed'); load(); };
 async function loadYoy(){ const r=await fetch('/api/money/yoy'); if(!r.ok) return; const d=await r.json(); const mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const M=d.metrics, g=v=>v==null?'n/a':(v>=0?'+':'')+v+'%'; const usd=c=>'$'+Math.round((c||0)/100).toLocaleString('en-US');
@@ -1924,7 +2004,7 @@ document.addEventListener('click',async e=>{ const rl=e.target.closest('button[d
   const dt=e.target.closest('button[data-details]'); if(dt){ dt.disabled=true; const r=await (await fetch('/api/plaid/items/'+dt.dataset.details+'/details')).json(); dt.disabled=false; const w=window.open('','_blank'); if(w){ w.document.write('<pre style="font:13px/1.5 monospace;white-space:pre-wrap;padding:16px">'+JSON.stringify(r,null,2).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</pre>'); w.document.close(); } else alert(JSON.stringify(r,null,2)); return; }
   const ac=e.target.closest('button[data-acct]'); if(ac){ ac.disabled=true; const r=await (await fetch('/api/plaid/items/'+ac.dataset.acct,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({personal:ac.dataset.personal==='1'})})).json(); $('#plaidmsg').textContent=r.ok?((r.personal?'Marked personal. ':'Marked business. ')+r.changed+' transactions re-filed.'):('Could not change it: '+(r.error||'unknown error')); loadPlaid(); load(); return; } const ul=e.target.closest('button[data-unlink]'); if(ul&&confirm('Remove this bank connection? Transactions already in the ledger stay.')){ await fetch('/api/plaid/items/'+ul.dataset.unlink,{method:'DELETE'}); loadPlaid(); } });
 loadPlaid();
-load();
+load(); loadPricing();
 </script></body></html>`;
 }
 
@@ -2106,4 +2186,354 @@ async function plaidRemove(env, itemId) {
   for (const a of JSON.parse(full.accounts || "[]")) { const r = await env.DB.prepare(`DELETE FROM bank_txns WHERE source = ?`).bind(`${full.institution} ${a.name}${a.mask ? " …" + a.mask : ""}`).run(); deleted += r.meta ? r.meta.changes : 0; }
   await env.DB.prepare(`DELETE FROM plaid_items WHERE item_id = ?`).bind(itemId).run();
   return { ok: true, deleted };
+}
+
+// ---------------------------------------------------------------- price book, custom orders, pricing review
+// One structured price list drives the order builder on the website, the in-store screen, the checkout and the weekly
+// pricing review. It lives in D1 (meta.price_book); DEFAULT_BOOK seeds it. Every change, manual or approved, is logged
+// to price_history, and the review only ever *suggests*: the owner approves or denies each change on the money page.
+const ATTEST_VERSION = "2026-09-26";
+const TARGET_MARGIN = 0.55;          // every piece should clear this after blank, labor and consumables
+const DEFAULT_BOOK = {
+  version: 1,
+  services: [
+    { key: "engrave", name: "Laser engraving", blurb: "Etched into the surface. Permanent, one tone.", setup_cents: 2500, min_per_piece: 4, per_inch: 2, consumable_cents: 8 },
+    { key: "uv", name: "UV printing", blurb: "Full color, printed onto the surface.", setup_cents: 3500, min_per_piece: 3, per_inch: 1.5, consumable_cents: 35 },
+  ],
+  // Price per piece by the artwork's longest side, in half-inch steps. Each step up costs a little more than the step
+  // before it (first_gap, then +gap_growth every step), so the bigger the engraving the more it carries, and the next
+  // size up always looks like a small jump. sizes[] is generated from these once, then edited cell by cell.
+  ladders: { engrave: { start_cents: 800, first_gap_cents: 150, gap_growth_cents: 50 }, uv: { start_cents: 1000, first_gap_cents: 175, gap_growth_cents: 50 } },
+  max_inches: 8,
+  sizes: [],
+  materials: [
+    { key: "wood", name: "Wood", factor: 1, services: ["engrave", "uv"] },
+    { key: "metal", name: "Metal", factor: 1.25, services: ["engrave", "uv"] },
+    { key: "glass", name: "Glass", factor: 1.35, services: ["engrave", "uv"] },
+    { key: "leather", name: "Leather", factor: 1.1, services: ["engrave"] },
+    { key: "acrylic", name: "Acrylic or plastic", factor: 1.1, services: ["engrave", "uv"] },
+    { key: "stone", name: "Stone or slate", factor: 1.4, services: ["engrave"] },
+  ],
+  // blank_cents is what the customer pays for the item when we supply it; cost_cents is what it costs us (never shown).
+  products: [
+    { key: "tumbler", name: "20 oz tumbler", material: "metal", blank_cents: 2200, cost_cents: 900, max_inches: 3.5, w_in: 3.5, h_in: 8.25, shape: "tumbler", photo: "/assets/corp-crest-tumbler.jpg" },
+    { key: "bottle", name: "Water bottle", material: "metal", blank_cents: 2400, cost_cents: 1000, max_inches: 3, w_in: 3, h_in: 10, shape: "bottle", photo: "/assets/corp-ucsd-bottle.jpg" },
+    { key: "pint", name: "Pint glass", material: "glass", blank_cents: 900, cost_cents: 300, max_inches: 3, w_in: 3.5, h_in: 6, shape: "glass", photo: "/assets/engrave-wine-glasses.jpg" },
+    { key: "board", name: "Cutting board", material: "wood", blank_cents: 3200, cost_cents: 1400, max_inches: 8, w_in: 10, h_in: 14, shape: "board", photo: "/assets/wood-wedding-board.jpg" },
+    { key: "plaque", name: "Wood plaque", material: "wood", blank_cents: 2800, cost_cents: 1100, max_inches: 7, w_in: 8, h_in: 10, shape: "plaque", photo: "/assets/engrave-tree-plaque.jpg" },
+    { key: "tag", name: "Metal tag or plate", material: "metal", blank_cents: 600, cost_cents: 150, max_inches: 2.5, w_in: 3, h_in: 2, shape: "tag", photo: "/assets/engrave-anodized-tags.jpg" },
+    { key: "patch", name: "Leather patch or wallet", material: "leather", blank_cents: 1400, cost_cents: 500, max_inches: 2.5, w_in: 3.5, h_in: 2.5, shape: "patch", photo: "/assets/uv-mandala-wallet.jpg" },
+    { key: "own", name: "Something I'll bring in", material: null, blank_cents: 0, cost_cents: 0, max_inches: 8, w_in: 8, h_in: 8, shape: "own", photo: null },
+  ],
+  qty_breaks: [{ min: 1, off_pct: 0 }, { min: 6, off_pct: 5 }, { min: 12, off_pct: 10 }, { min: 25, off_pct: 15 }, { min: 50, off_pct: 20 }, { min: 100, off_pct: 25 }],
+  rush_pct: 50,                       // added to the work portion when they need it in under 3 business days
+  own_item_handling_cents: 300,       // per piece on customer-supplied items: inspection, test fit, no replacement stock
+  min_order_cents: 2500,
+};
+function ladderPrices(l, steps) { const out = []; let p = l.start_cents; for (let i = 0; i < steps; i++) { out.push(Math.round(p / 25) * 25); p += l.first_gap_cents + i * l.gap_growth_cents; } return out; }
+function buildSizes(book) { const n = Math.round(book.max_inches / 0.5); const e = ladderPrices(book.ladders.engrave, n), u = ladderPrices(book.ladders.uv, n); return Array.from({ length: n }, (_, i) => ({ inches: (i + 1) / 2, engrave_cents: e[i], uv_cents: u[i] })); }
+DEFAULT_BOOK.sizes = buildSizes(DEFAULT_BOOK);
+
+async function priceBook(env) {
+  const row = env.DB ? await env.DB.prepare(`SELECT v FROM meta WHERE k = 'price_book'`).first() : null;
+  if (!row) return JSON.parse(JSON.stringify(DEFAULT_BOOK));
+  let s = {}; try { s = JSON.parse(row.v); } catch {}
+  const book = { ...JSON.parse(JSON.stringify(DEFAULT_BOOK)), ...s };
+  if (!Array.isArray(book.sizes) || !book.sizes.length) book.sizes = buildSizes(book);
+  return book;
+}
+async function saveBook(env, book) { book.updated_at = new Date().toISOString(); await env.DB.prepare(`INSERT OR REPLACE INTO meta (k, v) VALUES ('price_book', ?)`).bind(JSON.stringify(book)).run(); return book; }
+function publicBook(book) { return { ...book, products: book.products.map(({ cost_cents, ...p }) => p), ladders: undefined }; }
+function r25(c) { return Math.max(0, Math.round(c / 25) * 25); }
+
+// Price one spec against the book. Returns { error } or the full breakdown in cents.
+function quoteSpec(book, spec) {
+  const product = book.products.find((p) => p.key === String(spec.product || ""));
+  if (!product) return { error: "Pick what we're putting it on" };
+  const matKey = product.material || String(spec.material || "");
+  const material = book.materials.find((m) => m.key === matKey);
+  if (!material) return { error: "Pick the material" };
+  const service = book.services.find((s) => s.key === String(spec.service || ""));
+  if (!service) return { error: "Pick engraving or printing" };
+  if (!material.services.includes(service.key)) return { error: `${service.name} isn't available on ${material.name.toLowerCase()}` };
+  const inches = Math.round(Number(spec.inches) * 2) / 2;
+  const maxIn = Math.min(product.max_inches || book.max_inches, book.max_inches);
+  if (!(inches >= 0.5 && inches <= maxIn)) return { error: `Size must be between 0.5 and ${maxIn} inches` };
+  const qty = parseInt(spec.qty, 10);
+  if (!(qty >= 1 && qty <= 500)) return { error: "Quantity must be 1 to 500" };
+  const rush = !!spec.rush;
+  const size = book.sizes.find((s) => s.inches === inches);
+  if (!size) return { error: "Size not on the price list" };
+  const workUnit = r25(size[service.key + "_cents"] * material.factor);
+  const brk = [...book.qty_breaks].sort((a, b) => b.min - a.min).find((b) => qty >= b.min) || { off_pct: 0 };
+  const workUnitAfter = r25(workUnit * (1 - brk.off_pct / 100));
+  const handlingUnit = product.key === "own" ? book.own_item_handling_cents : 0;
+  const blankUnit = product.blank_cents || 0;
+  const work = workUnitAfter * qty, blank = blankUnit * qty, handling = handlingUnit * qty;
+  const rushCents = rush ? r25(work * book.rush_pct / 100) : 0;
+  const setup = service.setup_cents;
+  let subtotal = work + blank + handling + rushCents + setup;
+  const minimumTopUp = Math.max(0, book.min_order_cents - subtotal); subtotal += minimumTopUp;
+  const nextBreak = [...book.qty_breaks].sort((a, b) => a.min - b.min).find((b) => b.min > qty);
+  return { product, material, service, inches, qty, rush, work_unit_cents: workUnit, work_unit_after_cents: workUnitAfter, discount_pct: brk.off_pct, discount_cents: (workUnit - workUnitAfter) * qty,
+    blank_unit_cents: blankUnit, handling_unit_cents: handlingUnit, work_cents: work, blank_cents: blank, handling_cents: handling, rush_cents: rushCents, setup_cents: setup, minimum_top_up_cents: minimumTopUp, subtotal_cents: subtotal,
+    next_break: nextBreak ? { min: nextBreak.min, off_pct: nextBreak.off_pct } : null,
+    summary: `${qty} × ${service.name.toLowerCase()}, ${inches} in on ${product.key === "own" ? "customer's own " + material.name.toLowerCase() + " item" : product.name.toLowerCase()}${rush ? ", rush" : ""}` };
+}
+// The exact words the customer initials. Rendered identically on the order page; the copy stored with the order is this one.
+function attestText(q, name) {
+  return `I, ${name}, have checked this order myself. HD Laser Studio will make exactly what I have specified here: ${q.service.name.toLowerCase()} on ${q.product.key === "own" ? "my own " + q.material.name.toLowerCase() + " item" : "a " + q.product.name.toLowerCase()}, artwork ${q.inches} inches on its longest side, quantity ${q.qty}. I understand that engraving and printing are permanent and cannot be undone. If the size, spelling, artwork or quantity I chose turns out to be wrong, or I change my mind after approving the proof, any redo or replacement is at my expense.`;
+}
+function initialsFor(name) { const w = String(name || "").trim().split(/\s+/).filter(Boolean); if (!w.length) return ""; return (w[0][0] + (w.length > 1 ? w[w.length - 1][0] : "")).toUpperCase(); }
+
+async function orderCheckout(request, env, cors) {
+  let b; try { b = await request.json(); } catch { return json({ error: "Bad JSON" }, 400, cors); }
+  const ip = request.headers.get("CF-Connecting-IP") || "";
+  if (rateLimited("order:" + ip, 10, 600000)) return json({ error: "Too many attempts. Please wait a few minutes." }, 429, cors);
+  const book = await priceBook(env);
+  const q = quoteSpec(book, b.spec || {});
+  if (q.error) return json({ error: q.error }, 400, cors);
+  const c = b.customer || {};
+  const email = String(c.email || "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "Valid email required" }, 400, cors);
+  const name = String(c.name || "").trim().slice(0, 80);
+  if (name.length < 2) return json({ error: "Your name is required" }, 400, cors);
+  if (!c.agreed) return json({ error: "Terms must be accepted" }, 400, cors);
+  const a = b.attest || {};
+  const initials = String(a.initials || "").trim().toUpperCase().replace(/[^A-Z]/g, "");
+  const expect = initialsFor(name);
+  if (initials.length < 2 || initials.length > 4) return json({ error: "Type your initials to confirm the order" }, 400, cors);
+  if (!initials.startsWith(expect)) return json({ error: `Your initials should start with ${expect.split("").join(".")}. so they match the name on the order` }, 400, cors);
+  const text = attestText(q, name);
+  const ref = /^HD-[A-Z0-9]{4,12}$/.test(String(b.ref || "")) ? b.ref : "HD-" + Date.now().toString(36).toUpperCase();
+  const now = new Date().toISOString();
+  const ua = (request.headers.get("User-Agent") || "").slice(0, 200);
+  const hash = await sha256hex([ref, initials, text, now, email].join("|"));
+  const notes = String(b.notes || "").trim().slice(0, 2000);
+  const neededBy = /^\d{4}-\d{2}-\d{2}$/.test(String(b.needed_by || "")) ? b.needed_by : null;
+  const takenBy = String(b.taken_by || "").trim().slice(0, 60) || null;
+  const taxRate = parseFloat(env.TAX_RATE || "0.0775") || 0;
+  const tax = Math.round(q.subtotal_cents * taxRate);
+  const total = q.subtotal_cents + tax;
+  // logo, if they added one: a small data URL kept with the order so nobody has to chase the file
+  let logo = null; const L = b.logo || {};
+  if (L.data && /^data:(image\/(png|jpeg|webp|svg\+xml));base64,[A-Za-z0-9+/=]+$/.test(String(L.data)) && String(L.data).length <= 950000) logo = { name: String(L.name || "logo").slice(0, 120), type: String(L.data).slice(5, String(L.data).indexOf(";")), data: String(L.data) };
+
+  const lineItems = [{ name: `${q.service.name}, ${q.inches} in on ${q.product.key === "own" ? "customer's " + q.material.name.toLowerCase() + " item" : q.product.name.toLowerCase()}${q.discount_pct ? ` (${q.discount_pct}% quantity discount)` : ""}`, quantity: String(q.qty), base_price_money: { amount: q.work_unit_after_cents, currency: "USD" } }];
+  if (q.blank_unit_cents) lineItems.push({ name: q.product.name, quantity: String(q.qty), base_price_money: { amount: q.blank_unit_cents, currency: "USD" } });
+  if (q.handling_unit_cents) lineItems.push({ name: "Customer-supplied item handling", quantity: String(q.qty), base_price_money: { amount: q.handling_unit_cents, currency: "USD" } });
+  lineItems.push({ name: `${q.service.name} setup (artwork prep, one time)`, quantity: "1", base_price_money: { amount: q.setup_cents, currency: "USD" } });
+  if (q.rush_cents) lineItems.push({ name: `Rush (+${book.rush_pct}% on the work)`, quantity: "1", base_price_money: { amount: q.rush_cents, currency: "USD" } });
+  if (q.minimum_top_up_cents) lineItems.push({ name: "Shop minimum", quantity: "1", base_price_money: { amount: q.minimum_top_up_cents, currency: "USD" } });
+  const order = { location_id: env.SQUARE_LOCATION_ID, reference_id: ref, line_items: lineItems };
+  if (tax) order.taxes = [{ uid: "ca-sales-tax", name: "CA sales tax", percentage: String(+(taxRate * 100).toFixed(3)), scope: "ORDER" }];
+  let linkOk = false, data = {};
+  if (env.SQUARE_ACCESS_TOKEN && env.SQUARE_LOCATION_ID) {
+    const payload = { idempotency_key: `${ref}-${Date.now()}`, order,
+      checkout_options: { redirect_url: `${env.SITE_URL}/thanks/?paid=1&kind=custom&ref=${encodeURIComponent(ref)}${logo ? "&logo=1" : ""}`, ask_for_shipping_address: false, merchant_support_email: env.SUPPORT_EMAIL, allow_tipping: false },
+      pre_populated_data: { buyer_email: email, buyer_phone_number: e164(c.phone) },
+      payment_note: `hdlaser.net order ${ref}: ${q.summary} for ${c.business || name}`.slice(0, 500) };
+    const res = await squareFetch(env, "/v2/online-checkout/payment-links", { method: "POST", body: JSON.stringify(payload) });
+    data = await res.json().catch(() => ({}));
+    linkOk = res.ok && !!data.payment_link;
+    if (!linkOk) console.error("Square error", res.status, JSON.stringify(data).slice(0, 800));
+  }
+  const spec = { product: q.product.key, material: q.material.key, service: q.service.key, inches: q.inches, qty: q.qty, rush: q.rush, summary: q.summary, work_unit_cents: q.work_unit_cents, work_unit_after_cents: q.work_unit_after_cents, discount_pct: q.discount_pct, blank_unit_cents: q.blank_unit_cents, handling_unit_cents: q.handling_unit_cents, setup_cents: q.setup_cents, rush_cents: q.rush_cents, minimum_top_up_cents: q.minimum_top_up_cents, subtotal_cents: q.subtotal_cents, tax_cents: tax, book_version: book.version, book_updated_at: book.updated_at || null };
+  if (env.DB) {
+    let assetId = null;
+    if (logo) { const ins = await env.DB.prepare(`INSERT INTO order_assets (ref, created_at, name, type, bytes, data) VALUES (?,?,?,?,?,?)`).bind(ref, now, logo.name, logo.type, Math.round(logo.data.length * 0.75), logo.data).run(); assetId = ins.meta && ins.meta.last_row_id; }
+    await env.DB.batch([
+      env.DB.prepare(`INSERT OR REPLACE INTO orders (ref, created_at, status, business, name, email, phone, notes, text_consent, cups, base_price_cents, cups_subtotal_cents, setup_fee_cents, total_cents, deposit_percent, square_order_id, kind, spec, needed_by, rush, taken_by, tax_cents, tax_invoiced_at, attest_initials, attest_text, attest_at, attest_ip, attest_ua, attest_hash, logo_asset_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(ref, now, linkOk ? "checkout_started" : "pay_later", String(c.business || "").trim().slice(0, 80), name, email, String(c.phone || "").trim().slice(0, 40), notes, c.textConsent ? 1 : 0,
+        null, q.work_unit_cents, q.subtotal_cents - q.setup_cents, q.setup_cents, total, 100, linkOk ? (data.payment_link.order_id || null) : null, "custom", JSON.stringify(spec), neededBy, q.rush ? 1 : 0, takenBy, tax, tax ? now : null, initials, text, now, ip, ua, hash, assetId),
+      env.DB.prepare(`DELETE FROM order_items WHERE ref = ?`).bind(ref),
+      env.DB.prepare(`INSERT INTO order_items (ref, product, material, service, inches, qty, work_unit_cents, blank_unit_cents, discount_pct, line_cents) VALUES (?,?,?,?,?,?,?,?,?,?)`).bind(ref, q.product.key, q.material.key, q.service.key, q.inches, q.qty, q.work_unit_after_cents, q.blank_unit_cents, q.discount_pct, q.work_cents + q.blank_cents + q.handling_cents),
+      env.DB.prepare(`INSERT INTO events (ts, name, session, ref, path, detail) VALUES (?,?,?,?,?,?)`).bind(now, "order_checkout", null, ref, "/order/", JSON.stringify({ product: q.product.key, service: q.service.key, inches: q.inches, qty: q.qty })),
+    ]);
+  }
+  // tell the shop and the customer straight away; payment confirmation follows from the Square webhook
+  const $ = (n) => "$" + (n / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const who = c.business ? `${c.business} (${name})` : name;
+  const breakdown = [`${q.qty} × ${q.service.name.toLowerCase()} ${q.inches} in @ ${$(q.work_unit_after_cents)}${q.discount_pct ? ` (${q.discount_pct}% off for quantity)` : ""}`, q.blank_unit_cents ? `${q.qty} × ${q.product.name} @ ${$(q.blank_unit_cents)}` : "", q.handling_unit_cents ? `${q.qty} × customer-supplied item handling @ ${$(q.handling_unit_cents)}` : "", `Setup ${$(q.setup_cents)}`, q.rush_cents ? `Rush ${$(q.rush_cents)}` : "", q.minimum_top_up_cents ? `Shop minimum ${$(q.minimum_top_up_cents)}` : "", tax ? `Sales tax ${$(tax)}` : "", `Total ${$(total)}`].filter(Boolean).join("\n");
+  if (env.RESEND_API_KEY) {
+    await sendEmail(env, { to: env.SUPPORT_EMAIL, replyTo: email, subject: `${linkOk ? "Order" : "Order (needs payment link)"} ${ref}: ${who}, ${$(total)}`, text:
+`New order ${ref} from hdlaser.net${takenBy ? " (taken at the counter by " + takenBy + ")" : ""}
+
+Customer: ${[name, c.business, email, c.phone].filter(Boolean).join(" · ")}
+${q.summary}
+${neededBy ? "Needed by: " + neededBy + "\n" : ""}${notes ? "Notes: " + notes + "\n" : ""}
+${breakdown}
+
+Logo: ${logo ? "attached to the order in the dashboard (" + logo.name + ")" : "not uploaded, ask for it"}
+Sizing confirmation: initialed "${initials}" at ${now} from ${ip || "unknown IP"}.
+"${text}"
+
+${linkOk ? "They were sent to Square to pay." : "Square did not return a payment link. Send them a Square invoice for " + $(total) + "."}
+Dashboard: ${env.WORKER_URL || ""}/admin` });
+    const first = name.split(" ")[0] || "there";
+    await sendEmail(env, { to: email, subject: `We've got your order ${ref}`, text:
+`Hi ${first},
+
+Thanks for your order. Here's what we have on file:
+
+${q.summary}
+${breakdown}
+${neededBy ? "\nNeeded by " + neededBy + "." : ""}
+${logo ? "Your logo file came through with the order." : "Send your logo or artwork to " + env.SUPPORT_EMAIL + " or text it to (858) 373-9866 (vector AI/EPS/SVG/PDF is best; a clean PNG works)."}
+${linkOk ? "If you completed payment, you're all set." : "Payment didn't go through online, so we'll email you a secure payment link shortly."}
+
+What happens next:
+1. Digital proof by email within 1-2 business days.
+2. You approve it. Unlimited revisions until it's right.
+3. We make it and text you when it's ready for pickup in Pacific Beach.
+
+Your sizing confirmation (initialed ${initials}):
+"${text}"
+
+HD Laser Studio
+759 Turquoise St, Pacific Beach
+(858) 373-9866 · hdlaser.net` });
+  }
+  await sendAlert(env, `Order ${ref}: ${who}, ${q.summary}, ${$(total)}. ${linkOk ? "Paying through Square." : "NEEDS A PAYMENT LINK."}`);
+  if (!linkOk) return json({ ok: true, url: null, ref, total: total / 100, error: env.SQUARE_ACCESS_TOKEN ? squareErr(data) || "Square did not return a checkout link" : "Online payment is not set up" }, 200, cors);
+  return json({ ok: true, url: data.payment_link.url, ref, total: total / 100 }, 200, cors);
+}
+
+// ---- pricing review: rules that look at the book, the costs and what customers actually do, and write suggestions
+function targetKey(t) { return JSON.stringify(t); }
+function describeTarget(book, t) {
+  if (t.type === "size") return `${(book.services.find((s) => s.key === t.service) || {}).name}, ${t.inches} in`;
+  if (t.type === "product") return `${(book.products.find((p) => p.key === t.key) || {}).name} (item price)`;
+  if (t.type === "ladder") return `Every ${(book.services.find((s) => s.key === t.service) || {}).name.toLowerCase()} size`;
+  return t.type;
+}
+function readTarget(book, t) {
+  if (t.type === "size") { const s = book.sizes.find((x) => x.inches === t.inches); return s ? s[t.service + "_cents"] : null; }
+  if (t.type === "product") { const p = book.products.find((x) => x.key === t.key); return p ? p[t.field || "blank_cents"] : null; }
+  if (t.type === "ladder") { const s = book.sizes.find((x) => x.inches === 2) || book.sizes[0]; return s ? s[t.service + "_cents"] : null; }
+  return null;
+}
+function applyTarget(book, t, cents) {
+  if (t.type === "size") { const s = book.sizes.find((x) => x.inches === t.inches); if (s) s[t.service + "_cents"] = r25(cents); }
+  else if (t.type === "product") { const p = book.products.find((x) => x.key === t.key); if (p) p[t.field || "blank_cents"] = r25(cents); }
+  else if (t.type === "ladder") { const f = 1 + (t.pct || 0) / 100; for (const s of book.sizes) s[t.service + "_cents"] = r25(s[t.service + "_cents"] * f); }
+  return book;
+}
+async function analyzePricing(env) {
+  if (!env.DB) return { ok: false, error: "No database" };
+  const book = await priceBook(env);
+  const settings = await finSettings(env);
+  const now = new Date(), nowIso = now.toISOString();
+  const since90 = new Date(now - 90 * 86400000).toISOString();
+  const $ = (c) => "$" + (c / 100).toFixed(2);
+  const found = [];
+  // 1. The size ladder must keep climbing by a little more each step.
+  for (const svc of book.services) {
+    const k = svc.key + "_cents"; const p = book.sizes.map((s) => s[k]);
+    for (let i = 2; i < p.length; i++) {
+      const gap = p[i] - p[i - 1], prev = p[i - 1] - p[i - 2];
+      if (gap < prev) { const proposed = p[i - 1] + prev; p[i] = proposed;
+        found.push({ rule: "ladder_shape", target: { type: "size", service: svc.key, inches: book.sizes[i].inches }, current: book.sizes[i][k], proposed,
+          reason: `Bigger artwork should cost a little more per half inch than the step before it. That keeps every "next size up" feeling like a small jump while the large sizes carry the margin. Right now ${book.sizes[i].inches} in ${svc.name.toLowerCase()} is only ${$(gap)} more than ${book.sizes[i - 1].inches} in, but the step below it is ${$(prev)}. Setting it to ${$(proposed)} restores the progression.`,
+          evidence: { gap_cents: gap, previous_gap_cents: prev } }); }
+    }
+  }
+  // 2. Every product should clear the target margin at the size people typically pick.
+  const labor = settings.unit.labor_rate_hour || 2200;
+  for (const p of book.products) {
+    if (!p.cost_cents) continue;
+    const m = book.materials.find((x) => x.key === p.material); if (!m) continue;
+    const svc = book.services.find((s) => m.services.includes(s.key)); if (!svc) continue;
+    const typ = Math.min(p.max_inches, 2.5);
+    const size = book.sizes.find((s) => s.inches === typ); if (!size) continue;
+    const price = r25(size[svc.key + "_cents"] * m.factor) + p.blank_cents;
+    const minutes = svc.min_per_piece + svc.per_inch * typ;
+    const cost = p.cost_cents + Math.round(labor * minutes / 60) + svc.consumable_cents;
+    const margin = (price - cost) / price;
+    if (margin < TARGET_MARGIN - 0.02) {
+      const needed = Math.ceil(cost / (1 - TARGET_MARGIN)); const proposed = r25(p.blank_cents + (needed - price));
+      found.push({ rule: "margin_floor", target: { type: "product", key: p.key, field: "blank_cents" }, current: p.blank_cents, proposed,
+        reason: `A ${p.name.toLowerCase()} with ${typ} in of ${svc.name.toLowerCase()} sells for ${$(price)}. It costs about ${$(cost)} to make: the blank ${$(p.cost_cents)}, ${minutes} minutes of labor at ${$(labor)}/hour, and consumables. That is a ${Math.round(margin * 100)}% margin; the shop needs ${Math.round(TARGET_MARGIN * 100)}% on every piece so rent, payroll and marketing are covered before profit. Raising the item price from ${$(p.blank_cents)} to ${$(proposed)} gets there without touching the engraving price.`,
+        evidence: { price_cents: price, cost_cents: cost, margin_pct: Math.round(margin * 100), labor_minutes: minutes } });
+    }
+  }
+  // 3. What customers do on the order page: sizes and items that get looked at a lot but rarely bought, or bought far more than average.
+  const views = (await env.DB.prepare(`SELECT session, detail FROM events WHERE name = 'spec_view' AND ts >= ?`).bind(since90).all()).results;
+  const bySize = {}, byProduct = {}; const seen = new Set();
+  for (const v of views) { let d; try { d = JSON.parse(v.detail || "{}"); } catch { continue; } const sid = v.session || Math.random();
+    const ks = `${d.service}|${d.inches}`, kp = String(d.product);
+    if (!seen.has(sid + ks)) { seen.add(sid + ks); bySize[ks] = (bySize[ks] || 0) + 1; }
+    if (!seen.has(sid + "p" + kp)) { seen.add(sid + "p" + kp); byProduct[kp] = (byProduct[kp] || 0) + 1; } }
+  const sold = (await env.DB.prepare(`SELECT i.service, i.inches, i.product, COUNT(*) n FROM order_items i JOIN orders o ON o.ref = i.ref WHERE o.status IN ('paid','refunded') AND o.created_at >= ? GROUP BY i.service, i.inches, i.product`).bind(since90).all()).results;
+  const totalViews = Object.values(bySize).reduce((a, b) => a + b, 0), totalSold = sold.reduce((a, r) => a + r.n, 0);
+  const overall = totalViews ? totalSold / totalViews : 0;
+  if (totalViews >= 100 && totalSold >= 10) {
+    for (const [ks, v] of Object.entries(bySize)) { if (v < 25) continue; const [service, inchesS] = ks.split("|"); const inches = +inchesS; const size = book.sizes.find((s) => s.inches === inches); const svc = book.services.find((s) => s.key === service); if (!size || !svc) continue;
+      const n = sold.filter((r) => r.service === service && r.inches === inches).reduce((a, r) => a + r.n, 0); const conv = n / v; const cur = size[service + "_cents"];
+      if (n >= 5 && conv >= overall * 1.6) found.push({ rule: "demand_high", target: { type: "size", service, inches }, current: cur, proposed: r25(cur * 1.06), reason: `${inches} in ${svc.name.toLowerCase()} converts far better than the rest of the page: ${n} orders from ${v} people who priced it (${Math.round(conv * 100)}%), against ${Math.round(overall * 100)}% overall in the last 90 days. Customers are telling you this size is worth more than you charge. A 6% increase, ${$(cur)} to ${$(r25(cur * 1.06))}, adds margin where demand is strongest.`, evidence: { views: v, orders: n, conversion_pct: Math.round(conv * 100), overall_pct: Math.round(overall * 100) } });
+      else if (conv <= overall * 0.4) found.push({ rule: "demand_low", target: { type: "size", service, inches }, current: cur, proposed: r25(cur * 0.93), reason: `${inches} in ${svc.name.toLowerCase()} is looked at often but rarely bought: ${n} orders from ${v} people who priced it (${Math.round(conv * 100)}%), against ${Math.round(overall * 100)}% overall in the last 90 days. The price is where people stall. Trimming it 7%, ${$(cur)} to ${$(r25(cur * 0.93))}, should turn more of that interest into orders; if it doesn't within a month, the size itself is the issue, not the price.`, evidence: { views: v, orders: n, conversion_pct: Math.round(conv * 100), overall_pct: Math.round(overall * 100) } }); }
+    for (const [kp, v] of Object.entries(byProduct)) { if (v < 40) continue; const p = book.products.find((x) => x.key === kp); if (!p || !p.blank_cents) continue;
+      const n = sold.filter((r) => r.product === kp).reduce((a, r) => a + r.n, 0); const conv = n / v;
+      if (conv <= overall * 0.4) found.push({ rule: "demand_low", target: { type: "product", key: kp, field: "blank_cents" }, current: p.blank_cents, proposed: r25(p.blank_cents * 0.9), reason: `${p.name} gets priced by many people (${v} in 90 days) but only ${n} bought it (${Math.round(conv * 100)}% against ${Math.round(overall * 100)}% for the page). The item price is the likeliest reason. A 10% cut on the item, ${$(p.blank_cents)} to ${$(r25(p.blank_cents * 0.9))}, keeps the engraving price intact and tests whether volume follows.`, evidence: { views: v, orders: n, conversion_pct: Math.round(conv * 100), overall_pct: Math.round(overall * 100) } }); }
+  }
+  // 4. Cost of goods drifting up against sales: pass it through before it eats the margin.
+  const cogsKeys = CATEGORIES.filter((c) => c.group === "cogs").map((c) => `'${c.key}'`).join(",");
+  const m3 = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 3, 1)).toISOString().slice(0, 10), m15 = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 15, 1)).toISOString().slice(0, 10), m0 = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10);
+  const cogsFor = async (a, b) => { const c = await env.DB.prepare(`SELECT COALESCE(SUM(ABS(amount_cents)),0) c FROM bank_txns WHERE category IN (${cogsKeys}) AND posted_at >= ? AND posted_at < ?`).bind(a, b).first(); const s = await env.DB.prepare(`SELECT COALESCE(SUM(amount_cents - fee_cents - refunded_cents),0) s FROM payments WHERE status = 'COMPLETED' AND created_at >= ? AND created_at < ?`).bind(a, b).first(); return { cogs: c.c, sales: s.s }; };
+  const recent = await cogsFor(m3, m0), prior = await cogsFor(m15, m3);
+  if (recent.sales > 500000 && prior.sales > 500000 && recent.cogs && prior.cogs) {
+    const rp = recent.cogs / recent.sales, pp = prior.cogs / prior.sales; const drift = (rp - pp) * 100;
+    if (drift >= 4) { const pct = Math.min(15, Math.round(drift)); for (const svc of book.services) found.push({ rule: "cogs_drift", target: { type: "ladder", service: svc.key, pct }, current: readTarget(book, { type: "ladder", service: svc.key }), proposed: r25(readTarget(book, { type: "ladder", service: svc.key }) * (1 + pct / 100)),
+      reason: `Materials and consumables took ${Math.round(rp * 100)}% of sales over the last three months, up from ${Math.round(pp * 100)}% over the twelve months before. That ${Math.round(drift)}-point rise comes straight out of profit unless prices move with it. Raising every ${svc.name.toLowerCase()} size by ${pct}% passes the cost through; the 2 in price would go from ${$(readTarget(book, { type: "ladder", service: svc.key }))} to ${$(r25(readTarget(book, { type: "ladder", service: svc.key }) * (1 + pct / 100)))}.`, evidence: { recent_cogs_pct: Math.round(rp * 100), prior_cogs_pct: Math.round(pp * 100), recent_sales_cents: recent.sales } }); }
+  }
+  // write the new ones; leave alone anything already pending, denied in the last 60 days or approved in the last 30
+  const existing = (await env.DB.prepare(`SELECT target, status, decided_at FROM price_suggestions WHERE status = 'pending' OR decided_at >= ?`).bind(new Date(now - 60 * 86400000).toISOString()).all()).results;
+  let created = 0;
+  for (const f of found) {
+    if (f.proposed === f.current || f.proposed == null) continue;
+    const key = targetKey(f.target);
+    const dup = existing.find((e) => e.target === key && (e.status === "pending" || e.status === "denied" || (e.status === "approved" && e.decided_at >= new Date(now - 30 * 86400000).toISOString())));
+    if (dup) continue;
+    await env.DB.prepare(`INSERT INTO price_suggestions (created_at, status, rule, target, current_cents, proposed_cents, reason, evidence) VALUES (?,?,?,?,?,?,?,?)`).bind(nowIso, "pending", f.rule, key, f.current, f.proposed, f.reason, JSON.stringify(f.evidence || {})).run();
+    existing.push({ target: key, status: "pending" }); created++;
+  }
+  await env.DB.prepare(`INSERT OR REPLACE INTO meta (k, v) VALUES ('last_price_review', ?)`).bind(nowIso).run();
+  return { ok: true, checked: found.length, created, views: totalViews, sold: totalSold };
+}
+async function pricingAdmin(env) {
+  const book = await priceBook(env);
+  const pending = (await env.DB.prepare(`SELECT * FROM price_suggestions WHERE status = 'pending' ORDER BY created_at DESC`).all()).results.map((s) => ({ ...s, target: JSON.parse(s.target), evidence: JSON.parse(s.evidence || "{}"), label: describeTarget(book, JSON.parse(s.target)) }));
+  const decided = (await env.DB.prepare(`SELECT * FROM price_suggestions WHERE status != 'pending' ORDER BY decided_at DESC LIMIT 20`).all()).results.map((s) => ({ ...s, target: JSON.parse(s.target), label: describeTarget(book, JSON.parse(s.target)) }));
+  const history = (await env.DB.prepare(`SELECT * FROM price_history ORDER BY ts DESC LIMIT 30`).all()).results.map((h) => ({ ...h, target: JSON.parse(h.target), label: describeTarget(book, JSON.parse(h.target)) }));
+  const last = await env.DB.prepare(`SELECT v FROM meta WHERE k = 'last_price_review'`).first();
+  const sold = (await env.DB.prepare(`SELECT i.service, i.inches, COUNT(*) n FROM order_items i JOIN orders o ON o.ref = i.ref WHERE o.status IN ('paid','refunded') GROUP BY i.service, i.inches`).all()).results;
+  return { book, pending, decided, history, last_review: last ? last.v : null, sold, target_margin: TARGET_MARGIN };
+}
+async function decideSuggestion(env, id, body) {
+  const s = await env.DB.prepare(`SELECT * FROM price_suggestions WHERE id = ?`).bind(id).first();
+  if (!s) return { ok: false, error: "Not found" };
+  if (s.status !== "pending") return { ok: false, error: "Already " + s.status };
+  const decision = body.decision === "approve" ? "approved" : body.decision === "deny" ? "denied" : null;
+  if (!decision) return { ok: false, error: "decision must be approve or deny" };
+  const now = new Date().toISOString(); const note = String(body.note || "").slice(0, 500);
+  if (decision === "approved") {
+    const book = await priceBook(env); const t = JSON.parse(s.target); const from = readTarget(book, t);
+    applyTarget(book, t, t.type === "ladder" ? 0 : s.proposed_cents); await saveBook(env, book);
+    await env.DB.prepare(`INSERT INTO price_history (ts, target, from_cents, to_cents, source, suggestion_id, note) VALUES (?,?,?,?,?,?,?)`).bind(now, s.target, from, readTarget(book, t), "suggestion", id, note).run();
+  }
+  await env.DB.prepare(`UPDATE price_suggestions SET status = ?, decided_at = ?, note = ? WHERE id = ?`).bind(decision, now, note, id).run();
+  return { ok: true, status: decision };
+}
+async function editBook(env, body) {
+  const book = await priceBook(env); const t = body.target || {}; const cents = Math.round(+body.cents);
+  if (!(cents >= 0) || readTarget(book, t) == null) return { ok: false, error: "Bad target or amount" };
+  const from = readTarget(book, t); applyTarget(book, t, cents); await saveBook(env, book);
+  await env.DB.prepare(`INSERT INTO price_history (ts, target, from_cents, to_cents, source, suggestion_id, note) VALUES (?,?,?,?,?,?,?)`).bind(new Date().toISOString(), JSON.stringify(t), from, readTarget(book, t), "manual", null, String(body.note || "").slice(0, 200)).run();
+  return { ok: true, book };
+}
+async function assetResponse(env, id) {
+  const a = await env.DB.prepare(`SELECT * FROM order_assets WHERE id = ?`).bind(id).first();
+  if (!a) return json({ error: "Not found" }, 404);
+  const comma = a.data.indexOf(","); const bin = Uint8Array.from(atob(a.data.slice(comma + 1)), (c) => c.charCodeAt(0));
+  return new Response(bin, { headers: { "Content-Type": a.type, "Content-Disposition": `inline; filename="${a.ref}-${a.name.replace(/[^\w.-]/g, "_")}"`, "Cache-Control": "private, max-age=3600" } });
 }

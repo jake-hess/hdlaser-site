@@ -144,7 +144,7 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
 </section>
 </main>
 
-<script src="/assets/site-config.js?v=3"></script>
+<script src="/assets/site-config.js?v=4"></script>
 <script>
 (function(){
   var BASE=(window.HD_CONFIG&&HD_CONFIG.WORKER_BASE)||'';
@@ -214,7 +214,9 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
     $('#team').innerHTML=t.team.length?'<table><tr><th>Person</th><th class="num">Rate</th><th class="num">Hrs</th><th class="num">Shifts</th><th class="num">On time</th><th class="num">Checklist</th><th class="num">Jobs</th><th class="num">Value</th></tr>'+t.team.map(function(p){ return '<tr data-id="'+p.id+'" data-name="'+esc(p.name)+'" data-role="'+p.role+'" data-phone="'+esc(p.phone)+'" data-oncall="'+(p.on_call?1:0)+'" data-rate="'+(p.hourly_rate_cents||0)+'" data-comm="'+(p.commission_pct||0)+'" style="cursor:pointer"><td><b>'+esc(p.name)+'</b><div class="small">'+p.role+(p.on_call?' · on call':'')+(p.active?'':' · inactive')+'</div></td><td class="num">'+(p.hourly_rate_cents?'$'+(p.hourly_rate_cents/100).toFixed(2):'–')+'</td><td class="num">'+p.hours+'</td><td class="num">'+p.shifts+'</td><td class="num">'+(p.opens?p.on_time_opens+'/'+p.opens:'–')+'</td><td class="num">'+(p.checklist_pct==null?'–':p.checklist_pct+'%')+'</td><td class="num">'+p.jobs_done+'</td><td class="num">'+money(p.jobs_done_amount_cents)+'</td></tr>'; }).join('')+'<tr><td><b>Everyone</b></td><td></td><td class="num">'+a.hours+'</td><td class="num">'+a.shifts+'</td><td class="num">'+(a.opens?a.on_time_opens+'/'+a.opens:'–')+'</td><td></td><td class="num">'+a.jobs_done+'</td><td class="num">'+money(a.jobs_done_amount_cents)+'</td></tr></table>':'<p class="note">No one on the team yet.</p>';
     $('#log').innerHTML=t.log.length?'<table>'+t.log.slice(0,30).map(function(l){ return '<tr><td class="small">'+dt(l.ts)+' '+tm(l.ts)+'</td><td>'+esc(l.name||'')+'</td><td class="small">'+esc(l.action.replace(/_/g,' '))+' '+esc(l.detail||'')+'</td></tr>'; }).join('')+'</table>':'<p class="note">Nothing yet.</p>'; }).catch(function(){}); }
 
-  load();
+  function openHash(){ var h=(location.hash||'').replace('#',''); var b=h&&document.querySelector('#tabs button[data-tab="'+h+'"]'); if(b) b.click(); }
+  window.addEventListener('hashchange',openHash);
+  load(); openHash();
   setInterval(function(){ if(token&&!document.hidden) load(); },120000);
 })();
 </script>
