@@ -136,6 +136,7 @@ export default {
         if (path === "/api/pricing") return json(await pricingAdmin(env), 200, { "Cache-Control": "no-store" });
         if (path === "/api/pricing/analyze" && request.method === "POST") return json(await analyzePricing(env), 200);
         if (path === "/api/pricing/book" && request.method === "POST") { const r = await editBook(env, await request.json()); return json(r, r.ok ? 200 : 400); }
+        if (path === "/api/pricing/reload" && request.method === "POST") return json(await reloadBook(env), 200);
         const ps = path.match(/^\/api\/pricing\/suggestions\/(\d+)$/);
         if (ps && request.method === "POST") { const r = await decideSuggestion(env, +ps[1], await request.json()); return json(r, r.ok ? 200 : 400); }
         const am = path.match(/^\/api\/assets\/(\d+)$/);
@@ -1868,7 +1869,7 @@ svg text{font-size:11px;fill:var(--muted)}
 
 <h2>Price list <span class="small">what the order page charges; edit a number and press Enter to change it</span></h2>
 <div class="grid" id="pricelist"></div>
-<div class="card" style="margin-top:14px"><h3>Pricing review</h3><p class="small" id="reviewmeta"></p><p><button class="act dark" id="runreview">Run the pricing review now</button> <span class="small" id="reviewmsg"></span></p><p class="small">It runs by itself every Monday and looks at four things: the size ladder keeps climbing by a little more each half inch; every item clears the target margin after the blank, labor and consumables; sizes and items that get priced often but rarely bought (or bought far more than average); and materials taking a bigger share of sales than they used to. Suggestions land in the red box at the top. Decided ones are listed below.</p><div id="decided"></div></div>
+<div class="card" style="margin-top:14px"><h3>Pricing review</h3><p class="small" id="reviewmeta"></p><p><button class="act dark" id="runreview">Run the pricing review now</button> <button class="act" id="reloadbook">Load the price list from the code</button> <span class="small" id="reviewmsg"></span></p><p class="small">It runs by itself every Monday and looks at four things: the size ladder keeps climbing by a little more each half inch; every item clears the target margin after the blank, labor and consumables; sizes and items that get priced often but rarely bought (or bought far more than average); and materials taking a bigger share of sales than they used to. Suggestions land in the red box at the top. Decided ones are listed below.</p><div id="decided"></div></div>
 
 <h2>Unit economics, logo cups</h2>
 <div class="grid">
@@ -1951,6 +1952,7 @@ async function loadPricing(){ const r=await fetch('/api/pricing'); if(!r.ok) ret
   $('#decided').innerHTML=(P.decided.length?'<table>'+P.decided.map(d=>'<tr><td class="small">'+new Date(d.decided_at).toLocaleDateString()+'</td><td>'+esc(d.label)+'</td><td class="num">'+cents(d.current_cents)+' \u2192 '+cents(d.proposed_cents)+'</td><td><span class="pill '+(d.status==='approved'?'good':'over')+'">'+d.status+'</span></td><td class="small">'+esc(d.note||'')+'</td></tr>').join('')+'</table>':'<p class="small">No decisions yet.</p>')
     +(P.history.length?'<p class="small" style="margin-top:10px"><b>Every price change</b></p><table>'+P.history.map(h=>'<tr><td class="small">'+new Date(h.ts).toLocaleDateString()+'</td><td>'+esc(h.label)+'</td><td class="num">'+cents(h.from_cents)+' \u2192 '+cents(h.to_cents)+'</td><td class="small">'+esc(h.source)+(h.note?' \u00b7 '+esc(h.note):'')+'</td></tr>').join('')+'</table>':''); }
 document.addEventListener('click',async e=>{ const b=e.target.closest('button[data-dec]'); if(b){ const id=b.closest('.sug').dataset.id; const dec=b.dataset.dec; const note=dec==='deny'?(prompt('Why not? (optional, kept with the record)')||''):''; b.disabled=true; const r=await (await fetch('/api/pricing/suggestions/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision:dec,note})})).json(); if(!r.ok) alert(r.error||'Failed'); loadPricing(); return; }
+  if(e.target.id==='reloadbook'){ if(!confirm('Replace every price with the list in the worker code? Prices you changed by hand here will be overwritten. Each change is logged.')) return; e.target.disabled=true; const r=await (await fetch('/api/pricing/reload',{method:'POST'})).json(); e.target.disabled=false; $('#reviewmsg').textContent=r.ok?('Loaded. '+r.changed+' price'+(r.changed===1?'':'s')+' changed.'):(r.error||'Failed'); loadPricing(); return; }
   if(e.target.id==='runreview'||e.target.id==='rr2'){ e.target.disabled=true; const r=await (await fetch('/api/pricing/analyze',{method:'POST'})).json(); e.target.disabled=false; $('#reviewmsg').textContent=r.ok?('Checked '+r.checked+' thing'+(r.checked===1?'':'s')+', '+r.created+' new suggestion'+(r.created===1?'':'s')+'.'):(r.error||'Failed'); loadPricing(); } });
 document.addEventListener('keydown',async e=>{ const i=e.target.closest('#pricelist input[data-t]'); if(!i||e.key!=='Enter') return; const c=Math.round(parseFloat(i.value)*100); if(!(c>=0)) return; i.disabled=true; const r=await (await fetch('/api/pricing/book',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:JSON.parse(i.dataset.t),cents:c,note:'edited on the money page'})})).json(); if(!r.ok) alert(r.error||'Failed'); loadPricing(); });
 $('#w-save').onclick=async()=>{ const body={cash_balance_cents:Math.round((+$('#w-cash').value||0)*100),cash_as_of:new Date().toISOString().slice(0,10),reserve_months:+$('#w-reserve').value||1,monthly_fixed_costs_cents:Math.round((+$('#w-fixed').value||0)*100)}; await fetch('/api/money/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); load(); };
@@ -2525,6 +2527,14 @@ async function editBook(env, body) {
   const from = readTarget(book, t); applyTarget(book, t, cents); await saveBook(env, book);
   await env.DB.prepare(`INSERT INTO price_history (ts, target, from_cents, to_cents, source, suggestion_id, note) VALUES (?,?,?,?,?,?,?)`).bind(new Date().toISOString(), JSON.stringify(t), from, readTarget(book, t), "manual", null, String(body.note || "").slice(0, 200)).run();
   return { ok: true, book };
+}
+// Replace the saved price book with the one in the code (used after the defaults are updated from Hugh's spreadsheet).
+async function reloadBook(env) {
+  const before = await priceBook(env); const book = JSON.parse(JSON.stringify(DEFAULT_BOOK)); await saveBook(env, book);
+  let changed = 0; const now = new Date().toISOString();
+  for (const s of book.sizes) for (const svc of ["engrave", "uv"]) { const t = { type: "size", service: svc, inches: s.inches }; const from = readTarget(before, t), to = readTarget(book, t); if (from !== to) { changed++; await env.DB.prepare(`INSERT INTO price_history (ts, target, from_cents, to_cents, source, suggestion_id, note) VALUES (?,?,?,?,?,?,?)`).bind(now, JSON.stringify(t), from, to, "reload", null, "loaded from the code").run(); } }
+  for (const p of book.products) for (const field of ["blank_cents", "cost_cents"]) { const t = { type: "product", key: p.key, field }; const from = readTarget(before, t), to = readTarget(book, t); if (from !== to) { changed++; await env.DB.prepare(`INSERT INTO price_history (ts, target, from_cents, to_cents, source, suggestion_id, note) VALUES (?,?,?,?,?,?,?)`).bind(now, JSON.stringify(t), from, to, "reload", null, "loaded from the code").run(); } }
+  return { ok: true, changed, version: book.version };
 }
 async function assetResponse(env, id) {
   const a = await env.DB.prepare(`SELECT * FROM order_assets WHERE id = ?`).bind(id).first();
