@@ -125,7 +125,9 @@ Plaid setup, once: dashboard.plaid.com → sign up as HD Laser Studio INC → Te
 
 
 
-## Boards n' Beans coffee counter
+## Boards n' Beans coffee counter (not in use)
+
+Not shown on the dashboard and not linked from the site. The page and routes are still in the code in case it comes back; delete the `coffee` folder and the coffee section of the worker to remove it fully.
 
 `hdlaser.net/coffee/` sells Boards n' Beans drinks for pickup. The menu and prices live in the `COFFEE` constant at the top of the coffee section in `src/index.js` (the page fetches `/coffee/menu`, so editing the worker updates the site).
 

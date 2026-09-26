@@ -3,6 +3,7 @@ Allow: /
 Disallow: /thanks/
 Disallow: /staff/
 Disallow: /hub/
+Disallow: /coffee/
 Disallow: /marisa/
 Disallow: /partnership/
 
